@@ -341,24 +341,6 @@ class VendorBillPaymentForm(FlaskForm):
                           validators=[DataRequired(), NumberRange(min=0.01)])
     submit = SubmitField('Record Payment')
 
-class ReferralCampaignForm(FlaskForm):
-    name = StringField('Campaign Name', validators=[DataRequired(), Length(max=120)])
-    code = StringField('Code', validators=[Optional(), Length(max=40)])
-    description = TextAreaField('Description', validators=[Optional()])
-    reward_type = SelectField('Reward Type', choices=[
-        ('fixed', 'Fixed Amount (\u20b9)'),
-        ('percent', 'Percentage (%)'),
-        ('days', 'Free Days'),
-    ], default='fixed')
-    referrer_reward = DecimalField('Reward to Referrer', default=0,
-                                   validators=[Optional(), NumberRange(min=0)])
-    referee_reward = DecimalField('Reward to New Customer', default=0,
-                                  validators=[Optional(), NumberRange(min=0)])
-    start_date = DateField('Start Date', default=date.today, validators=[Optional()])
-    end_date = DateField('End Date', validators=[Optional()])
-    is_active = BooleanField('Active', default=True)
-    submit = SubmitField('Save Campaign')
-
 class StockForm(FlaskForm):
     product_id = SelectField('Product', coerce=int, validators=[DataRequired()])
     quantity = IntegerField('Quantity', validators=[DataRequired(), NumberRange(min=0)])
@@ -406,12 +388,8 @@ class PlanDatesForm(FlaskForm):
     ], default='active')
     submit = SubmitField('Update Dates')
 
-# =========================================================== #
-#  NEW FORMS FOR CUSTOMER PORTAL & MESSAGE TEMPLATES          #
-# =========================================================== #
-
+# ---------- Message Template Forms ----------
 class MessageTemplateForm(FlaskForm):
-    """Form for creating/editing WhatsApp/SMS templates."""
     name = StringField('Template Name', validators=[DataRequired(), Length(max=100)])
     template_type = SelectField('Template Type', choices=[
         ('renewal', 'Plan Renewed'),
@@ -426,7 +404,6 @@ class MessageTemplateForm(FlaskForm):
     submit = SubmitField('Save Template')
 
 class BulkMessageForm(FlaskForm):
-    """Form for sending bulk expiry messages to customers within a date range."""
     template_id = SelectField('Select Template', coerce=int, validators=[DataRequired()])
     start_date = DateField('Start Date', validators=[DataRequired()])
     end_date = DateField('End Date', validators=[DataRequired()])

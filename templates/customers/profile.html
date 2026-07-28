@@ -1,0 +1,57 @@
+{% extends "customer/base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6 col-lg-5">
+    <div class="card shadow-sm border-0">
+      <div class="card-body p-4">
+        <h4 class="card-title text-center text-primary fw-bold mb-4">
+          <i class="fas fa-user-cog me-2"></i> My Profile
+        </h4>
+
+        <div class="mb-4">
+          <div class="row g-2">
+            <div class="col-6 text-muted small">Full Name</div>
+            <div class="col-6 text-end fw-bold">{{ customer.full_name }}</div>
+            <div class="col-6 text-muted small">Username</div>
+            <div class="col-6 text-end fw-bold">{{ customer.username }}</div>
+            <div class="col-6 text-muted small">Mobile</div>
+            <div class="col-6 text-end fw-bold">{{ customer.mobile }}</div>
+            <div class="col-6 text-muted small">Email</div>
+            <div class="col-6 text-end fw-bold">{{ customer.email or '-' }}</div>
+          </div>
+        </div>
+
+        <hr>
+
+        <h5 class="fw-bold text-secondary mb-3"><i class="fas fa-key me-2"></i>Change Password</h5>
+
+        <form method="POST" action="{{ url_for('customer_profile') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          
+          <div class="mb-3">
+            <label for="new_password" class="form-label fw-bold">New Password</label>
+            <input type="password" class="form-control" id="new_password" name="new_password" required minlength="6" placeholder="Enter new password">
+            <div class="form-text">Minimum 6 characters.</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="confirm_password" class="form-label fw-bold">Confirm New Password</label>
+            <input type="password" class="form-control" id="confirm_password" name="confirm_password" required placeholder="Confirm new password">
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="fas fa-save me-2"></i> Update Password
+          </button>
+        </form>
+
+        <div class="text-center mt-3">
+          <a href="{{ url_for('customer_dashboard') }}" class="btn btn-link btn-sm text-decoration-none">
+            <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

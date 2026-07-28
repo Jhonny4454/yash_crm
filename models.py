@@ -16,7 +16,6 @@ class User(UserMixin, db.Model):
     role = db.Column(db.Enum('admin','support','field','accounts'), default='support')
     is_active = db.Column(db.Boolean, default=True)
     staff_type_id = db.Column(db.Integer, db.ForeignKey('staff_types.id'))
-    # NEW: monthly salary for this staff member
     monthly_salary = db.Column(db.Numeric(10,2), default=0.00)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     staff_type = db.relationship('StaffType', backref='users')
@@ -78,7 +77,6 @@ class Customer(db.Model):
 
     plans = db.relationship('CustomerPlan', backref='customer', lazy=True)
     invoices = db.relationship('Invoice', backref='customer', lazy=True)
-    wallet = db.relationship('Wallet', uselist=False, back_populates='customer')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -90,7 +88,7 @@ class Customer(db.Model):
     def full_name(self):
         return f"{self.title} {self.first_name} {self.last_name}".strip()
 
-# ===== ADDED: Service Provider Master =====
+# ===== Service Provider Master =====
 class ServiceProvider(db.Model):
     __tablename__ = 'service_providers'
     id = db.Column(db.Integer, primary_key=True)
@@ -102,18 +100,13 @@ class ServiceProvider(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     plans = db.relationship('Plan', backref='service_provider', lazy=True)
-# ===========================================
 
 class Plan(db.Model):
     __tablename__ = 'plans'
     id = db.Column(db.Integer, primary_key=True)
-    
-    # <-- UPDATED: Removed old service_provider string, added 3 new fields below
     plan_code = db.Column(db.String(50))
     isp_amount = db.Column(db.Numeric(10,2), default=0.00)
     service_provider_id = db.Column(db.Integer, db.ForeignKey('service_providers.id'), nullable=True)
-    # --------------------------------
-
     plan_type = db.Column(db.String(50))
     name = db.Column(db.String(50), nullable=False)
     speed_mbps = db.Column(db.Integer, nullable=False)
@@ -145,25 +138,19 @@ class Invoice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
     customer_plan_id = db.Column(db.Integer, db.ForeignKey('customer_plans.id'), nullable=True)
-    
     invoice_no = db.Column(db.String(20), unique=True, nullable=False)
     issue_date = db.Column(db.Date, nullable=False, default=date.today)
     due_date = db.Column(db.Date, nullable=False)
     total_amount = db.Column(db.Numeric(10,2), nullable=False)
     tax_amount = db.Column(db.Numeric(10,2), default=0.00)
-    
     discount_percent = db.Column(db.Numeric(5,2), default=0.00)
     discount_amount = db.Column(db.Numeric(10,2), default=0.00)
     receipt_number = db.Column(db.String(50))
     remarks = db.Column(db.Text)
-
     status = db.Column(db.Enum('draft','sent','paid','overdue','cancelled'), default='draft')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
     caption = db.Column(db.String(120))
     invoice_type = db.Column(db.Enum('plan','addon','discount','other'), default='plan')
-
-    # NEW: Vendor (Service Provider) field – stores the selected vendor name from the addon invoice form
     vendor = db.Column(db.String(100), nullable=True)
 
     payments = db.relationship('Payment', backref='invoice', lazy=True)
@@ -215,12 +202,10 @@ class Payment(db.Model):
     status = db.Column(db.Enum('pending','approved','rejected'), default='approved')
     gateway_transaction_id = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
     book_receipt_no = db.Column(db.String(50))
     remarks = db.Column(db.Text)
     received_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     received_by_user = db.relationship('User', foreign_keys=[received_by_user_id])
-
     authorized_at = db.Column(db.DateTime)
     authorized_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     authorized_by_user = db.relationship('User', foreign_keys=[authorized_by_user_id])
@@ -263,13 +248,11 @@ class Vendor(db.Model):
     address = db.Column(db.Text)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
     products = db.relationship('Product', back_populates='vendor', lazy=True)
 
     @property
     def product_count(self):
         return len([p for p in self.products if p.is_active])
-
 
 class Product(db.Model):
     __tablename__ = 'products'
@@ -277,8 +260,6 @@ class Product(db.Model):
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
     unit_price = db.Column(db.Numeric(10,2), default=0.00)
-
-    # Purchase price from the vendor (used to build the vendor bill)
     cost_price = db.Column(db.Numeric(10,2), default=0.00)
     sku = db.Column(db.String(50))
     hsn_code = db.Column(db.String(20))
@@ -286,7 +267,6 @@ class Product(db.Model):
     vendor_id = db.Column(db.Integer, db.ForeignKey('vendors.id'), nullable=True, index=True)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
     vendor = db.relationship('Vendor', back_populates='products')
 
     @property
@@ -312,42 +292,29 @@ class InventoryAssignment(db.Model):
     serial_number = db.Column(db.String(100))
     assigned_date = db.Column(db.Date, default=date.today)
     status = db.Column(db.String(20), default='Active')
-    
     customer = db.relationship('Customer', backref='inventory_assignments')
     product = db.relationship('Product')
 
-# ===== Vendor purchase bills (created when vendor products are billed) =====
 class VendorBill(db.Model):
-    """A purchase bill raised against a Vendor for products supplied.
-
-    Created automatically when an addon invoice bills products belonging to a
-    vendor, and also creatable by hand from Inventory -> Vendor Bills.
-    """
     __tablename__ = 'vendor_bills'
     id = db.Column(db.Integer, primary_key=True)
     bill_no = db.Column(db.String(30), unique=True, nullable=False)
     vendor_id = db.Column(db.Integer, db.ForeignKey('vendors.id'), nullable=False, index=True)
-
-    # Set when this bill was generated from a customer invoice
     invoice_id = db.Column(db.Integer, db.ForeignKey('invoices.id'), nullable=True, index=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=True)
-
     bill_date = db.Column(db.Date, nullable=False, default=date.today)
     due_date = db.Column(db.Date)
     total_amount = db.Column(db.Numeric(10, 2), default=0.00, nullable=False)
     tax_amount = db.Column(db.Numeric(10, 2), default=0.00)
     paid_amount = db.Column(db.Numeric(10, 2), default=0.00)
-    status = db.Column(db.Enum('draft', 'pending', 'partial', 'paid', 'cancelled'),
-                       default='pending')
+    status = db.Column(db.Enum('draft', 'pending', 'partial', 'paid', 'cancelled'), default='pending')
     reference = db.Column(db.String(100))
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
     vendor = db.relationship('Vendor', backref=db.backref('bills', lazy=True))
     invoice = db.relationship('Invoice', backref=db.backref('vendor_bills', lazy=True))
     customer = db.relationship('Customer')
-    items = db.relationship('VendorBillItem', backref='bill', lazy=True,
-                            cascade='all, delete-orphan')
+    items = db.relationship('VendorBillItem', backref='bill', lazy=True, cascade='all, delete-orphan')
 
     @property
     def balance(self):
@@ -362,7 +329,6 @@ class VendorBill(db.Model):
             self.status = 'partial'
         return self.total_amount
 
-
 class VendorBillItem(db.Model):
     __tablename__ = 'vendor_bill_items'
     id = db.Column(db.Integer, primary_key=True)
@@ -373,7 +339,6 @@ class VendorBillItem(db.Model):
     quantity = db.Column(db.Integer, default=1, nullable=False)
     unit_cost = db.Column(db.Numeric(10, 2), default=0.00, nullable=False)
     tax_percent = db.Column(db.Numeric(5, 2), default=0.00)
-
     product = db.relationship('Product')
 
     @property
@@ -388,7 +353,6 @@ class VendorBillItem(db.Model):
     def line_total(self):
         return self.base_amount + self.tax_amount
 
-
 class ExpenseCategory(db.Model):
     __tablename__ = 'expense_categories'
     id = db.Column(db.Integer, primary_key=True)
@@ -399,18 +363,15 @@ class ExpenseAccount(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
 
-# ===== UPDATED: ExpensePayee with mobile, email, address =====
 class ExpensePayee(db.Model):
     __tablename__ = 'expense_payees'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    mobile = db.Column(db.String(20))          # NEW
-    email = db.Column(db.String(120))          # NEW
-    address = db.Column(db.Text)               # NEW
+    mobile = db.Column(db.String(20))
+    email = db.Column(db.String(120))
+    address = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-# ============================================================
 
-# ===== UPDATED: Expense with prepared_by, passed_by, status =====
 class Expense(db.Model):
     __tablename__ = 'expenses'
     id = db.Column(db.Integer, primary_key=True)
@@ -420,21 +381,16 @@ class Expense(db.Model):
     amount = db.Column(db.Numeric(10,2))
     expense_date = db.Column(db.Date)
     description = db.Column(db.Text)
-
-    # NEW fields
     prepared_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     passed_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     status = db.Column(db.Enum('draft','pending','approved','rejected'), default='pending')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # relationships
     category = db.relationship('ExpenseCategory')
     account = db.relationship('ExpenseAccount')
     payee = db.relationship('ExpensePayee')
     prepared_by = db.relationship('User', foreign_keys=[prepared_by_id])
     passed_by = db.relationship('User', foreign_keys=[passed_by_id])
-# ============================================================
 
 class Attendance(db.Model):
     __tablename__ = 'attendance'
@@ -483,7 +439,6 @@ class Company(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-# Many-to-many company-zones
 company_zones = db.Table('company_zones',
     db.Column('company_id', db.Integer, db.ForeignKey('company.id')),
     db.Column('zone_id', db.Integer, db.ForeignKey('zones.id'))
@@ -509,7 +464,6 @@ class Zone(db.Model):
     whatsapp_url = db.Column(db.String(255))
     whatsapp_attachment_url = db.Column(db.String(255))
     company = db.Column(db.String(100))
-
     companies = db.relationship('Company', secondary=company_zones, backref='zones')
 
 class Locality(db.Model):
@@ -544,37 +498,6 @@ class Address(db.Model):
     pincode = db.Column(db.String(10))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-class PaymentGatewayTransaction(db.Model):
-    __tablename__ = 'payment_gateway_transactions'
-    id = db.Column(db.Integer, primary_key=True)
-    invoice_id = db.Column(db.Integer, db.ForeignKey('invoices.id'), nullable=False)
-    gateway = db.Column(db.String(20), default='razorpay')
-    transaction_id = db.Column(db.String(100), unique=True, nullable=False)
-    amount = db.Column(db.Numeric(10,2), nullable=False)
-    status = db.Column(db.String(20), default='created')
-    payment_id = db.Column(db.String(100))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-class Wallet(db.Model):
-    __tablename__ = 'wallets'
-    id = db.Column(db.Integer, primary_key=True)
-    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), unique=True, nullable=False)
-    balance = db.Column(db.Numeric(10,2), default=0.00)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    customer = db.relationship('Customer', back_populates='wallet')
-    transactions = db.relationship('WalletTransaction', backref='wallet', lazy=True)
-
-class WalletTransaction(db.Model):
-    __tablename__ = 'wallet_transactions'
-    id = db.Column(db.Integer, primary_key=True)
-    wallet_id = db.Column(db.Integer, db.ForeignKey('wallets.id'), nullable=False)
-    amount = db.Column(db.Numeric(10,2), nullable=False)
-    transaction_type = db.Column(db.Enum('credit', 'debit'), nullable=False)
-    description = db.Column(db.String(255))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
 class ServiceRequest(db.Model):
     __tablename__ = 'service_requests'
     id = db.Column(db.Integer, primary_key=True)
@@ -585,16 +508,13 @@ class ServiceRequest(db.Model):
     status = db.Column(db.Enum('open', 'in_progress', 'resolved', 'closed'), default='open')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     resolved_at = db.Column(db.DateTime)
-    
     customer = db.relationship('Customer', backref='service_requests')
 
-# ===== NEW: Message Template for SMS/WhatsApp notifications =====
 class MessageTemplate(db.Model):
     __tablename__ = 'message_templates'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    template_type = db.Column(db.String(50), nullable=False, unique=True)  # e.g., renewal, expiry_3d, expiry_2d, expired, payment_received
+    template_type = db.Column(db.String(50), nullable=False, unique=True)
     body = db.Column(db.Text, nullable=False)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-# ============================================================

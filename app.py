@@ -16,39 +16,46 @@ from flask_wtf.csrf import CSRFProtect, CSRFError
 from werkzeug.middleware.proxy_fix import ProxyFix
 from urllib.parse import urlsplit
 
+# ---------- Database Models ----------
 from models import (
     db, User, Customer, Plan, CustomerPlan, Invoice, Payment, AuditLog,
     StaffType, Attendance, Leave, Payroll,
     Vendor, Product, Stock,
     ExpenseCategory, ExpenseAccount, ExpensePayee, Expense,
-    Company, Address, PaymentGatewayTransaction, Zone, TaxMaster,
+    Company, Address, Zone, TaxMaster,
     Locality, Area, Building, InventoryAssignment, ServiceProvider, VendorBill, VendorBillItem,
-    ServiceRequest, MessageTemplate  # <--- Added MessageTemplate
+    ServiceRequest, MessageTemplate
 )
 from models_ext import (
     Setting, InvoiceItem, ISPCredential, ISPSyncLog, BackupLog, ImportJob,
 )
 from services import isp_providers
 from services.invoicing import amount_in_words
+
+# ---------- Forms ----------
 from forms import (
     LoginForm, CustomerForm, PlanForm, InvoiceForm, PaymentForm,
     StaffForm, AttendanceForm, LeaveForm, PayrollForm,
     ExpenseForm, VendorForm, ProductForm, StockForm, CompanyForm, ChangePasswordForm,
     ExpenseCategoryForm, ExpenseAccountForm, ExpensePayeeForm, ZoneForm, TaxForm,
     AddonInvoiceForm, PlanDatesForm, PAYMENT_MODE_CHOICES,
-    ServiceProviderForm, VendorBillForm
+    ServiceProviderForm, VendorBillForm, CustomerLoginForm, CustomerChangePasswordForm,
+    MessageTemplateForm, BulkMessageForm
 )
 from config import Config
+
+# ---------- Standard Libs ----------
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from collections import defaultdict
+import requests
 
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# ---------- Security-critical config ----------
+# ---------- Security & Session ----------
 if not app.config.get('SECRET_KEY') or app.config.get('SECRET_KEY') in ('dev', 'changeme', '', 'dev-secret-key-change-me'):
     if os.environ.get('FLASK_ENV') == 'production':
         raise RuntimeError(
@@ -94,12 +101,13 @@ def unauthorized():
     flash('Please log in to continue.', 'warning')
     return redirect(url_for('login', next=request.path))
 
-# ---------- Feature blueprints (Settings / Backup / Import-Export / ISP) ----------
+# ---------- Feature Blueprints ----------
 from blueprints.settings_bp import register as register_settings
 register_settings(app)
 
-# Amount-in-words filter used by the invoice templates
+# ---------- Jinja Globals ----------
 app.jinja_env.globals['amount_in_words'] = amount_in_words
+app.jinja_env.globals['now'] = datetime.utcnow
 
 # ---------- Helpers ----------
 def generate_invoice_no():
@@ -113,7 +121,6 @@ def generate_invoice_no():
     return f"INV-{today}-{secrets.token_hex(3)}"
 
 def _vendor_choices(include_blank=True):
-    """(id, label) list for any Vendor SelectField."""
     rows = Vendor.query.filter_by(is_active=True).order_by(Vendor.name).all()
     out = [(0, '-- No vendor --')] if include_blank else []
     return out + [(v.id, v.name) for v in rows]
@@ -121,7 +128,6 @@ def _vendor_choices(include_blank=True):
 def generate_reference_id():
     return ''.join(secrets.choice('0123456789') for _ in range(8))
 
-# Expose a few helpers to Jinja so templates can call them directly
 @app.context_processor
 def inject_template_helpers():
     return dict(
@@ -161,17 +167,39 @@ def reset_customer_password_on_log2space(customer, new_password):
     print(f"New password: {new_password}")
     return True
 
-# ---------- Communication placeholders ----------
+# ---------- Communication (WhatsApp / SMS / Email) ----------
 def send_sms(phone, message):
+    # Replace with your actual SMS gateway API (e.g., Twilio, Fast2SMS)
     print(f"SMS to {phone}: {message}")
 
 def send_whatsapp(phone, message):
-    print(f"WhatsApp to {phone}: {message}")
+    """
+    Send WhatsApp message via Wabassist API.
+    Credentials: yashinternetservices9@gmail.com / uni@U01263
+    """
+    if not phone or not message:
+        return False
+    try:
+        url = "https://wabassist.com/api/send"
+        payload = {
+            "username": "yashinternetservices9@gmail.com",
+            "password": "uni@U01263",
+            "phone": phone,
+            "message": message
+        }
+        # Uncomment the next line when you have the actual API endpoint
+        # response = requests.post(url, json=payload, timeout=10)
+        # return response.status_code == 200
+        print(f"WhatsApp via Wabassist to {phone}: {message}")
+        return True
+    except Exception as e:
+        app.logger.error(f"WhatsApp send failed: {e}")
+        return False
 
 def send_email(to, subject, body, attachment=None):
     print(f"Email to {to}: {subject} - {body}")
 
-# ---------- Template Messaging (NEW) ----------
+# ---------- Template Messaging (for WhatsApp/SMS) ----------
 def send_template_message(customer, template_type, context=None):
     """Fetch the active template and send via WhatsApp."""
     if not customer or not customer.mobile:
@@ -180,7 +208,6 @@ def send_template_message(customer, template_type, context=None):
     if not template:
         return
     body = template.body
-    # Default replacements
     replacements = {
         '{{customer_name}}': customer.full_name or '',
         '{{username}}': customer.username or '',
@@ -196,6 +223,51 @@ def send_template_message(customer, template_type, context=None):
         body = body.replace(k, v)
     send_whatsapp(customer.mobile, body)
     log_audit('Send Template', f"Sent {template_type} to {customer.full_name}")
+
+def send_invoice_whatsapp(customer, invoice):
+    """Send a PDF invoice to customer via WhatsApp."""
+    # Generate PDF (simplified – you can use pdfkit or weasyprint)
+    try:
+        import pdfkit
+        html = render_template('invoices/summary.html', invoice=invoice,
+                               customer=customer, company=Company.query.first(),
+                               today=date.today(), download=True)
+        pdf = pdfkit.from_string(html, False)
+        # In production, you would upload this PDF to a temporary URL and send the URL
+        # For now, we'll just send a message with a link to the invoice.
+        message = f"Your invoice {invoice.invoice_no} is ready. You can view it at {url_for('invoice_summary', id=invoice.id, _external=True)}"
+        send_whatsapp(customer.mobile, message)
+        return True
+    except ImportError:
+        flash('PDF generation not configured.', 'warning')
+        return False
+
+# ---------- Cashfree Payment Gateway (Placeholder) ----------
+def initiate_cashfree_payment(invoice):
+    """Create a Cashfree order and return the payment link."""
+    # This is a placeholder – replace with actual Cashfree API call
+    # Reference: https://docs.cashfree.com/reference/pgordercreate
+    try:
+        order_data = {
+            "order_id": invoice.invoice_no,
+            "order_amount": float(invoice.balance),
+            "order_currency": "INR",
+            "customer_details": {
+                "customer_id": str(invoice.customer_id),
+                "customer_name": invoice.customer.full_name,
+                "customer_email": invoice.customer.email,
+                "customer_phone": invoice.customer.mobile
+            },
+            "order_meta": {
+                "return_url": url_for('cashfree_callback', _external=True) + "?order_id={order_id}"
+            }
+        }
+        # response = requests.post('https://api.cashfree.com/pg/orders', json=order_data, headers=...)
+        # return response.json().get('payment_link')
+        return f"https://example.com/pay/{invoice.invoice_no}"  # placeholder
+    except Exception as e:
+        app.logger.error(f"Cashfree initiation failed: {e}")
+        return None
 
 # ---------- Rate limiting ----------
 _login_attempts = {}
@@ -251,7 +323,6 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
-# ---------- Customer Self-Service Access control ----------
 def customer_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -344,23 +415,20 @@ def send_expiry_reminders():
     """Send templates for plans expiring in 3 days, 2 days, and expired today."""
     with app.app_context():
         today = date.today()
-        # 3 days before expiry
         expiring_3d = CustomerPlan.query.filter(
             CustomerPlan.status == 'active',
             CustomerPlan.end_date == today + timedelta(days=3)
         ).all()
         for cp in expiring_3d:
             send_template_message(cp.customer, 'expiry_3d', {'days': 3})
-        
-        # 2 days before expiry
+
         expiring_2d = CustomerPlan.query.filter(
             CustomerPlan.status == 'active',
             CustomerPlan.end_date == today + timedelta(days=2)
         ).all()
         for cp in expiring_2d:
             send_template_message(cp.customer, 'expiry_2d', {'days': 2})
-        
-        # Expired today
+
         expired_today = CustomerPlan.query.filter(
             CustomerPlan.status == 'active',
             CustomerPlan.end_date == today
@@ -378,7 +446,7 @@ if _should_start_scheduler and not scheduler.running:
     scheduler.add_job(generate_auto_invoices, CronTrigger(hour=1, minute=0))
     scheduler.add_job(auto_suspend_overdue, CronTrigger(hour=2, minute=0))
     scheduler.add_job(send_grace_period_reminders, CronTrigger(minute=0))
-    scheduler.add_job(send_expiry_reminders, CronTrigger(hour=8, minute=0))  # <-- NEW
+    scheduler.add_job(send_expiry_reminders, CronTrigger(hour=8, minute=0))
     scheduler.start()
 
 # ---------- Error handlers ----------
@@ -520,7 +588,6 @@ def _group_of(mode):
     return 'other'
 
 def _bucket_payments(payments):
-    """Split a list of payments into the cash / cheque / online / other buckets."""
     out = {'cash': 0.0, 'cheque': 0.0, 'online': 0.0, 'other': 0.0}
     for p in payments:
         out[_group_of(p.payment_mode)] += float(p.amount or 0)
@@ -555,16 +622,14 @@ def dashboard():
     payment_count = len(approved_payments)
     payment_amount = sum(float(p.amount or 0) for p in approved_payments)
 
-    # Donut + legend: Cash / Cheque / Online / Other
     payment_breakdown = _bucket_payments(approved_payments)
 
-    # ===== To be Authorized (all pending payments, any date) =====
+    # ===== To be Authorized =====
     all_pending = Payment.query.filter_by(status='pending').all()
     to_authorize_breakdown = _bucket_payments(all_pending)
     to_authorize_total = sum(to_authorize_breakdown.values())
     to_authorize_count = len(all_pending)
 
-    # Authorizing Payment counters
     pending_authorization_count = to_authorize_count
     authorization_done_count = Payment.query.filter(
         Payment.status == 'approved',
@@ -572,7 +637,6 @@ def dashboard():
         Payment.payment_date >= month_start,
         Payment.payment_date <= month_end).count()
 
-    # "To be Authorized" table -> grouped by date
     to_authorize_rows = {}
     for p in all_pending:
         row = to_authorize_rows.setdefault(
@@ -581,7 +645,7 @@ def dashboard():
         row['amount'] += float(p.amount or 0)
     to_authorize_rows = sorted(to_authorize_rows.values(), key=lambda r: r['date'], reverse=True)
 
-    # ===== Plan lifecycle chips (7 days) =====
+    # ===== Plan lifecycle chips =====
     expiring_days, expired_days, renewed_days = [], [], []
     for i in range(7):
         day = today + timedelta(days=i)
@@ -614,7 +678,7 @@ def dashboard():
     renewed_total = CustomerPlan.query.filter(
         CustomerPlan.start_date >= month_start, CustomerPlan.start_date <= month_end).count()
 
-    # ===== Plans expiring in the next 7 days -> full detail rows =====
+    # ===== Plans expiring in next 7 days =====
     horizon = today + timedelta(days=7)
     expiring_plans = (CustomerPlan.query
                       .filter(CustomerPlan.status == 'active',
@@ -642,7 +706,7 @@ def dashboard():
             'outstanding': outstanding,
         })
 
-    # ===== 12-month summary table =====
+    # ===== 12-month summary =====
     monthly_summary = []
     for i in range(0, 12):
         m_start = _shift_month(today, i)
@@ -665,7 +729,7 @@ def dashboard():
             'paid_amount': sum(float(x.total_amount or 0) for x in paid),
         })
 
-    # ===== Zone-wise outstanding & collection (current month) =====
+    # ===== Zone-wise outstanding & collection =====
     zone_names = [z[0] for z in db.session.query(Customer.zone).distinct().all() if z[0]]
     zone_outstanding, zone_collection = [], []
     for zone_name in sorted(zone_names):
@@ -772,7 +836,7 @@ def dashboard_export():
         headers={'Content-Disposition': f'attachment; filename=dashboard_snapshot_{today.isoformat()}.csv'}
     )
 
-# ---------- Plan expiry / renewal reports (dashboard drill-down) ----------
+# ---------- Plan expiry / renewal reports ----------
 @app.route('/reports/plan-expiry')
 @login_required
 def plan_expiry_report():
@@ -1279,7 +1343,7 @@ def address_delete(id):
 def masters_index():
     return render_template('masters/index.html')
 
-# ---------- Message Templates CRUD (NEW) ----------
+# ---------- Message Templates CRUD ----------
 @app.route('/masters/templates')
 @login_required
 @admin_required
@@ -1308,7 +1372,7 @@ def message_template_add():
         log_audit('Add Template', f"Added message template {name}")
         flash('Template added successfully.', 'success')
         return redirect(url_for('message_template_list'))
-    return render_template('masters/message_template_form.html')
+    return render_template('masters/message_template_form.html', template=None)
 
 @app.route('/masters/templates/edit/<int:id>', methods=['GET', 'POST'])
 @login_required
@@ -1435,7 +1499,7 @@ def customer_add():
         if password:
             password_hash = generate_password_hash(password)
         else:
-            password_hash = generate_password_hash('123456')  # <--- DEFAULT PASSWORD
+            password_hash = generate_password_hash('123456')  # default
 
         reg_form_filename = None
         if form.reg_form.data:
@@ -1638,7 +1702,6 @@ def customer_view(id):
                .order_by(Vendor.name).all())
     service_providers = ServiceProvider.query.filter_by(is_active=True).all()
 
-    # === FIX: pass service provider name properly ===
     service_provider_name = None
     if active_plan and active_plan.plan and active_plan.plan.service_provider:
         service_provider_name = active_plan.plan.service_provider.name
@@ -1648,7 +1711,7 @@ def customer_view(id):
                            service_providers=service_providers,
                            customer=customer,
                            active_plan=active_plan,
-                           service_provider_name=service_provider_name,  # <--- FIX
+                           service_provider_name=service_provider_name,
                            plans=plans,
                            plans_history=plans_history,
                            invoices=invoices,
@@ -1697,7 +1760,7 @@ def customer_disable(id):
     flash('Customer disabled.', 'success')
     return redirect(url_for('customer_view', id=id))
 
-# ---- Reset Customer Password (and send to log2space) ----
+# ---- Reset Customer Password ----
 @app.route('/customers/<int:id>/reset-password', methods=['POST'])
 @login_required
 @admin_required
@@ -1713,7 +1776,7 @@ def customer_reset_password(id):
     flash('Password reset and sent to customer and log2space.', 'success')
     return redirect(url_for('customer_view', id=id))
 
-# ---- Reset MAC (NO DB storage – only API) ----
+# ---- Reset MAC ----
 @app.route('/customers/<int:id>/reset-mac', methods=['POST'])
 @login_required
 @admin_required
@@ -1802,6 +1865,7 @@ def send_customer_sms(id):
     flash('SMS sent.', 'success')
     return redirect(url_for('customer_view', id=id))
 
+# ---------- Vendor Bills (Auto-generate) ----------
 def _next_vendor_bill_no():
     prefix = f"VB-{date.today():%Y%m}-"
     seq = 1
@@ -2182,7 +2246,6 @@ def renew_plan(customer_id):
     log_audit('Renew Plan', f"Renewed plan {plan.name} for {customer.full_name} until {new_end_date}")
     flash(f'Plan renewed successfully. New expiry: {new_end_date.strftime("%d-%b-%Y")}', 'success')
     
-    # Send Renewal Notification
     send_template_message(customer, 'renewal', {
         'customer_name': customer.full_name,
         'username': customer.username,
@@ -2255,11 +2318,7 @@ def record_payment(invoice_id):
         except ValueError:
             flash('Invalid renew date format.', 'warning')
 
-    # Send Payment Received Notification
-    if needs_auth:
-        # Payment is pending, but still we can send a notification if configured
-        pass
-    else:
+    if not needs_auth:
         send_template_message(customer, 'payment_received', {
             'customer_name': customer.full_name,
             'paid_amount': amount,
@@ -2270,7 +2329,7 @@ def record_payment(invoice_id):
           + (' — awaiting authorization.' if needs_auth else '.'), 'success')
     return redirect(url_for('customer_view', id=customer.id) + '#payment-history')
 
-# ---- Delete a recorded payment (admin only) ----
+# ---- Delete a recorded payment ----
 @app.route('/payments/<int:id>/delete', methods=['POST'])
 @login_required
 @admin_required
@@ -2432,7 +2491,7 @@ def payment_approve(id):
     flash('Payment authorized.', 'success')
     return redirect(request.referrer or url_for('customer_view', id=payment.customer_id))
 
-# ---------- Service Provider Master CRUD ----------
+# ---------- Service Provider Master ----------
 @app.route('/masters/service-providers')
 @login_required
 @admin_required
@@ -2785,7 +2844,7 @@ def expense_payee_delete(id):
     flash('Payee deleted.', 'success')
     return redirect(url_for('expense_payee_list'))
 
-# ---- Expenses main list with filters and totals ----
+# ---- Expenses main list ----
 @app.route('/expenses')
 @login_required
 def expenses_index():
@@ -3361,9 +3420,7 @@ def plan_delete(id):
     flash('Plan deactivated.', 'success')
     return redirect(url_for('plan_list'))
 
-# =========================================================================== #
-#  VENDOR BILLS  (Inventory -> Vendor Bills)
-# =========================================================================== #
+# ---------- Vendor Bills ----------
 @app.route('/inventory/vendor-bills')
 @login_required
 def vendor_bill_list():
@@ -3396,7 +3453,6 @@ def vendor_bill_view(id):
 @login_required
 @admin_required
 def vendor_bill_add():
-    """Raise a purchase bill by hand and receive the stock in one step."""
     form = VendorBillForm()
     form.vendor_id.choices = _vendor_choices(include_blank=False)
     products = Product.query.filter_by(is_active=True).order_by(Product.name).all()
@@ -3536,9 +3592,7 @@ def vendor_bill_export():
                     headers={'Content-Disposition':
                              'attachment; filename=vendor-bills.csv'})
 
-# =========================================================================== #
-#  CUSTOMER SELF-SERVICE PORTAL (NEW)
-# =========================================================================== #
+# ---------- Customer Portal ----------
 @app.route('/customer/login', methods=['GET', 'POST'])
 def customer_login():
     if session.get('customer_id'):
@@ -3608,7 +3662,6 @@ def customer_invoice_download(id):
     html = render_template('invoices/summary.html', invoice=invoice,
                            customer=invoice.customer, company=Company.query.first(),
                            today=date.today(), download=True)
-    # Generate PDF (requires pdfkit or weasyprint; using pdfkit as example)
     try:
         import pdfkit
         pdf = pdfkit.from_string(html, False)
@@ -3644,12 +3697,10 @@ def customer_renew_plan():
     db.session.add(invoice)
     db.session.commit()
     
-    # Extend the plan now (payment is pending approval, but service is renewed)
     active_plan.end_date = new_end
     active_plan.last_invoice_date = date.today()
     db.session.commit()
     
-    # Send Renewal Notification
     send_template_message(customer, 'renewal', {
         'customer_name': customer.full_name,
         'username': customer.username,
@@ -3662,7 +3713,6 @@ def customer_renew_plan():
 
 # ---------- Startup ----------
 def init_database(flask_app=None):
-    """Create tables and ensure a usable admin account exists."""
     flask_app = flask_app or app
     with flask_app.app_context():
         db.create_all()

@@ -163,7 +163,6 @@
                 <tr>
                   <td>1</td>
                   <td>{{ customer.username or '-' }}</td>
-                  <!-- FIXED: Use service_provider_name to avoid <ServiceProvider 1> bug -->
                   <td>{{ service_provider_name or '-' }}</td>
                   <td>{{ active_plan.plan.name }}</td>
                   <td>&#8377; {{ '%.2f'|format(active_plan.plan.price_monthly) }}</td>
