@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Add Zone{% endblock %}
+
+{% block content %}
+<style>
+  .glass-form {
+    background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 24px;
+    padding: 1.5rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.04);
+  }
+  .glass-form label {
+    font-weight: 600;
+    color: #1a0f2e;
+  }
+  .glass-form .form-control, .glass-form .form-select {
+    background: rgba(255,255,255,0.7);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 16px;
+    padding: 0.8rem 1rem;
+    transition: all 0.3s;
+  }
+  .glass-form .form-control:focus, .glass-form .form-select:focus {
+    background: rgba(255,255,255,0.9);
+    border-color: #764ba2;
+    box-shadow: 0 0 0 4px rgba(118,75,162,0.15);
+  }
+  .btn-submit {
+    background: linear-gradient(135deg, #764ba2, #667eea);
+    border: none;
+    border-radius: 50px;
+    padding: 0.8rem 2.5rem;
+    color: #fff;
+    font-weight: 600;
+    transition: all 0.3s;
+  }
+  .btn-submit:hover {
+    transform: scale(1.02);
+    box-shadow: 0 8px 24px rgba(118,75,162,0.4);
+  }
+</style>
+
+<h4 class="mb-3"><i class="fas fa-plus-circle me-2 text-primary"></i>Add New Zone</h4>
+
+<div class="glass-form">
+  <form method="POST" enctype="multipart/form-data">
+    {{ form.hidden_tag() }}
+    <div class="row g-3">
+      <div class="col-md-6">
+        {{ form.name.label(class="form-label") }}
+        {{ form.name(class="form-control", placeholder="Zone name") }}
+      </div>
+      <div class="col-md-6">
+        {{ form.code.label(class="form-label") }}
+        {{ form.code(class="form-control", placeholder="Zone code") }}
+      </div>
+      <div class="col-md-6">
+        {{ form.phone.label(class="form-label") }}
+        {{ form.phone(class="form-control", placeholder="Phone number") }}
+      </div>
+      <div class="col-md-6">
+        {{ form.email.label(class="form-label") }}
+        {{ form.email(class="form-control", placeholder="Email address") }}
+      </div>
+      <div class="col-md-12">
+        {{ form.address.label(class="form-label") }}
+        {{ form.address(class="form-control", rows="2", placeholder="Full address") }}
+      </div>
+      <div class="col-md-4">
+        {{ form.city.label(class="form-label") }}
+        {{ form.city(class="form-control", placeholder="City") }}
+      </div>
+      <div class="col-md-4">
+        {{ form.state.label(class="form-label") }}
+        {{ form.state(class="form-control", placeholder="State") }}
+      </div>
+      <div class="col-md-4">
+        {{ form.country.label(class="form-label") }}
+        {{ form.country(class="form-control", placeholder="Country") }}
+      </div>
+      <div class="col-md-12">
+        {{ form.logo.label(class="form-label") }}
+        {{ form.logo(class="form-control") }}
+        <small class="text-muted">Upload zone logo (JPG, PNG, GIF)</small>
+      </div>
+      <div class="col-md-6">
+        {{ form.l2s_site_name.label(class="form-label") }}
+        {{ form.l2s_site_name(class="form-control", placeholder="L2s Site Name") }}
+      </div>
+      <div class="col-md-6">
+        {{ form.nas.label(class="form-label") }}
+        {{ form.nas(class="form-control", placeholder="NAS") }}
+      </div>
+      <div class="col-md-6">
+        {{ form.l2s_sync_id.label(class="form-label") }}
+        {{ form.l2s_sync_id(class="form-control", placeholder="L2sSync/Ijaz Id") }}
+      </div>
+      <div class="col-md-6">
+        {{ form.sms_url.label(class="form-label") }}
+        {{ form.sms_url(class="form-control", placeholder="SMS URL") }}
+      </div>
+      <div class="col-md-6">
+        {{ form.http_url.label(class="form-label") }}
+        {{ form.http_url(class="form-control", placeholder="HTTP URL") }}
+      </div>
+      <div class="col-md-6">
+        {{ form.whatsapp_url.label(class="form-label") }}
+        {{ form.whatsapp_url(class="form-control", placeholder="WhatsApp URL") }}
+      </div>
+      <div class="col-md-6">
+        {{ form.whatsapp_attachment_url.label(class="form-label") }}
+        {{ form.whatsapp_attachment_url(class="form-control", placeholder="WhatsApp Attachment URL") }}
+      </div>
+      <div class="col-md-6">
+        {{ form.company.label(class="form-label") }}
+        {{ form.company(class="form-control", placeholder="Company name") }}
+      </div>
+    </div>
+    <div class="mt-4">
+      <a href="{{ url_for('zone_list') }}" class="btn btn-secondary rounded-pill px-4 me-2">Cancel</a>
+      {{ form.submit(class="btn-submit") }}
+    </div>
+  </form>
+</div>
+{% endblock %}

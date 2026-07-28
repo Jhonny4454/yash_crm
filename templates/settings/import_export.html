@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block page_title %}Import / Export{% endblock %}
+
+{% block content %}
+<div class="alert alert-warning">
+  <strong>Before importing:</strong> run a
+  <a href="{{ url_for('database_backup') }}" class="alert-link">database backup</a>.
+  Use <em>Validate only</em> first — it reports every problem row without
+  writing anything.
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white fw-semibold">Export</div>
+      <ul class="list-group list-group-flush">
+        {% for key, spec in exports.items() %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <span>{{ spec.label }}
+            <span class="badge bg-light text-muted ms-1">{{ counts[key] }}</span></span>
+          <a class="btn btn-sm btn-outline-primary"
+             href="{{ url_for('export_csv', target=key) }}">Export CSV</a>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white fw-semibold">Import</div>
+      <div class="card-body">
+        {% for key, spec in imports.items() %}
+        <form method="post" enctype="multipart/form-data"
+              action="{{ url_for('import_csv', target=key) }}"
+              class="border rounded p-3 mb-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <strong>{{ spec.label }}</strong>
+            <a class="small" href="{{ url_for('import_template', target=key) }}">
+              Download template</a>
+          </div>
+          <div class="small text-muted mb-2">
+            Required columns: <code>{{ spec.required | join('</code>, <code>') | safe }}</code>
+            &nbsp;·&nbsp; duplicates skipped on <code>{{ spec.unique }}</code>
+          </div>
+          <div class="input-group input-group-sm">
+            <input type="file" class="form-control" name="file" accept=".csv,.txt" required>
+            <button class="btn btn-outline-secondary" name="dry_run" value="1">Validate only</button>
+            <button class="btn btn-primary">Import</button>
+          </div>
+        </form>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mt-3">
+  <div class="card-header bg-white fw-semibold">Recent import jobs</div>
+  <div class="table-responsive">
+    <table class="table table-sm mb-0 align-middle">
+      <thead class="table-light">
+        <tr><th>#</th><th>Target</th><th>File</th><th>Rows</th>
+            <th>OK</th><th>Failed</th><th>When</th><th></th></tr>
+      </thead>
+      <tbody>
+      {% for j in jobs %}
+        <tr>
+          <td>{{ j.id }}</td><td>{{ j.target }}</td>
+          <td class="small"><code>{{ j.filename }}</code></td>
+          <td>{{ j.total_rows }}</td>
+          <td class="text-success">{{ j.ok_rows }}</td>
+          <td class="{{ 'text-danger' if j.failed_rows else 'text-muted' }}">{{ j.failed_rows }}</td>
+          <td class="small text-muted">{{ j.created_at.strftime('%d-%b %H:%M') }}</td>
+          <td>{% if j.failed_rows %}
+            <a class="btn btn-sm btn-outline-danger"
+               href="{{ url_for('import_errors', job_id=j.id) }}">Error report</a>
+          {% endif %}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-3">No imports yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

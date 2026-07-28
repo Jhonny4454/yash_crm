@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<form method="post" enctype="multipart/form-data" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white fw-semibold">Numbering</div>
+    <div class="card-body">
+      <div class="row g-3">
+        {% for key, label in [('staff','Staff'), ('customer','Customer'),
+                              ('invoice','Invoice'), ('receipt','Receipt')] %}
+        <div class="col-md-3">
+          <label class="form-label">{{ label }}<span class="text-danger">*</span></label>
+          <div class="input-group">
+            <input type="text" class="form-control" style="max-width:80px"
+                   name="{{ key }}_prefix" value="{{ s.get(key ~ '_prefix', '') }}"
+                   maxlength="8" required>
+            <input type="number" class="form-control" min="1"
+                   name="{{ key }}_next_no" value="{{ s.get(key ~ '_next_no', 1) }}" required>
+          </div>
+          <div class="form-text">Next {{ label|lower }} number.</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white fw-semibold">Tax &amp; Billing</div>
+    <div class="card-body">
+      <div class="row g-4">
+        <div class="col-md-3">
+          <label class="form-label d-block">Tax Type:</label>
+          {% for v in ['Include','Exclude'] %}
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="tax_type"
+                   id="tt{{ v }}" value="{{ v }}"
+                   {% if s.get('tax_type') == v %}checked{% endif %}>
+            <label class="form-check-label" for="tt{{ v }}">{{ v }}</label>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label d-block">Tax On:</label>
+          {% for v, lab in [('Base','Base Price'),('Total','Total Price')] %}
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="tax_on"
+                   id="to{{ v }}" value="{{ v }}"
+                   {% if s.get('tax_on') == v %}checked{% endif %}>
+            <label class="form-check-label" for="to{{ v }}">{{ lab }}</label>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label d-block">Invoice Package Price:</label>
+          {% for v in ['Customer','Master'] %}
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="invoice_package_price"
+                   id="ipp{{ v }}" value="{{ v }}"
+                   {% if s.get('invoice_package_price') == v %}checked{% endif %}>
+            <label class="form-check-label" for="ipp{{ v }}">{{ v }}</label>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Invoice due (days)</label>
+          <input type="number" class="form-control" name="invoice_due_days"
+                 min="0" max="180" value="{{ s.get('invoice_due_days', 15) }}">
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Voucher No.</label>
+          <input type="number" class="form-control" name="voucher_no"
+                 value="{{ s.get('voucher_no', 1) }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Grace period (days)</label>
+          <input type="number" class="form-control" name="grace_period_days"
+                 min="0" max="30" value="{{ s.get('grace_period_days', 1) }}">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white fw-semibold">Collection App</div>
+    <div class="card-body">
+      <div class="row g-3">
+        {% for key, label in [
+            ('happy_code_enabled','Happy Code'),
+            ('coll_amount_change','Collection Amount Change'),
+            ('coll_date_change','Change Payment Date'),
+            ('coll_renew_only','Coll App (Renew Only)'),
+            ('discount_applicable','Discount Applicable')] %}
+        <div class="col-md-4">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch"
+                   name="{{ key }}" id="{{ key }}"
+                   {% if s.get(key) %}checked{% endif %}>
+            <label class="form-check-label" for="{{ key }}">{{ label }}</label>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white fw-semibold">
+      SMS Templates
+      <span class="text-muted small fw-normal ms-2">
+        Placeholders: {name} {plan} {expiry} {amount} {invoice} {mobile}
+      </span>
+    </div>
+    <div class="card-body">
+      <div class="mb-3">
+        <label class="form-label">Renewal SMS</label>
+        <textarea class="form-control" name="sms_template_renewal" rows="2"
+                  maxlength="320">{{ s.get('sms_template_renewal','') }}</textarea>
+      </div>
+      <div>
+        <label class="form-label">Expiry reminder SMS</label>
+        <textarea class="form-control" name="sms_template_expiry" rows="2"
+                  maxlength="320">{{ s.get('sms_template_expiry','') }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white fw-semibold">Customer App Banner</div>
+    <div class="card-body row g-3 align-items-start">
+      <div class="col-md-6">
+        <label class="form-label">Banner image</label>
+        <input type="file" class="form-control" name="banner_image"
+               accept=".jpg,.jpeg,.png,.gif,.webp">
+        <div class="form-text">JPG / PNG / GIF / WebP, max 2 MB.</div>
+        {% if s.get('banner_image') %}
+        <div class="mt-2">
+          <img src="{{ url_for('static', filename='uploads/' ~ s.get('banner_image')) }}"
+               alt="Current banner" style="max-width:220px;border:1px solid #ddd">
+          <div class="form-check mt-1">
+            <input class="form-check-input" type="checkbox" name="remove_banner" id="rb">
+            <label class="form-check-label small text-danger" for="rb">Remove banner</label>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Banner Link</label>
+        <input type="text" class="form-control" name="banner_link"
+               value="{{ s.get('banner_link','') }}">
+      </div>
+    </div>
+  </div>
+
+  <button class="btn btn-primary px-4" type="submit">Save Settings</button>
+  <a class="btn btn-link" href="{{ url_for('masters_index') }}">Cancel</a>
+</form>
+{% endblock %}

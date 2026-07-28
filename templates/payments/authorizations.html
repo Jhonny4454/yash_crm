@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Payment Authorization{% endblock %}
+
+{% block content %}
+<style>
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:6px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.05); margin-bottom:24px; }
+  .panel-head { background:#1a76b8; color:#fff; padding:12px 18px; font-weight:600; font-size:.95rem;
+                display:flex; justify-content:space-between; align-items:center; }
+  .tbl { width:100%; font-size:.83rem; border-collapse:collapse; }
+  .tbl th { background:#f8fafc; color:#243447; font-weight:600; padding:11px 12px; border-bottom:1px solid #e2e8f0; white-space:nowrap; }
+  .tbl td { padding:10px 12px; border-bottom:1px solid #f1f5f9; color:#334155; }
+  .tbl tbody tr:hover { background:#f8fafc; }
+  .tbl a { color:#1a76b8; text-decoration:none; }
+  .tbl a:hover { text-decoration:underline; }
+  .empty { text-align:center; color:#94a3b8; padding:30px 0; }
+  .mode-badge { background:#e8f2fa; color:#1a76b8; border-radius:4px; padding:2px 8px; font-size:11px; font-weight:600; }
+</style>
+
+<h3 class="fw-bold mb-3" style="color:#243447;">Payment Authorization</h3>
+
+<div class="panel">
+  <div class="panel-head">
+    <span>Pending Authorization</span>
+    <span>{{ pending|length }} payment{{ '' if pending|length == 1 else 's' }} &middot;
+      &#8377; {{ '%.2f'|format(pending|sum(attribute='amount')|float) }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="tbl">
+      <thead>
+        <tr><th>#</th><th>Date</th><th>Customer</th><th>Invoice</th><th>Amount</th><th>Mode</th>
+            <th>Book Receipt</th><th>Received By</th><th>Remarks</th><th style="width:170px;">Action</th></tr>
+      </thead>
+      <tbody>
+        {% for p in pending %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ p.payment_date.strftime('%d %b, %Y') }}</td>
+          <td><a href="{{ url_for('customer_view', id=p.customer_id) }}">
+            {{ p.invoice.customer.full_name if p.invoice and p.invoice.customer else 'Customer #' ~ p.customer_id }}</a></td>
+          <td>{% if p.invoice %}<a target="_blank" href="{{ url_for('invoice_summary', id=p.invoice_id) }}">{{ p.invoice.invoice_no }}</a>{% else %}-{% endif %}</td>
+          <td>&#8377; {{ '%.2f'|format(p.amount) }}</td>
+          <td><span class="mode-badge">{{ p.payment_mode }}</span></td>
+          <td>{{ p.book_receipt_no or '-' }}</td>
+          <td>{{ p.received_by_user.full_name if p.received_by_user else 'System' }}</td>
+          <td>{{ p.remarks or '-' }}</td>
+          <td class="text-nowrap">
+            {% if current_user.is_admin() %}
+            <form method="POST" action="{{ url_for('payment_approve', id=p.id) }}" style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-success btn-sm"><i class="fas fa-check"></i> Authorize</button>
+            </form>
+            <form method="POST" action="{{ url_for('payment_reject', id=p.id) }}" style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-outline-danger btn-sm" onclick="return confirm('Reject this payment?')">
+                <i class="fas fa-times"></i></button>
+            </form>
+            {% else %}
+            <span class="text-muted small">Admin only</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="10" class="empty">Nothing waiting for authorization.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <span>Authorization Done</span>
+    <span>{{ done|length }} recent</span>
+  </div>
+  <div class="table-responsive">
+    <table class="tbl">
+      <thead>
+        <tr><th>#</th><th>Payment Date</th><th>Customer</th><th>Invoice</th><th>Amount</th>
+            <th>Mode</th><th>Authorized On</th><th>Authorized By</th></tr>
+      </thead>
+      <tbody>
+        {% for p in done %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ p.payment_date.strftime('%d %b, %Y') }}</td>
+          <td><a href="{{ url_for('customer_view', id=p.customer_id) }}">
+            {{ p.invoice.customer.full_name if p.invoice and p.invoice.customer else 'Customer #' ~ p.customer_id }}</a></td>
+          <td>{% if p.invoice %}<a target="_blank" href="{{ url_for('invoice_summary', id=p.invoice_id) }}">{{ p.invoice.invoice_no }}</a>{% else %}-{% endif %}</td>
+          <td>&#8377; {{ '%.2f'|format(p.amount) }}</td>
+          <td><span class="mode-badge">{{ p.payment_mode }}</span></td>
+          <td>{{ p.authorized_at.strftime('%d %b, %Y %H:%M') if p.authorized_at else '-' }}</td>
+          <td>{{ p.authorized_by_user.full_name if p.authorized_by_user else 'System' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="empty">No authorizations recorded yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
