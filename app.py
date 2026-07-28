@@ -22,12 +22,11 @@ from models import (
     Vendor, Product, Stock,
     ExpenseCategory, ExpenseAccount, ExpensePayee, Expense,
     Company, Address, PaymentGatewayTransaction, Zone, TaxMaster,
-    Locality, Area, Building, InventoryAssignment, Wallet, WalletTransaction,
-    ServiceProvider, VendorBill, VendorBillItem, ServiceRequest
+    Locality, Area, Building, InventoryAssignment, ServiceProvider, VendorBill, VendorBillItem,
+    ServiceRequest, MessageTemplate  # <--- Added MessageTemplate
 )
 from models_ext import (
-    Setting, InvoiceItem, ReferralCampaign, Referral,
-    ISPCredential, ISPSyncLog, BackupLog, ImportJob,
+    Setting, InvoiceItem, ISPCredential, ISPSyncLog, BackupLog, ImportJob,
 )
 from services import isp_providers
 from services.invoicing import amount_in_words
@@ -37,15 +36,14 @@ from forms import (
     ExpenseForm, VendorForm, ProductForm, StockForm, CompanyForm, ChangePasswordForm,
     ExpenseCategoryForm, ExpenseAccountForm, ExpensePayeeForm, ZoneForm, TaxForm,
     AddonInvoiceForm, PlanDatesForm, PAYMENT_MODE_CHOICES,
-    ServiceProviderForm, VendorBillForm, ReferralCampaignForm
+    ServiceProviderForm, VendorBillForm
 )
 from config import Config
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-import razorpay
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from collections import defaultdict  # <-- ADDED for reports
+from collections import defaultdict
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -103,19 +101,6 @@ register_settings(app)
 # Amount-in-words filter used by the invoice templates
 app.jinja_env.globals['amount_in_words'] = amount_in_words
 
-RAZORPAY_KEY_ID = app.config.get('RAZORPAY_KEY_ID')
-RAZORPAY_KEY_SECRET = app.config.get('RAZORPAY_KEY_SECRET')
-_RAZORPAY_PLACEHOLDERS = {None, '', 'your_key_id_here', 'your_key_secret_here'}
-RAZORPAY_CONFIGURED = (
-    RAZORPAY_KEY_ID not in _RAZORPAY_PLACEHOLDERS
-    and RAZORPAY_KEY_SECRET not in _RAZORPAY_PLACEHOLDERS
-)
-if not RAZORPAY_CONFIGURED:
-    app.logger.warning("RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET are not configured "
-                        "(missing or still set to the placeholder values in config.py). "
-                        "Online payment routes will be disabled until real keys are set.")
-razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID or '', RAZORPAY_KEY_SECRET or ''))
-
 # ---------- Helpers ----------
 def generate_invoice_no():
     today = date.today().strftime('%Y%m%d')
@@ -133,7 +118,6 @@ def _vendor_choices(include_blank=True):
     out = [(0, '-- No vendor --')] if include_blank else []
     return out + [(v.id, v.name) for v in rows]
 
-
 def generate_reference_id():
     return ''.join(secrets.choice('0123456789') for _ in range(8))
 
@@ -145,7 +129,6 @@ def inject_template_helpers():
         payment_mode_choices=PAYMENT_MODE_CHOICES,
         today=date.today(),
     )
-
 
 def log_audit(action, details):
     safe_details = (details or '')[:500]
@@ -169,7 +152,6 @@ def reset_mac_on_log2space(mac_address, customer_reference):
     print(f"=== RESET MAC ON LOG2SPACE ===")
     print(f"Customer Ref: {customer_reference}")
     print(f"New MAC: {mac_address}")
-    # Replace with actual API call
     return True
 
 def reset_customer_password_on_log2space(customer, new_password):
@@ -177,7 +159,6 @@ def reset_customer_password_on_log2space(customer, new_password):
     print(f"=== RESET PASSWORD ON LOG2SPACE ===")
     print(f"Customer Ref: {customer.reference_id}")
     print(f"New password: {new_password}")
-    # Replace with actual API call
     return True
 
 # ---------- Communication placeholders ----------
@@ -189,6 +170,32 @@ def send_whatsapp(phone, message):
 
 def send_email(to, subject, body, attachment=None):
     print(f"Email to {to}: {subject} - {body}")
+
+# ---------- Template Messaging (NEW) ----------
+def send_template_message(customer, template_type, context=None):
+    """Fetch the active template and send via WhatsApp."""
+    if not customer or not customer.mobile:
+        return
+    template = MessageTemplate.query.filter_by(template_type=template_type, is_active=True).first()
+    if not template:
+        return
+    body = template.body
+    # Default replacements
+    replacements = {
+        '{{customer_name}}': customer.full_name or '',
+        '{{username}}': customer.username or '',
+        '{{amount}}': '0',
+        '{{days}}': '0',
+        '{{balance}}': '0',
+        '{{paid_amount}}': '0'
+    }
+    if context:
+        for k, v in context.items():
+            replacements[f'{{{{{k}}}}}'] = str(v)
+    for k, v in replacements.items():
+        body = body.replace(k, v)
+    send_whatsapp(customer.mobile, body)
+    log_audit('Send Template', f"Sent {template_type} to {customer.full_name}")
 
 # ---------- Rate limiting ----------
 _login_attempts = {}
@@ -241,6 +248,21 @@ def admin_required(f):
                       f"User {current_user.username} tried to access {request.path}")
             flash('You do not have permission to perform this action.', 'danger')
             abort(403)
+        return f(*args, **kwargs)
+    return decorated
+
+# ---------- Customer Self-Service Access control ----------
+def customer_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'customer_id' not in session:
+            flash('Please log in as a customer.', 'warning')
+            return redirect(url_for('customer_login', next=request.path))
+        customer = Customer.query.get(session['customer_id'])
+        if not customer or not customer.is_active:
+            session.pop('customer_id', None)
+            flash('Account not found or inactive.', 'danger')
+            return redirect(url_for('customer_login'))
         return f(*args, **kwargs)
     return decorated
 
@@ -318,12 +340,35 @@ def auto_suspend_overdue():
                 send_email(customer.email, "Service Suspended",
                            "Your service has been suspended due to non-payment. Please contact support.")
 
+def send_expiry_reminders():
+    """Send templates for plans expiring in 3 days, 2 days, and expired today."""
+    with app.app_context():
+        today = date.today()
+        # 3 days before expiry
+        expiring_3d = CustomerPlan.query.filter(
+            CustomerPlan.status == 'active',
+            CustomerPlan.end_date == today + timedelta(days=3)
+        ).all()
+        for cp in expiring_3d:
+            send_template_message(cp.customer, 'expiry_3d', {'days': 3})
+        
+        # 2 days before expiry
+        expiring_2d = CustomerPlan.query.filter(
+            CustomerPlan.status == 'active',
+            CustomerPlan.end_date == today + timedelta(days=2)
+        ).all()
+        for cp in expiring_2d:
+            send_template_message(cp.customer, 'expiry_2d', {'days': 2})
+        
+        # Expired today
+        expired_today = CustomerPlan.query.filter(
+            CustomerPlan.status == 'active',
+            CustomerPlan.end_date == today
+        ).all()
+        for cp in expired_today:
+            send_template_message(cp.customer, 'expired')
+
 scheduler = BackgroundScheduler()
-# Guard against the Flask debug reloader starting two schedulers (which would
-# run every cron job twice: duplicate invoices, duplicate suspensions,
-# duplicate SMS). Under a multi-worker production server (e.g. gunicorn -w N)
-# this guard alone isn't enough — run the scheduler in a single dedicated
-# process there instead of inside every worker.
 _should_start_scheduler = (
     os.environ.get('FLASK_ENV') == 'production'
     or os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
@@ -333,6 +378,7 @@ if _should_start_scheduler and not scheduler.running:
     scheduler.add_job(generate_auto_invoices, CronTrigger(hour=1, minute=0))
     scheduler.add_job(auto_suspend_overdue, CronTrigger(hour=2, minute=0))
     scheduler.add_job(send_grace_period_reminders, CronTrigger(minute=0))
+    scheduler.add_job(send_expiry_reminders, CronTrigger(hour=8, minute=0))  # <-- NEW
     scheduler.start()
 
 # ---------- Error handlers ----------
@@ -480,7 +526,6 @@ def _bucket_payments(payments):
         out[_group_of(p.payment_mode)] += float(p.amount or 0)
     return out
 
-
 # ---------- Dashboard ----------
 @app.route('/')
 @app.route('/dashboard')
@@ -538,7 +583,7 @@ def dashboard():
 
     # ===== Plan lifecycle chips (7 days) =====
     expiring_days, expired_days, renewed_days = [], [], []
-    for i in range(7):                                  # today -> today + 6
+    for i in range(7):
         day = today + timedelta(days=i)
         expiring_days.append({
             'date': day,
@@ -547,7 +592,7 @@ def dashboard():
                 CustomerPlan.end_date == day,
                 CustomerPlan.status == 'active').count()
         })
-    for i in range(7):                                  # today -> today - 6
+    for i in range(7):
         day = today - timedelta(days=i)
         expired_days.append({
             'date': day,
@@ -673,7 +718,6 @@ def dashboard():
         zone_collection=zone_collection,
     )
 
-
 @app.route('/dashboard/export')
 @login_required
 def dashboard_export():
@@ -727,7 +771,6 @@ def dashboard_export():
         mimetype='text/csv',
         headers={'Content-Disposition': f'attachment; filename=dashboard_snapshot_{today.isoformat()}.csv'}
     )
-
 
 # ---------- Plan expiry / renewal reports (dashboard drill-down) ----------
 @app.route('/reports/plan-expiry')
@@ -794,7 +837,6 @@ def plan_expiry_report():
     return render_template('reports/plan_expiry.html', rows=rows, kind=kind,
                            heading=heading, days=days, on_date=on_date, today=today)
 
-
 @app.route('/customer-plans/<int:plan_id>/dates', methods=['POST'])
 @login_required
 @admin_required
@@ -826,7 +868,6 @@ def customer_plan_update_dates(plan_id):
     flash('Plan dates updated.', 'success')
     return redirect(request.referrer or url_for('customer_view', id=cp.customer_id))
 
-
 # ---------- Payment authorization queue ----------
 @app.route('/payments/authorizations')
 @login_required
@@ -839,7 +880,6 @@ def payment_authorizations():
         Payment.authorized_at.desc()).limit(200).all()
     return render_template('payments/authorizations.html',
                            pending=pending, done=done, today=date.today())
-
 
 @app.route('/payments/<int:id>/reject', methods=['POST'])
 @login_required
@@ -855,7 +895,6 @@ def payment_reject(id):
     log_audit('Reject Payment', f"Rejected payment #{id}")
     flash('Payment rejected.', 'warning')
     return redirect(request.referrer or url_for('payment_authorizations'))
-
 
 # ---------- Zone CRUD ----------
 @app.route('/zones')
@@ -933,7 +972,7 @@ def zone_delete(id):
     flash('Zone deleted successfully.', 'success')
     return redirect(url_for('zone_list'))
 
-# ---------- Locality Master CRUD (ADDED) ----------
+# ---------- Locality Master CRUD ----------
 @app.route('/masters/localities')
 @login_required
 @admin_required
@@ -982,7 +1021,7 @@ def locality_delete(id):
     flash('Locality deleted.', 'success')
     return redirect(url_for('locality_list'))
 
-# ---------- Area Master CRUD (ADDED) ----------
+# ---------- Area Master CRUD ----------
 @app.route('/masters/areas')
 @login_required
 @admin_required
@@ -1031,7 +1070,7 @@ def area_delete(id):
     flash('Area deleted.', 'success')
     return redirect(url_for('area_list'))
 
-# ---------- Building Master CRUD (ADDED) ----------
+# ---------- Building Master CRUD ----------
 @app.route('/masters/buildings')
 @login_required
 @admin_required
@@ -1089,7 +1128,6 @@ def company_edit():
     form = CompanyForm(obj=company)
     form.zones.choices = [(z.id, z.name) for z in Zone.query.all()]
     if form.validate_on_submit():
-        # FIXED: Manually assign fields (avoid populate_obj due to zones relationship)
         company.name = form.name.data
         company.mobile = form.mobile.data
         company.phone = form.phone.data
@@ -1111,7 +1149,6 @@ def company_edit():
             filename = secure_filename(file.filename)
             company.company_logo = filename
             file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
-        # Handle zones (multi-select)
         selected_zone_ids = request.form.getlist('zones') if request.form.getlist('zones') else []
         company.zones = Zone.query.filter(Zone.id.in_(selected_zone_ids)).all()
         db.session.add(company)
@@ -1242,6 +1279,98 @@ def address_delete(id):
 def masters_index():
     return render_template('masters/index.html')
 
+# ---------- Message Templates CRUD (NEW) ----------
+@app.route('/masters/templates')
+@login_required
+@admin_required
+def message_template_list():
+    templates = MessageTemplate.query.all()
+    return render_template('masters/message_templates.html', templates=templates)
+
+@app.route('/masters/templates/add', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def message_template_add():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        template_type = request.form.get('template_type')
+        body = request.form.get('body')
+        is_active = 'is_active' in request.form
+        if not name or not template_type or not body:
+            flash('All fields except Subject are required.', 'danger')
+            return render_template('masters/message_template_form.html')
+        if MessageTemplate.query.filter_by(template_type=template_type).first():
+            flash('A template with this type already exists.', 'danger')
+            return render_template('masters/message_template_form.html')
+        mt = MessageTemplate(name=name, template_type=template_type, body=body, is_active=is_active)
+        db.session.add(mt)
+        db.session.commit()
+        log_audit('Add Template', f"Added message template {name}")
+        flash('Template added successfully.', 'success')
+        return redirect(url_for('message_template_list'))
+    return render_template('masters/message_template_form.html')
+
+@app.route('/masters/templates/edit/<int:id>', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def message_template_edit(id):
+    mt = MessageTemplate.query.get_or_404(id)
+    if request.method == 'POST':
+        mt.name = request.form.get('name')
+        mt.template_type = request.form.get('template_type')
+        mt.body = request.form.get('body')
+        mt.is_active = 'is_active' in request.form
+        db.session.commit()
+        log_audit('Edit Template', f"Edited message template {mt.name}")
+        flash('Template updated successfully.', 'success')
+        return redirect(url_for('message_template_list'))
+    return render_template('masters/message_template_form.html', template=mt)
+
+@app.route('/masters/templates/delete/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def message_template_delete(id):
+    mt = MessageTemplate.query.get_or_404(id)
+    db.session.delete(mt)
+    db.session.commit()
+    log_audit('Delete Template', f"Deleted message template {mt.name}")
+    flash('Template deleted.', 'success')
+    return redirect(url_for('message_template_list'))
+
+@app.route('/masters/templates/send-bulk', methods=['POST'])
+@login_required
+@admin_required
+def send_bulk_message():
+    template_id = request.form.get('template_id', type=int)
+    start_date_str = request.form.get('start_date')
+    end_date_str = request.form.get('end_date')
+    try:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+    except ValueError:
+        flash('Invalid date format. Use YYYY-MM-DD.', 'danger')
+        return redirect(url_for('message_template_list'))
+    
+    template = MessageTemplate.query.get(template_id)
+    if not template:
+        flash('Template not found.', 'danger')
+        return redirect(url_for('message_template_list'))
+    
+    plans = CustomerPlan.query.filter(
+        CustomerPlan.end_date >= start_date,
+        CustomerPlan.end_date <= end_date
+    ).all()
+    
+    sent_count = 0
+    for cp in plans:
+        if cp.customer and cp.customer.mobile:
+            send_template_message(cp.customer, template.template_type)
+            sent_count += 1
+    
+    log_audit('Bulk Message', f"Sent {template.name} to {sent_count} customers")
+    flash(f'Message sent to {sent_count} customers.', 'success')
+    return redirect(url_for('message_template_list'))
+
 # ---------- Customer CRUD ----------
 @app.route('/customers')
 @login_required
@@ -1276,19 +1405,15 @@ def customer_search():
 def customer_add():
     form = CustomerForm()
     
-    # Populate Dropdowns from Database
     form.zone.choices = [(z.name, z.name) for z in Zone.query.all()]
     form.locality.choices = [(l.name, l.name) for l in Locality.query.all()]
     form.area.choices = [(a.name, a.name) for a in Area.query.all()]
     form.building.choices = [(b.name, b.name) for b in Building.query.all()]
 
     plans = Plan.query.filter_by(is_active=True).all()
-
-    # Generate a fresh Reference ID for the HTML template
     ref_id = generate_reference_id()
 
     if form.validate_on_submit():
-        # STRICTLY AUTO-GENERATED REFERENCE ID (Ensuring uniqueness)
         ref_id = generate_reference_id()
         while Customer.query.filter_by(reference_id=ref_id).first():
             ref_id = generate_reference_id()
@@ -1305,13 +1430,13 @@ def customer_add():
                 flash(f'Username "{username}" is already taken. Please choose another.', 'danger')
                 return render_template('customers/add.html', form=form, plans=plans, date=date, ref_id=ref_id)
 
-        # Handle password (if provided)
         password = form.password.data
         password_hash = None
         if password:
             password_hash = generate_password_hash(password)
+        else:
+            password_hash = generate_password_hash('123456')  # <--- DEFAULT PASSWORD
 
-        # Handle file uploads
         reg_form_filename = None
         if form.reg_form.data:
             file = form.reg_form.data
@@ -1374,7 +1499,6 @@ def customer_add():
             db.session.add(customer)
             db.session.commit()
 
-            # ----- Plan Assignment -----
             plan_id = request.form.get('plan_id', type=int)
             plan_start_date_str = request.form.get('plan_start_date')
             if plan_id and plan_start_date_str:
@@ -1410,7 +1534,7 @@ def customer_add():
             flash(f'Please correct the following errors: {form.errors}', 'danger')
 
     return render_template('customers/add.html', form=form, plans=plans, date=date, ref_id=ref_id)
-    
+
 # ===== CUSTOMER EDIT =====
 @app.route('/customers/edit/<int:id>', methods=['GET', 'POST'])
 @login_required
@@ -1419,7 +1543,6 @@ def customer_edit(id):
     customer = Customer.query.get_or_404(id)
     form = CustomerForm(obj=customer)
     
-    # Populate Dropdowns from Database
     form.zone.choices = [(z.name, z.name) for z in Zone.query.all()]
     form.locality.choices = [(l.name, l.name) for l in Locality.query.all()]
     form.area.choices = [(a.name, a.name) for a in Area.query.all()]
@@ -1465,7 +1588,6 @@ def payment_ledger(id):
     invoices = Invoice.query.filter_by(customer_id=id).order_by(Invoice.issue_date).all()
     payments = Payment.query.filter_by(customer_id=id).order_by(Payment.payment_date).all()
 
-    # Combine invoices and payments into a single sorted ledger
     combined_ledger = []
     for inv in invoices:
         combined_ledger.append({
@@ -1480,7 +1602,6 @@ def payment_ledger(id):
             'object': pay
         })
 
-    # Sort by date, newest first
     combined_ledger.sort(key=lambda x: x['date'], reverse=True)
 
     return render_template('customers/ledger.html',
@@ -1499,7 +1620,6 @@ def customer_view(id):
     plans_history = CustomerPlan.query.filter_by(customer_id=id).order_by(CustomerPlan.start_date.desc()).all()
     invoices = Invoice.query.filter_by(customer_id=id).order_by(Invoice.issue_date.desc()).all()
 
-    # Pending invoices: those with status 'sent' or 'overdue' and balance > 0
     all_unpaid = Invoice.query.filter(
         Invoice.customer_id == id,
         Invoice.status.in_(['sent', 'overdue'])
@@ -1513,20 +1633,22 @@ def customer_view(id):
     total_paid = sum(float(p.amount or 0) for p in payments if p.status == 'approved')
     total_outstanding = sum(i.balance for i in invoices
                             if i.status in ('draft', 'sent', 'overdue'))
-    wallet_balance = float(customer.wallet.balance) if customer.wallet else 0.0
     company = Company.query.first()
-    inventory_items = InventoryAssignment.query.filter_by(customer_id=id).all()
-
-    # Inventory vendors drive the Addon Invoice product picker.
     vendors = (Vendor.query.filter_by(is_active=True)
                .order_by(Vendor.name).all())
     service_providers = ServiceProvider.query.filter_by(is_active=True).all()
+
+    # === FIX: pass service provider name properly ===
+    service_provider_name = None
+    if active_plan and active_plan.plan and active_plan.plan.service_provider:
+        service_provider_name = active_plan.plan.service_provider.name
 
     return render_template('customers/view.html',
                            vendors=vendors,
                            service_providers=service_providers,
                            customer=customer,
                            active_plan=active_plan,
+                           service_provider_name=service_provider_name,  # <--- FIX
                            plans=plans,
                            plans_history=plans_history,
                            invoices=invoices,
@@ -1535,8 +1657,6 @@ def customer_view(id):
                            total_billed=total_billed,
                            total_paid=total_paid,
                            total_outstanding=total_outstanding,
-                           wallet_balance=wallet_balance,
-                           inventory_items=inventory_items,
                            company=company,
                            payment_modes=PAYMENT_MODE_CHOICES,
                            today=date.today())
@@ -1606,7 +1726,6 @@ def reset_customer_mac(id):
     if len(mac) != 17 or mac.count(':') != 5:
         flash('Invalid MAC address format. Use XX:XX:XX:XX:XX:XX', 'danger')
         return redirect(url_for('customer_view', id=id))
-    # Call external API – NOT stored in DB
     if reset_mac_on_log2space(mac, customer.reference_id):
         log_audit('Reset MAC', f"Reset MAC to {mac} for customer {customer.full_name}")
         flash('MAC address reset successfully on network.', 'success')
@@ -1684,11 +1803,6 @@ def send_customer_sms(id):
     return redirect(url_for('customer_view', id=id))
 
 def _next_vendor_bill_no():
-    """Sequential vendor bill number of the form VB-YYYYMM-NNNN.
-
-    The counter restarts each month. Only the trailing segment after the last
-    hyphen is parsed, so the YYYYMM part can never leak into the sequence.
-    """
     prefix = f"VB-{date.today():%Y%m}-"
     seq = 1
     last = (VendorBill.query
@@ -1705,13 +1819,7 @@ def _next_vendor_bill_no():
         seq += 1
     return f"{prefix}{secrets.token_hex(3).upper()}"
 
-
 def _build_vendor_bills(invoice, customer, lines, issue_date):
-    """Group billed products by their vendor and raise one purchase bill each.
-
-    Returns the list of VendorBill rows created. Products with no vendor set
-    are skipped (nothing to bill anyone for).
-    """
     by_vendor = defaultdict(list)
     for ln in lines:
         vid = ln.get('vendor_id')
@@ -1753,11 +1861,9 @@ def _build_vendor_bills(invoice, customer, lines, issue_date):
         created.append(bill)
     return created
 
-
 @app.route('/api/vendors/<int:vendor_id>/products')
 @login_required
 def api_vendor_products(vendor_id):
-    """Feeds the product dropdown on the Addon Invoice bar."""
     vendor = db.session.get(Vendor, vendor_id)
     if vendor is None:
         return jsonify(error='Vendor not found'), 404
@@ -1773,23 +1879,9 @@ def api_vendor_products(vendor_id):
         'on_hand': p.on_hand,
     } for p in products])
 
-
 @app.route('/customers/<int:id>/add_invoice', methods=['POST'])
 @login_required
 def add_customer_invoice(id):
-    """Addon Invoice bar on the Pending Invoice tab.
-
-    Supports two modes, which can be combined:
-
-      1. Flat amount  - the plain Amount box (a service charge, a discount).
-      2. Vendor items - pick a Vendor, then add one row per product taken from
-         that vendor's catalogue. Each row becomes an InvoiceItem, decrements
-         Stock, is assigned to the customer, and rolls up into a VendorBill so
-         the purchase side is recorded against the vendor too.
-
-    Everything happens in a single transaction: if any part fails, no invoice
-    is created and no stock is moved.
-    """
     customer = Customer.query.get_or_404(id)
     back = redirect(url_for('customer_view', id=id) + '#pending-invoice')
 
@@ -1814,7 +1906,6 @@ def add_customer_invoice(id):
         flash('Amount and discount must be valid numbers.', 'danger')
         return back
 
-    # ---------- collect vendor product rows ----------
     prod_ids = request.form.getlist('item_product_id[]')
     serials  = request.form.getlist('item_serial[]')
     qtys     = request.form.getlist('item_qty[]')
@@ -1860,7 +1951,6 @@ def add_customer_invoice(id):
 
     total = items_total + flat_amount
 
-    # ---------- validate ----------
     if total < 0:
         flash('Invoice amount cannot be negative.', 'danger')
         return back
@@ -1882,7 +1972,7 @@ def add_customer_invoice(id):
     due_days = 15
     try:
         due_days = int(Setting.get('invoice_due_days', 15) or 15)
-    except Exception:  # noqa: BLE001 - settings table may not be seeded yet
+    except Exception:
         pass
 
     payment = None
@@ -1908,7 +1998,6 @@ def add_customer_invoice(id):
         db.session.add(invoice)
         db.session.flush()
 
-        # A flat charge with no product rows still gets a readable line.
         if flat_amount > 0:
             db.session.add(InvoiceItem(
                 invoice_id=invoice.id,
@@ -1941,11 +2030,9 @@ def add_customer_invoice(id):
                 assigned_date=issue_date,
                 status='Active'))
 
-        # ---------- vendor purchase bills ----------
         if lines:
             vendor_bills = _build_vendor_bills(invoice, customer, lines, issue_date)
 
-        # ---------- optional immediate collection ----------
         if payment_mode and total > 0:
             needs_auth = not current_user.is_admin()
             payment = Payment(
@@ -1969,7 +2056,7 @@ def add_customer_invoice(id):
 
         db.session.commit()
 
-    except Exception:  # noqa: BLE001
+    except Exception:
         db.session.rollback()
         app.logger.exception("Addon invoice failed for customer %s", id)
         flash('The invoice could not be saved. Nothing was charged and no '
@@ -1989,7 +2076,6 @@ def add_customer_invoice(id):
         msg += ' The payment is waiting for admin authorization.'
     flash(msg, 'success')
     return back
-
 
 @app.route('/customers/<int:id>/terminate', methods=['POST'])
 @login_required
@@ -2095,6 +2181,14 @@ def renew_plan(customer_id):
     db.session.commit()
     log_audit('Renew Plan', f"Renewed plan {plan.name} for {customer.full_name} until {new_end_date}")
     flash(f'Plan renewed successfully. New expiry: {new_end_date.strftime("%d-%b-%Y")}', 'success')
+    
+    # Send Renewal Notification
+    send_template_message(customer, 'renewal', {
+        'customer_name': customer.full_name,
+        'username': customer.username,
+        'amount': plan.price_monthly
+    })
+    
     send_sms(customer.mobile, f"Dear {customer.full_name}, your plan has been renewed until {new_end_date.strftime('%d-%b-%Y')}.")
     return redirect(url_for('customer_view', id=customer_id))
 
@@ -2161,6 +2255,17 @@ def record_payment(invoice_id):
         except ValueError:
             flash('Invalid renew date format.', 'warning')
 
+    # Send Payment Received Notification
+    if needs_auth:
+        # Payment is pending, but still we can send a notification if configured
+        pass
+    else:
+        send_template_message(customer, 'payment_received', {
+            'customer_name': customer.full_name,
+            'paid_amount': amount,
+            'balance': invoice.balance
+        })
+
     flash('Payment recorded successfully'
           + (' — awaiting authorization.' if needs_auth else '.'), 'success')
     return redirect(url_for('customer_view', id=customer.id) + '#payment-history')
@@ -2176,8 +2281,6 @@ def payment_delete(id):
     amount = payment.amount
     db.session.delete(payment)
     db.session.commit()
-    # If the parent invoice had been marked paid off the back of this
-    # payment, re-open it now that the payment no longer exists.
     if invoice and invoice.balance > 0 and invoice.status == 'paid':
         invoice.status = 'sent'
         db.session.commit()
@@ -2219,41 +2322,33 @@ def _invoice_context(invoice):
     return dict(invoice=invoice, customer=customer, company=company,
                 payments=payments, today=date.today())
 
-
 def _serve_invoice(template, invoice, download, filename):
-    """Render an invoice view; as an attachment when download=1."""
     html = render_template(template, download=download, **_invoice_context(invoice))
     if not download:
         return html
     return Response(html, mimetype='text/html',
                     headers={'Content-Disposition': f'attachment; filename={filename}'})
 
-
 @app.route('/invoices/<int:id>/print')
 @login_required
 def invoice_print(id):
     return redirect(url_for('invoice_summary', id=id))
 
-
 @app.route('/invoices/<int:id>/summary')
 @login_required
 def invoice_summary(id):
-    """Summary Invoice — one-line-per-invoice format. ?download=1 saves the file."""
     invoice = Invoice.query.get_or_404(id)
     download = request.args.get('download') == '1'
     return _serve_invoice('invoices/summary.html', invoice, download,
                           f'summary-{invoice.invoice_no}.html')
 
-
 @app.route('/invoices/<int:id>/detailed')
 @login_required
 def invoice_detailed(id):
-    """Detailed Invoice — full line items, tax and payment breakdown."""
     invoice = Invoice.query.get_or_404(id)
     download = request.args.get('download') == '1'
     return _serve_invoice('invoices/detailed.html', invoice, download,
                           f'detailed-{invoice.invoice_no}.html')
-
 
 @app.route('/invoices/<int:id>/delete', methods=['POST'])
 @login_required
@@ -2272,11 +2367,9 @@ def invoice_delete(id):
     flash('Invoice deleted.', 'success')
     return redirect(url_for('customer_view', id=customer_id) + '#pending-invoice')
 
-
 @app.route('/customers/<int:id>/invoices/export')
 @login_required
 def customer_invoices_export(id):
-    """Download the customer's whole invoice history as CSV."""
     customer = Customer.query.get_or_404(id)
     invoices = Invoice.query.filter_by(customer_id=id).order_by(Invoice.issue_date.desc()).all()
     output = io.StringIO()
@@ -2339,92 +2432,7 @@ def payment_approve(id):
     flash('Payment authorized.', 'success')
     return redirect(request.referrer or url_for('customer_view', id=payment.customer_id))
 
-# ---------- Payment Gateway ----------
-@app.route('/payments/gateway/<int:invoice_id>')
-@login_required
-def payment_gateway(invoice_id):
-    invoice = Invoice.query.get_or_404(invoice_id)
-    if invoice.status == 'paid':
-        flash('This invoice is already paid.', 'info')
-        return redirect(url_for('customer_view', id=invoice.customer_id))
-    if not RAZORPAY_CONFIGURED:
-        flash('Online payment is not configured yet. Please contact support or pay by another method.', 'warning')
-        return redirect(url_for('customer_view', id=invoice.customer_id))
-    order_data = {
-        'amount': int(float(invoice.total_amount) * 100),
-        'currency': 'INR',
-        'receipt': invoice.invoice_no,
-        'payment_capture': 1
-    }
-    try:
-        order = razorpay_client.order.create(data=order_data)
-    except Exception:
-        app.logger.exception("Failed to create Razorpay order")
-        flash('Could not start the online payment. Please try again later.', 'danger')
-        return redirect(url_for('customer_view', id=invoice.customer_id))
-    txn = PaymentGatewayTransaction(
-        invoice_id=invoice.id,
-        gateway='razorpay',
-        transaction_id=order['id'],
-        amount=invoice.total_amount,
-        status='created'
-    )
-    db.session.add(txn)
-    db.session.commit()
-    return render_template('payments/gateway.html', invoice=invoice, order=order, key=RAZORPAY_KEY_ID)
-
-@app.route('/payments/gateway/callback', methods=['POST'])
-@csrf.exempt
-def payment_callback():
-    data = request.form
-    params_dict = {
-        'razorpay_payment_id': data.get('razorpay_payment_id'),
-        'razorpay_order_id': data.get('razorpay_order_id'),
-        'razorpay_signature': data.get('razorpay_signature')
-    }
-    if not all(params_dict.values()):
-        flash('Incomplete payment response received.', 'danger')
-        return redirect(url_for('dashboard'))
-    try:
-        razorpay_client.utility.verify_payment_signature(params_dict)
-        order_id = data['razorpay_order_id']
-        payment_id = data['razorpay_payment_id']
-        txn = PaymentGatewayTransaction.query.filter_by(transaction_id=order_id).first()
-        if txn and txn.status != 'paid':
-            txn.status = 'paid'
-            txn.payment_id = payment_id
-            txn.updated_at = datetime.utcnow()
-            invoice = Invoice.query.get(txn.invoice_id)
-            payment = Payment(
-                invoice_id=invoice.id,
-                customer_id=invoice.customer_id,
-                amount=txn.amount,
-                payment_date=date.today(),
-                payment_mode='Online',
-                mode_detail='Razorpay Payment ID: ' + payment_id,
-                status='approved',
-                gateway_transaction_id=payment_id
-            )
-            db.session.add(payment)
-            if invoice.balance <= 0:
-                invoice.status = 'paid'
-            db.session.commit()
-            log_audit('Gateway Payment', f"Razorpay payment {payment_id} verified for invoice {invoice.invoice_no}")
-            flash('Payment successful.', 'success')
-            return redirect(url_for('customer_view', id=invoice.customer_id))
-        elif txn:
-            flash('Payment already recorded.', 'info')
-            return redirect(url_for('customer_view', id=txn.invoice.customer_id))
-        else:
-            flash('Transaction not found.', 'danger')
-            return redirect(url_for('dashboard'))
-    except Exception:
-        app.logger.exception("Razorpay signature verification failed")
-        flash('Payment verification failed. Please contact support if the amount was debited.', 'danger')
-        return redirect(url_for('dashboard'))
-
-
-# ---------- Service Provider Master CRUD (ADDED) ----------
+# ---------- Service Provider Master CRUD ----------
 @app.route('/masters/service-providers')
 @login_required
 @admin_required
@@ -2562,7 +2570,6 @@ def product_add():
         )
         db.session.add(product)
         db.session.flush()
-        # Every product gets a stock row so it can be billed immediately.
         if not Stock.query.filter_by(product_id=product.id).first():
             db.session.add(Stock(product_id=product.id, quantity=0))
         db.session.commit()
@@ -2594,8 +2601,6 @@ def product_edit(id):
 @admin_required
 def product_delete(id):
     product = Product.query.get_or_404(id)
-    # Soft-delete: the product may already be referenced by invoice line items
-    # and vendor bills, so removing the row outright would break that history.
     product.is_active = False
     db.session.commit()
     log_audit('Delete Product', f"Deactivated product {product.name}")
@@ -2784,10 +2789,7 @@ def expense_payee_delete(id):
 @app.route('/expenses')
 @login_required
 def expenses_index():
-    # Base query
     query = Expense.query
-
-    # Filters
     category_id = request.args.get('category', type=int)
     account_id = request.args.get('account', type=int)
     payee_id = request.args.get('payee', type=int)
@@ -2808,7 +2810,6 @@ def expenses_index():
     expenses = query.order_by(Expense.expense_date.desc(), Expense.id.desc()).all()
     total_amount = sum(float(e.amount or 0) for e in expenses)
 
-    # For filter dropdowns
     categories = ExpenseCategory.query.all()
     accounts = ExpenseAccount.query.all()
     payees = ExpensePayee.query.all()
@@ -2922,7 +2923,7 @@ def staff_add():
             role=form.role.data,
             staff_type_id=form.staff_type_id.data,
             is_active=form.is_active.data,
-            monthly_salary=form.monthly_salary.data or 0.00   # <-- ADDED
+            monthly_salary=form.monthly_salary.data or 0.00
         )
         if form.password.data:
             user.set_password(form.password.data)
@@ -2946,7 +2947,7 @@ def staff_edit(id):
     form = StaffForm(obj=user)
     form.staff_type_id.choices = [(t.id, t.name) for t in StaffType.query.all()]
     if form.validate_on_submit():
-        form.populate_obj(user)  # this includes monthly_salary because it's in the form
+        form.populate_obj(user)
         if form.password.data:
             user.set_password(form.password.data)
         db.session.commit()
@@ -3140,7 +3141,7 @@ def payroll_mark_paid(id):
     flash('Payroll marked as paid.', 'success')
     return redirect(url_for('payroll_list'))
 
-# ---------- HR Reports (NEW) ----------
+# ---------- HR Reports ----------
 @app.route('/hr/attendance/report')
 @login_required
 def attendance_report():
@@ -3300,7 +3301,7 @@ def payroll_report():
                            month=month_date.strftime('%Y-%m'),
                            month_display=month_date.strftime('%B %Y'))
 
-# ---------- Plan CRUD (UPDATED) ----------
+# ---------- Plan CRUD ----------
 @app.route('/plans')
 @login_required
 def plan_list():
@@ -3384,14 +3385,12 @@ def vendor_bill_list():
                            vendors=Vendor.query.order_by(Vendor.name).all(),
                            totals=totals, status=status, vendor_id=vendor_id)
 
-
 @app.route('/inventory/vendor-bills/<int:id>')
 @login_required
 def vendor_bill_view(id):
     bill = VendorBill.query.get_or_404(id)
     return render_template('inventory/vendor_bill_view.html', bill=bill,
                            company=Company.query.first(), today=date.today())
-
 
 @app.route('/inventory/vendor-bills/add', methods=['GET', 'POST'])
 @login_required
@@ -3460,7 +3459,6 @@ def vendor_bill_add():
                     description=product.name, serial_number=serial,
                     quantity=qty, unit_cost=cost,
                     tax_percent=float(product.tax_percent or 0)))
-                # Receiving a purchase bill increases stock.
                 stock = Stock.query.filter_by(product_id=product.id).first()
                 if stock:
                     stock.quantity = (stock.quantity or 0) + qty
@@ -3469,7 +3467,7 @@ def vendor_bill_add():
             db.session.flush()
             bill.recalculate()
             db.session.commit()
-        except Exception:  # noqa: BLE001
+        except Exception:
             db.session.rollback()
             app.logger.exception("Vendor bill creation failed")
             flash('The bill could not be saved. No stock was changed.', 'danger')
@@ -3482,7 +3480,6 @@ def vendor_bill_add():
 
     return render_template('inventory/vendor_bill_form.html', form=form,
                            products=products)
-
 
 @app.route('/inventory/vendor-bills/<int:id>/pay', methods=['POST'])
 @login_required
@@ -3504,7 +3501,6 @@ def vendor_bill_pay(id):
     flash(f'Recorded Rs.{amount:,.2f} against {bill.bill_no}.', 'success')
     return redirect(url_for('vendor_bill_view', id=id))
 
-
 @app.route('/inventory/vendor-bills/<int:id>/cancel', methods=['POST'])
 @login_required
 @admin_required
@@ -3519,7 +3515,6 @@ def vendor_bill_cancel(id):
     log_audit('Vendor Bill Cancelled', bill.bill_no)
     flash(f'Bill {bill.bill_no} cancelled.', 'success')
     return redirect(url_for('vendor_bill_list'))
-
 
 @app.route('/inventory/vendor-bills/export')
 @login_required
@@ -3541,114 +3536,140 @@ def vendor_bill_export():
                     headers={'Content-Disposition':
                              'attachment; filename=vendor-bills.csv'})
 
-
 # =========================================================================== #
-#  REFERRAL CAMPAIGNS
+#  CUSTOMER SELF-SERVICE PORTAL (NEW)
 # =========================================================================== #
-@app.route('/referrals')
-@login_required
-def referral_index():
-    campaigns = ReferralCampaign.query.order_by(ReferralCampaign.id.desc()).all()
-    referrals = (Referral.query.order_by(Referral.id.desc()).limit(100).all())
-    return render_template('referral/index.html', campaigns=campaigns,
-                           referrals=referrals, today=date.today())
-
-
-@app.route('/referrals/add', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def referral_add():
-    form = ReferralCampaignForm()
+@app.route('/customer/login', methods=['GET', 'POST'])
+def customer_login():
+    if session.get('customer_id'):
+        return redirect(url_for('customer_dashboard'))
+    form = CustomerLoginForm()
     if form.validate_on_submit():
-        if form.end_date.data and form.start_date.data \
-                and form.end_date.data < form.start_date.data:
-            flash('The end date cannot be before the start date.', 'danger')
-            return render_template('referral/add.html', form=form)
-        campaign = ReferralCampaign(
-            name=form.name.data,
-            code=(form.code.data or '').strip().upper() or None,
-            description=form.description.data or None,
-            reward_type=form.reward_type.data,
-            referrer_reward=form.referrer_reward.data or 0,
-            referee_reward=form.referee_reward.data or 0,
-            start_date=form.start_date.data,
-            end_date=form.end_date.data,
-            is_active=form.is_active.data,
-        )
-        db.session.add(campaign)
-        db.session.commit()
-        log_audit('Add Referral Campaign', campaign.name)
-        flash('Referral campaign created.', 'success')
-        return redirect(url_for('referral_index'))
-    return render_template('referral/add.html', form=form)
+        customer = Customer.query.filter_by(username=form.username.data).first()
+        if customer and customer.is_active and customer.check_password(form.password.data):
+            session['customer_id'] = customer.id
+            session.permanent = True
+            log_audit('Customer Login', f"Customer {customer.full_name} logged in")
+            next_page = request.args.get('next')
+            if next_page and urlsplit(next_page).netloc == '' and next_page.startswith('/'):
+                return redirect(next_page)
+            return redirect(url_for('customer_dashboard'))
+        flash('Invalid username or password.', 'danger')
+    return render_template('customer/login.html', form=form)
 
+@app.route('/customer/logout')
+def customer_logout():
+    session.pop('customer_id', None)
+    flash('Logged out successfully.', 'success')
+    return redirect(url_for('customer_login'))
 
-@app.route('/referrals/<int:id>/edit', methods=['GET', 'POST'])
-@login_required
-@admin_required
-def referral_edit(id):
-    campaign = ReferralCampaign.query.get_or_404(id)
-    form = ReferralCampaignForm(obj=campaign)
-    if form.validate_on_submit():
-        if form.end_date.data and form.start_date.data \
-                and form.end_date.data < form.start_date.data:
-            flash('The end date cannot be before the start date.', 'danger')
-            return render_template('referral/edit.html', form=form, campaign=campaign)
-        form.populate_obj(campaign)
-        campaign.code = (campaign.code or '').strip().upper() or None
-        db.session.commit()
-        log_audit('Edit Referral Campaign', campaign.name)
-        flash('Referral campaign updated.', 'success')
-        return redirect(url_for('referral_index'))
-    return render_template('referral/edit.html', form=form, campaign=campaign)
+@app.route('/customer/dashboard')
+@customer_required
+def customer_dashboard():
+    customer_id = session['customer_id']
+    customer = Customer.query.get_or_404(customer_id)
+    active_plan = CustomerPlan.query.filter_by(customer_id=customer_id, status='active').first()
+    invoices = Invoice.query.filter_by(customer_id=customer_id).order_by(Invoice.issue_date.desc()).all()
+    payments = Payment.query.filter_by(customer_id=customer_id).order_by(Payment.payment_date.desc()).all()
 
+    total_billed = sum(float(i.total_amount or 0) for i in invoices)
+    total_paid = sum(float(p.amount or 0) for p in payments if p.status == 'approved')
+    balance = total_billed - total_paid
 
-@app.route('/referrals/<int:id>/toggle', methods=['POST'])
-@login_required
-@admin_required
-def referral_toggle(id):
-    campaign = ReferralCampaign.query.get_or_404(id)
-    campaign.is_active = not campaign.is_active
+    return render_template('customer/dashboard.html',
+                           customer=customer,
+                           active_plan=active_plan,
+                           invoices=invoices,
+                           payments=payments,
+                           balance=balance)
+
+@app.route('/customer/profile', methods=['GET', 'POST'])
+@customer_required
+def customer_profile():
+    customer_id = session['customer_id']
+    customer = Customer.query.get_or_404(customer_id)
+    if request.method == 'POST':
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+        if new_password and new_password == confirm_password:
+            customer.set_password(new_password)
+            db.session.commit()
+            flash('Password updated successfully.', 'success')
+        else:
+            flash('Passwords do not match or are empty.', 'danger')
+    return render_template('customer/profile.html', customer=customer)
+
+@app.route('/customer/invoice/<int:id>/download')
+@customer_required
+def customer_invoice_download(id):
+    invoice = Invoice.query.get_or_404(id)
+    if invoice.customer_id != session['customer_id']:
+        abort(403)
+    html = render_template('invoices/summary.html', invoice=invoice,
+                           customer=invoice.customer, company=Company.query.first(),
+                           today=date.today(), download=True)
+    # Generate PDF (requires pdfkit or weasyprint; using pdfkit as example)
+    try:
+        import pdfkit
+        pdf = pdfkit.from_string(html, False)
+    except ImportError:
+        flash('PDF generation is not configured. Please contact support.', 'warning')
+        return redirect(url_for('customer_dashboard'))
+    response = Response(pdf, mimetype='application/pdf')
+    response.headers['Content-Disposition'] = f'attachment; filename=invoice-{invoice.invoice_no}.pdf'
+    return response
+
+@app.route('/customer/renew', methods=['POST'])
+@customer_required
+def customer_renew_plan():
+    customer_id = session['customer_id']
+    customer = Customer.query.get_or_404(customer_id)
+    active_plan = CustomerPlan.query.filter_by(customer_id=customer_id, status='active').first()
+    if not active_plan:
+        flash('No active plan to renew.', 'warning')
+        return redirect(url_for('customer_dashboard'))
+    plan = active_plan.plan
+    new_end = active_plan.end_date + timedelta(days=plan.validity_days)
+    invoice = Invoice(
+        customer_id=customer_id,
+        invoice_no=generate_invoice_no(),
+        issue_date=date.today(),
+        due_date=date.today() + timedelta(days=15),
+        total_amount=plan.price_monthly,
+        tax_amount=0.00,
+        caption=f"Online Renewal - Plan: {plan.name}",
+        invoice_type='plan',
+        status='sent'
+    )
+    db.session.add(invoice)
     db.session.commit()
-    log_audit('Toggle Referral Campaign',
-              f"{campaign.name} -> {'active' if campaign.is_active else 'inactive'}")
-    flash(f"Campaign {'activated' if campaign.is_active else 'deactivated'}.",
-          'success')
-    return redirect(url_for('referral_index'))
-
-
-@app.route('/referrals/<int:id>/delete', methods=['POST'])
-@login_required
-@admin_required
-def referral_delete(id):
-    campaign = ReferralCampaign.query.get_or_404(id)
-    if Referral.query.filter_by(campaign_id=campaign.id).first():
-        campaign.is_active = False
-        db.session.commit()
-        flash('This campaign already has referrals, so it was deactivated '
-              'rather than deleted.', 'warning')
-        return redirect(url_for('referral_index'))
-    db.session.delete(campaign)
+    
+    # Extend the plan now (payment is pending approval, but service is renewed)
+    active_plan.end_date = new_end
+    active_plan.last_invoice_date = date.today()
     db.session.commit()
-    log_audit('Delete Referral Campaign', campaign.name)
-    flash('Referral campaign deleted.', 'success')
-    return redirect(url_for('referral_index'))
-
+    
+    # Send Renewal Notification
+    send_template_message(customer, 'renewal', {
+        'customer_name': customer.full_name,
+        'username': customer.username,
+        'amount': plan.price_monthly
+    })
+    
+    flash(f'Plan renewed successfully! New expiry: {new_end.strftime("%d-%b-%Y")}. '
+          f'An invoice has been generated and payment is awaiting admin authorization.', 'success')
+    return redirect(url_for('customer_dashboard'))
 
 # ---------- Startup ----------
 def init_database(flask_app=None):
-    """Create tables and ensure a usable admin account exists.
-
-    Safe to call repeatedly. Used by both `python app.py` and wsgi.py so the
-    behaviour is identical under gunicorn.
-    """
+    """Create tables and ensure a usable admin account exists."""
     flask_app = flask_app or app
     with flask_app.app_context():
         db.create_all()
         try:
             from blueprints.settings_bp import seed_settings
             seed_settings()
-        except Exception:  # noqa: BLE001
+        except Exception:
             flask_app.logger.warning("Could not seed settings table.")
 
         admin = User.query.filter_by(username='admin').first()
@@ -3672,7 +3693,6 @@ def init_database(flask_app=None):
             admin.is_active = True
             db.session.commit()
             flask_app.logger.info("Admin account re-enabled.")
-
 
 if __name__ == '__main__':
     init_database(app)

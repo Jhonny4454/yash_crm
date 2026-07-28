@@ -262,11 +262,9 @@
 
         <li class="nav-item"><a class="nav-link {% if request.endpoint and (request.endpoint.startswith('hr_') or request.endpoint.startswith('attendance_') or request.endpoint.startswith('leave_') or request.endpoint.startswith('payroll_')) %}active{% endif %}" href="{{ url_for('hr_index') }}"><span class="link-label"><i class="fas fa-calendar-check"></i> HR &amp; Payroll</span></a></li>
 
-        <li class="nav-item"><a class="nav-link {% if request.endpoint and request.endpoint.startswith('referral_') %}active{% endif %}" href="{{ url_for('referral_index') }}"><span class="link-label"><i class="fas fa-gift"></i> Referrals</span></a></li>
-
         <!-- Masters Dropdown with nested submenus -->
         <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('company_') or request.endpoint.startswith('zone_') or request.endpoint.startswith('tax_') or request.endpoint.startswith('building_') or request.endpoint.startswith('area_') or request.endpoint.startswith('locality_') or request.endpoint in ['settings','import_export','database_backup']) %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
+          <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('company_') or request.endpoint.startswith('zone_') or request.endpoint.startswith('tax_') or request.endpoint.startswith('building_') or request.endpoint.startswith('area_') or request.endpoint.startswith('locality_') or request.endpoint in ['settings','import_export','database_backup','message_template_list']) %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
             <span class="link-label"><i class="fas fa-cog"></i> Masters</span>
           </a>
           <ul class="dropdown-menu dropdown-menu-dark">
@@ -288,6 +286,13 @@
                 <li><a class="dropdown-item" href="{{ url_for('building_list') }}">Building</a></li>
                 <li><a class="dropdown-item" href="{{ url_for('area_list') }}">Area</a></li>
                 <li><a class="dropdown-item" href="{{ url_for('locality_list') }}">Locality</a></li>
+              </ul>
+            </li>
+            <!-- NEW: Customer Templates submenu -->
+            <li class="dropdown-submenu">
+              <a class="dropdown-item submenu-toggle" href="#">Templates <i class="fas fa-chevron-down"></i></a>
+              <ul class="dropdown-menu dropdown-menu-dark">
+                <li><a class="dropdown-item" href="{{ url_for('message_template_list') }}">Customer Templates</a></li>
               </ul>
             </li>
           </ul>
@@ -364,18 +369,18 @@
           </li>
 
           <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('inventory') or request.endpoint.startswith('vendor_') or request.endpoint.startswith('product_') or request.endpoint.startswith('stock_')) %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
-            <span class="link-label"><i class="fas fa-boxes"></i> Inventory</span>
-          </a>
-          <ul class="dropdown-menu dropdown-menu-dark">
-            <li><a class="dropdown-item" href="{{ url_for('inventory_index') }}">Overview</a></li>
-            <li><a class="dropdown-item" href="{{ url_for('vendor_list') }}">Vendors</a></li>
-            <li><a class="dropdown-item" href="{{ url_for('product_list') }}">Products</a></li>
-            <li><a class="dropdown-item" href="{{ url_for('stock_list') }}">Stock</a></li>
-            <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item" href="{{ url_for('vendor_bill_list') }}">Vendor Bills</a></li>
-          </ul>
-        </li>
+            <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('inventory') or request.endpoint.startswith('vendor_') or request.endpoint.startswith('product_') or request.endpoint.startswith('stock_')) %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
+              <span class="link-label"><i class="fas fa-boxes"></i> Inventory</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-dark">
+              <li><a class="dropdown-item" href="{{ url_for('inventory_index') }}">Overview</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('vendor_list') }}">Vendors</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('product_list') }}">Products</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('stock_list') }}">Stock</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{{ url_for('vendor_bill_list') }}">Vendor Bills</a></li>
+            </ul>
+          </li>
 
           {% if current_user.is_admin() %}
           <li class="nav-item"><a class="nav-link {% if request.endpoint and request.endpoint.startswith('staff_') %}active{% endif %}" href="{{ url_for('staff_list') }}"><span class="link-label"><i class="fas fa-id-badge"></i> Staff</span></a></li>
@@ -383,11 +388,9 @@
 
           <li class="nav-item"><a class="nav-link {% if request.endpoint and (request.endpoint.startswith('hr_') or request.endpoint.startswith('attendance_') or request.endpoint.startswith('leave_') or request.endpoint.startswith('payroll_')) %}active{% endif %}" href="{{ url_for('hr_index') }}"><span class="link-label"><i class="fas fa-calendar-check"></i> HR &amp; Payroll</span></a></li>
 
-        <li class="nav-item"><a class="nav-link {% if request.endpoint and request.endpoint.startswith('referral_') %}active{% endif %}" href="{{ url_for('referral_index') }}"><span class="link-label"><i class="fas fa-gift"></i> Referrals</span></a></li>
-
           <!-- Masters Dropdown with nested submenus -->
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('company_') or request.endpoint.startswith('zone_') or request.endpoint.startswith('tax_') or request.endpoint.startswith('building_') or request.endpoint.startswith('area_') or request.endpoint.startswith('locality_') or request.endpoint in ['settings','import_export','database_backup']) %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
+            <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('company_') or request.endpoint.startswith('zone_') or request.endpoint.startswith('tax_') or request.endpoint.startswith('building_') or request.endpoint.startswith('area_') or request.endpoint.startswith('locality_') or request.endpoint in ['settings','import_export','database_backup','message_template_list']) %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
               <span class="link-label"><i class="fas fa-cog"></i> Masters</span>
             </a>
             <ul class="dropdown-menu dropdown-menu-dark">
@@ -409,6 +412,13 @@
                   <li><a class="dropdown-item" href="{{ url_for('building_list') }}">Building</a></li>
                   <li><a class="dropdown-item" href="{{ url_for('area_list') }}">Area</a></li>
                   <li><a class="dropdown-item" href="{{ url_for('locality_list') }}">Locality</a></li>
+                </ul>
+              </li>
+              <!-- NEW: Customer Templates submenu -->
+              <li class="dropdown-submenu">
+                <a class="dropdown-item submenu-toggle" href="#">Templates <i class="fas fa-chevron-down"></i></a>
+                <ul class="dropdown-menu dropdown-menu-dark">
+                  <li><a class="dropdown-item" href="{{ url_for('message_template_list') }}">Customer Templates</a></li>
                 </ul>
               </li>
             </ul>

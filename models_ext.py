@@ -458,3 +458,4 @@ class ImportJob(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     created_by = db.relationship('User')
+    

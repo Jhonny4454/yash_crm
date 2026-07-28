@@ -587,3 +587,14 @@ class ServiceRequest(db.Model):
     resolved_at = db.Column(db.DateTime)
     
     customer = db.relationship('Customer', backref='service_requests')
+
+# ===== NEW: Message Template for SMS/WhatsApp notifications =====
+class MessageTemplate(db.Model):
+    __tablename__ = 'message_templates'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    template_type = db.Column(db.String(50), nullable=False, unique=True)  # e.g., renewal, expiry_3d, expiry_2d, expired, payment_received
+    body = db.Column(db.Text, nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+# ============================================================

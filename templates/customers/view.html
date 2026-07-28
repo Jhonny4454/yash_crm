@@ -114,12 +114,10 @@
     <div class="tabs-container">
       <ul class="nav nav-tabs" id="customerTabs" role="tablist">
         <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#overview" type="button">Overview</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#wallet" type="button">Wallet</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#plan" type="button">Plan</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pending-invoice" type="button">Pending Invoice</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#invoice-history" type="button">Invoice History</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#payment-history" type="button">Payment History</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#inventory" type="button">Inventory</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#plan-history" type="button">Plan History</button></li>
       </ul>
 
@@ -133,7 +131,6 @@
               <p>{{ active_plan.plan.name if active_plan else 'None' }}</p>
               <span>{% if active_plan %}Expires {{ active_plan.end_date.strftime('%d-%m-%Y') }} &middot; {{ (active_plan.end_date - today).days }} days left{% else %}No active plan{% endif %}</span>
             </div>
-            <div class="info-card"><h6>Wallet Balance</h6><p>&#8377; {{ '%.2f'|format(wallet_balance) }}</p><span>Available credit</span></div>
             <div class="info-card"><h6>Total Billed</h6><p>&#8377; {{ '%.2f'|format(total_billed) }}</p><span>{{ invoices|length }} invoices</span></div>
             <div class="info-card"><h6>Total Paid</h6><p>&#8377; {{ '%.2f'|format(total_paid) }}</p><span>{{ payments|selectattr('status','equalto','approved')|list|length }} payments</span></div>
             <div class="info-card"><h6>Outstanding</h6><p style="color:{{ '#dc2626' if total_outstanding > 0 else '#16a34a' }};">&#8377; {{ '%.2f'|format(total_outstanding) }}</p><span>{{ pending_invoices|length }} pending invoices</span></div>
@@ -147,34 +144,6 @@
                 <tr><th style="width:200px;">Flat No</th><td>{{ customer.flat_no or '-' }}</td><th style="width:200px;">Building</th><td>{{ customer.building or '-' }}</td></tr>
                 <tr><th>Area</th><td>{{ customer.area or '-' }}</td><th>Locality</th><td>{{ customer.locality or '-' }}</td></tr>
                 <tr><th>Primary Address</th><td colspan="3">{{ customer.primary_address or customer.billing_address or '-' }}</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- ===== WALLET ===== -->
-        <div class="tab-pane fade" id="wallet">
-          <div class="section-title">Wallet</div>
-          <div class="info-grid">
-            <div class="info-card"><h6>Balance</h6><p>&#8377; {{ '%.2f'|format(wallet_balance) }}</p></div>
-          </div>
-          <div class="tbl-wrap">
-            <table class="tbl">
-              <thead><tr><th>#</th><th>Date</th><th>Type</th><th>Amount</th><th>Description</th></tr></thead>
-              <tbody>
-                {% if customer.wallet and customer.wallet.transactions %}
-                  {% for t in customer.wallet.transactions %}
-                  <tr>
-                    <td>{{ loop.index }}</td>
-                    <td>{{ t.created_at.strftime('%d %b, %Y') }}</td>
-                    <td><span class="mode-badge">{{ t.transaction_type|capitalize }}</span></td>
-                    <td>&#8377; {{ '%.2f'|format(t.amount) }}</td>
-                    <td>{{ t.description or '-' }}</td>
-                  </tr>
-                  {% endfor %}
-                {% else %}
-                  <tr><td colspan="5" class="empty">No wallet transactions.</td></tr>
-                {% endif %}
               </tbody>
             </table>
           </div>
@@ -194,7 +163,8 @@
                 <tr>
                   <td>1</td>
                   <td>{{ customer.username or '-' }}</td>
-                  <td>{{ active_plan.plan.service_provider or '-' }}</td>
+                  <!-- FIXED: Use service_provider_name to avoid <ServiceProvider 1> bug -->
+                  <td>{{ service_provider_name or '-' }}</td>
                   <td>{{ active_plan.plan.name }}</td>
                   <td>&#8377; {{ '%.2f'|format(active_plan.plan.price_monthly) }}</td>
                   <td><input form="planDatesForm" type="date" class="form-control form-control-sm" name="start_date" value="{{ active_plan.start_date.isoformat() }}" style="width:145px;"></td>
@@ -445,29 +415,6 @@
           </div>
           <a href="{{ url_for('payment_ledger', id=customer.id) }}" class="btn btn-outline-primary btn-sm">
             <i class="fas fa-book"></i> Open payment ledger</a>
-        </div>
-
-        <!-- ===== INVENTORY ===== -->
-        <div class="tab-pane fade" id="inventory">
-          <div class="section-title">Assigned Inventory</div>
-          <div class="tbl-wrap">
-            <table class="tbl">
-              <thead><tr><th>#</th><th>Product</th><th>Serial Number</th><th>Assigned Date</th><th>Status</th></tr></thead>
-              <tbody>
-                {% for item in inventory_items %}
-                <tr>
-                  <td>{{ loop.index }}</td>
-                  <td>{{ item.product.name if item.product else '-' }}</td>
-                  <td>{{ item.serial_number or '-' }}</td>
-                  <td>{{ item.assigned_date.strftime('%d %b, %Y') if item.assigned_date else '-' }}</td>
-                  <td>{{ item.status }}</td>
-                </tr>
-                {% else %}
-                <tr><td colspan="5" class="empty">No inventory assigned.</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
         </div>
 
         <!-- ===== PLAN HISTORY ===== -->

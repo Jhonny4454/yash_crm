@@ -3,7 +3,7 @@ from flask_wtf.file import FileField, FileAllowed
 from wtforms import (
     StringField, PasswordField, SelectField, DateField, DecimalField,
     TextAreaField, BooleanField, IntegerField, HiddenField, SubmitField, RadioField,
-    SelectMultipleField  # <-- ADDED for zones
+    SelectMultipleField
 )
 from wtforms.validators import DataRequired, Email, Length, Optional, NumberRange, EqualTo
 from datetime import date
@@ -27,11 +27,23 @@ class LoginForm(FlaskForm):
     remember = BooleanField('Keep me signed in')
     submit = SubmitField('Login')
 
+class CustomerLoginForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired()])
+    password = PasswordField('Password', validators=[DataRequired()])
+    remember = BooleanField('Keep me signed in')
+    submit = SubmitField('Login')
+
 class ChangePasswordForm(FlaskForm):
     current_password = PasswordField('Current Password', validators=[DataRequired()])
     new_password = PasswordField('New Password', validators=[DataRequired(), Length(min=6)])
     confirm_password = PasswordField('Confirm New Password', validators=[DataRequired(), EqualTo('new_password')])
     submit = SubmitField('Change Password')
+
+class CustomerChangePasswordForm(FlaskForm):
+    current_password = PasswordField('Current Password', validators=[DataRequired()])
+    new_password = PasswordField('New Password', validators=[DataRequired(), Length(min=6)])
+    confirm_password = PasswordField('Confirm New Password', validators=[DataRequired(), EqualTo('new_password')])
+    submit = SubmitField('Update Password')
 
 # ---------- Zone Form ----------
 class ZoneForm(FlaskForm):
@@ -73,7 +85,6 @@ class CompanyForm(FlaskForm):
     company_type = StringField('Company Type')
     company_logo = FileField('Company Logo', validators=[Optional(), FileAllowed(['jpg', 'png', 'jpeg', 'gif'], 'Images only!')])
     invoice_notes = TextAreaField('Invoice Notes', render_kw={"rows": 4})
-    # FIXED: Use SelectMultipleField for zones (returns a list of IDs)
     zones = SelectMultipleField('Zones', coerce=int, validators=[Optional()])
     submit = SubmitField('Submit')
 
@@ -227,7 +238,6 @@ class StaffForm(FlaskForm):
         ('field', 'Field Engineer'), ('accounts', 'Accounts')
     ])
     staff_type_id = SelectField('Staff Type', coerce=int, validators=[DataRequired()])
-    # NEW: monthly salary for this staff member
     monthly_salary = DecimalField('Monthly Salary (₹)', validators=[Optional(), NumberRange(min=0)])
     is_active = BooleanField('Active', default=True)
     submit = SubmitField('Save Staff')
@@ -302,7 +312,6 @@ class VendorForm(FlaskForm):
     is_active = BooleanField('Active', default=True)
     submit = SubmitField('Save Vendor')
 
-
 class ProductForm(FlaskForm):
     name = StringField('Product Name', validators=[DataRequired(), Length(max=100)])
     vendor_id = SelectField('Vendor', coerce=int, validators=[Optional()])
@@ -318,7 +327,6 @@ class ProductForm(FlaskForm):
     is_active = BooleanField('Active', default=True)
     submit = SubmitField('Save Product')
 
-
 class VendorBillForm(FlaskForm):
     vendor_id = SelectField('Vendor', coerce=int, validators=[DataRequired()])
     bill_date = DateField('Bill Date', default=date.today, validators=[DataRequired()])
@@ -328,12 +336,10 @@ class VendorBillForm(FlaskForm):
     notes = TextAreaField('Notes', validators=[Optional()])
     submit = SubmitField('Save Bill')
 
-
 class VendorBillPaymentForm(FlaskForm):
     amount = DecimalField('Amount Paid (\u20b9)',
                           validators=[DataRequired(), NumberRange(min=0.01)])
     submit = SubmitField('Record Payment')
-
 
 class ReferralCampaignForm(FlaskForm):
     name = StringField('Campaign Name', validators=[DataRequired(), Length(max=120)])
@@ -399,3 +405,29 @@ class PlanDatesForm(FlaskForm):
         ('cancelled', 'Cancelled'), ('terminated', 'Terminated')
     ], default='active')
     submit = SubmitField('Update Dates')
+
+# =========================================================== #
+#  NEW FORMS FOR CUSTOMER PORTAL & MESSAGE TEMPLATES          #
+# =========================================================== #
+
+class MessageTemplateForm(FlaskForm):
+    """Form for creating/editing WhatsApp/SMS templates."""
+    name = StringField('Template Name', validators=[DataRequired(), Length(max=100)])
+    template_type = SelectField('Template Type', choices=[
+        ('renewal', 'Plan Renewed'),
+        ('payment_received', 'Payment Received'),
+        ('expiry_3d', 'Expiry Reminder (3 Days)'),
+        ('expiry_2d', 'Expiry Reminder (2 Days)'),
+        ('expired', 'Plan Expired')
+    ], validators=[DataRequired()])
+    body = TextAreaField('Message Body', validators=[DataRequired()], 
+                         render_kw={"rows": 6, "placeholder": "Use {{customer_name}}, {{username}}, {{amount}}, {{days}}, {{balance}}, {{paid_amount}} as placeholders."})
+    is_active = BooleanField('Active', default=True)
+    submit = SubmitField('Save Template')
+
+class BulkMessageForm(FlaskForm):
+    """Form for sending bulk expiry messages to customers within a date range."""
+    template_id = SelectField('Select Template', coerce=int, validators=[DataRequired()])
+    start_date = DateField('Start Date', validators=[DataRequired()])
+    end_date = DateField('End Date', validators=[DataRequired()])
+    submit = SubmitField('Send Bulk Message')
