@@ -1,11 +1,11 @@
 # ---- Core web stack ----
 Flask==3.0.3
 Flask-SQLAlchemy==3.1.1
+SQLAlchemy==2.0.30
 Flask-Login==0.6.3
 Flask-WTF==1.2.1
 WTForms==3.1.2
 Werkzeug==3.0.3
-SQLAlchemy==2.0.30
 Jinja2==3.1.4
 
 # ---- Database drivers ----
