@@ -16,14 +16,7 @@ class User(UserMixin, db.Model):
     role = db.Column(db.Enum('admin','support','field','accounts'), default='support')
     is_active = db.Column(db.Boolean, default=True)
     staff_type_id = db.Column(db.Integer, db.ForeignKey('staff_types.id'))
-<<<<<<< HEAD
-    # NEW: monthly salary for this staff member
-=======
-<<<<<<< HEAD
-    # NEW: monthly salary for this staff member
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
     monthly_salary = db.Column(db.Numeric(10,2), default=0.00)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     staff_type = db.relationship('StaffType', backref='users')
@@ -96,15 +89,6 @@ class Customer(db.Model):
     def full_name(self):
         return f"{self.title} {self.first_name} {self.last_name}".strip()
 
-<<<<<<< HEAD
-# ===== ADDED: Service Provider Master =====
-=======
-<<<<<<< HEAD
-# ===== ADDED: Service Provider Master =====
-=======
-# ===== Service Provider Master =====
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
 class ServiceProvider(db.Model):
     __tablename__ = 'service_providers'
     id = db.Column(db.Integer, primary_key=True)
@@ -116,22 +100,11 @@ class ServiceProvider(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     plans = db.relationship('Plan', backref='service_provider', lazy=True)
-<<<<<<< HEAD
-# ===========================================
-=======
-<<<<<<< HEAD
-# ===========================================
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
 
 class Plan(db.Model):
     __tablename__ = 'plans'
     id = db.Column(db.Integer, primary_key=True)
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
     
     # <-- UPDATED: Removed old service_provider string, added 3 new fields below
     plan_code = db.Column(db.String(50))
@@ -139,14 +112,11 @@ class Plan(db.Model):
     service_provider_id = db.Column(db.Integer, db.ForeignKey('service_providers.id'), nullable=True)
     # --------------------------------
 
-<<<<<<< HEAD
-=======
-=======
+
     plan_code = db.Column(db.String(50))
     isp_amount = db.Column(db.Numeric(10,2), default=0.00)
     service_provider_id = db.Column(db.Integer, db.ForeignKey('service_providers.id'), nullable=True)
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
     plan_type = db.Column(db.String(50))
     name = db.Column(db.String(50), nullable=False)
     speed_mbps = db.Column(db.Integer, nullable=False)
@@ -178,35 +148,18 @@ class Invoice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
     customer_plan_id = db.Column(db.Integer, db.ForeignKey('customer_plans.id'), nullable=True)
-<<<<<<< HEAD
-    
-=======
-<<<<<<< HEAD
-    
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
     invoice_no = db.Column(db.String(20), unique=True, nullable=False)
     issue_date = db.Column(db.Date, nullable=False, default=date.today)
     due_date = db.Column(db.Date, nullable=False)
     total_amount = db.Column(db.Numeric(10,2), nullable=False)
     tax_amount = db.Column(db.Numeric(10,2), default=0.00)
-<<<<<<< HEAD
-    
-=======
-<<<<<<< HEAD
-    
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
     discount_percent = db.Column(db.Numeric(5,2), default=0.00)
     discount_amount = db.Column(db.Numeric(10,2), default=0.00)
     receipt_number = db.Column(db.String(50))
     remarks = db.Column(db.Text)
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
 
     status = db.Column(db.Enum('draft','sent','paid','overdue','cancelled'), default='draft')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -215,15 +168,12 @@ class Invoice(db.Model):
     invoice_type = db.Column(db.Enum('plan','addon','discount','other'), default='plan')
 
     # NEW: Vendor (Service Provider) field – stores the selected vendor name from the addon invoice form
-<<<<<<< HEAD
-=======
-=======
+
     status = db.Column(db.Enum('draft','sent','paid','overdue','cancelled'), default='draft')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     caption = db.Column(db.String(120))
     invoice_type = db.Column(db.Enum('plan','addon','discount','other'), default='plan')
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
     vendor = db.Column(db.String(100), nullable=True)
 
     payments = db.relationship('Payment', backref='invoice', lazy=True)
@@ -274,32 +224,17 @@ class Payment(db.Model):
     mode_detail = db.Column(db.String(200))
     status = db.Column(db.Enum('pending','approved','rejected'), default='approved')
     gateway_transaction_id = db.Column(db.String(100))
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
     # Where the money came from: 'admin' (counter entry) or 'portal' (customer paid online)
     source = db.Column(db.String(20), default='admin', index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-<<<<<<< HEAD
-=======
-=======
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
     book_receipt_no = db.Column(db.String(50))
     remarks = db.Column(db.Text)
     received_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     received_by_user = db.relationship('User', foreign_keys=[received_by_user_id])
-<<<<<<< HEAD
 
-=======
-<<<<<<< HEAD
-
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
     authorized_at = db.Column(db.DateTime)
     authorized_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     authorized_by_user = db.relationship('User', foreign_keys=[authorized_by_user_id])
@@ -307,10 +242,7 @@ class Payment(db.Model):
 
     @property
     def is_authorized(self):
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
         """True once an admin has signed this entry off."""
         return self.status == 'approved' and self.authorized_at is not None
 
@@ -330,16 +262,10 @@ class Payment(db.Model):
     @property
     def source_label(self):
         return 'Online Payment' if (self.source or '') == 'portal' else 'Counter Entry'
-
     @property
-<<<<<<< HEAD
-=======
-=======
-        return self.status == 'approved'
-
+    def is_authorized(self):
+        return self.status == "approved"
     @property
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
     def mode_group(self):
         m = (self.payment_mode or '').lower()
         if m == 'cash':
@@ -372,44 +298,21 @@ class Vendor(db.Model):
     address = db.Column(db.Text)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-<<<<<<< HEAD
 
-=======
-<<<<<<< HEAD
-
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
     products = db.relationship('Product', back_populates='vendor', lazy=True)
 
     @property
     def product_count(self):
         return len([p for p in self.products if p.is_active])
 
-<<<<<<< HEAD
 
-=======
-<<<<<<< HEAD
-
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
 class Product(db.Model):
     __tablename__ = 'products'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
     unit_price = db.Column(db.Numeric(10,2), default=0.00)
-<<<<<<< HEAD
 
-    # Purchase price from the vendor (used to build the vendor bill)
-=======
-<<<<<<< HEAD
-
-    # Purchase price from the vendor (used to build the vendor bill)
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
     cost_price = db.Column(db.Numeric(10,2), default=0.00)
     sku = db.Column(db.String(50))
     hsn_code = db.Column(db.String(20))
@@ -417,14 +320,7 @@ class Product(db.Model):
     vendor_id = db.Column(db.Integer, db.ForeignKey('vendors.id'), nullable=True, index=True)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-<<<<<<< HEAD
 
-=======
-<<<<<<< HEAD
-
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
     vendor = db.relationship('Vendor', back_populates='products')
 
     @property
@@ -450,10 +346,7 @@ class InventoryAssignment(db.Model):
     serial_number = db.Column(db.String(100))
     assigned_date = db.Column(db.Date, default=date.today)
     status = db.Column(db.String(20), default='Active')
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
     
     customer = db.relationship('Customer', backref='inventory_assignments')
     product = db.relationship('Product')
@@ -465,44 +358,32 @@ class VendorBill(db.Model):
     Created automatically when an addon invoice bills products belonging to a
     vendor, and also creatable by hand from Inventory -> Vendor Bills.
     """
-<<<<<<< HEAD
-=======
-=======
+
     customer = db.relationship('Customer', backref='inventory_assignments')
     product = db.relationship('Product')
 
 class VendorBill(db.Model):
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
     __tablename__ = 'vendor_bills'
     id = db.Column(db.Integer, primary_key=True)
     bill_no = db.Column(db.String(30), unique=True, nullable=False)
     vendor_id = db.Column(db.Integer, db.ForeignKey('vendors.id'), nullable=False, index=True)
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
 
     # Set when this bill was generated from a customer invoice
     invoice_id = db.Column(db.Integer, db.ForeignKey('invoices.id'), nullable=True, index=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=True)
 
-<<<<<<< HEAD
-=======
-=======
+
     invoice_id = db.Column(db.Integer, db.ForeignKey('invoices.id'), nullable=True, index=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=True)
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
     bill_date = db.Column(db.Date, nullable=False, default=date.today)
     due_date = db.Column(db.Date)
     total_amount = db.Column(db.Numeric(10, 2), default=0.00, nullable=False)
     tax_amount = db.Column(db.Numeric(10, 2), default=0.00)
     paid_amount = db.Column(db.Numeric(10, 2), default=0.00)
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
     status = db.Column(db.Enum('draft', 'pending', 'partial', 'paid', 'cancelled'),
                        default='pending')
     reference = db.Column(db.String(100))
@@ -514,9 +395,7 @@ class VendorBill(db.Model):
     customer = db.relationship('Customer')
     items = db.relationship('VendorBillItem', backref='bill', lazy=True,
                             cascade='all, delete-orphan')
-<<<<<<< HEAD
-=======
-=======
+
     status = db.Column(db.Enum('draft', 'pending', 'partial', 'paid', 'cancelled'), default='pending')
     reference = db.Column(db.String(100))
     notes = db.Column(db.Text)
@@ -525,8 +404,7 @@ class VendorBill(db.Model):
     invoice = db.relationship('Invoice', backref=db.backref('vendor_bills', lazy=True))
     customer = db.relationship('Customer')
     items = db.relationship('VendorBillItem', backref='bill', lazy=True, cascade='all, delete-orphan')
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
 
     @property
     def balance(self):
@@ -541,14 +419,7 @@ class VendorBill(db.Model):
             self.status = 'partial'
         return self.total_amount
 
-<<<<<<< HEAD
 
-=======
-<<<<<<< HEAD
-
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
 class VendorBillItem(db.Model):
     __tablename__ = 'vendor_bill_items'
     id = db.Column(db.Integer, primary_key=True)
@@ -559,14 +430,7 @@ class VendorBillItem(db.Model):
     quantity = db.Column(db.Integer, default=1, nullable=False)
     unit_cost = db.Column(db.Numeric(10, 2), default=0.00, nullable=False)
     tax_percent = db.Column(db.Numeric(5, 2), default=0.00)
-<<<<<<< HEAD
 
-=======
-<<<<<<< HEAD
-
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
     product = db.relationship('Product')
 
     @property
@@ -581,14 +445,7 @@ class VendorBillItem(db.Model):
     def line_total(self):
         return self.base_amount + self.tax_amount
 
-<<<<<<< HEAD
 
-=======
-<<<<<<< HEAD
-
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
 class ExpenseCategory(db.Model):
     __tablename__ = 'expense_categories'
     id = db.Column(db.Integer, primary_key=True)
@@ -599,22 +456,12 @@ class ExpenseAccount(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
 
-<<<<<<< HEAD
-# ===== UPDATED: ExpensePayee with mobile, email, address =====
-=======
-<<<<<<< HEAD
-# ===== UPDATED: ExpensePayee with mobile, email, address =====
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
 class ExpensePayee(db.Model):
     __tablename__ = 'expense_payees'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
     mobile = db.Column(db.String(20))          # NEW
     email = db.Column(db.String(120))          # NEW
     address = db.Column(db.Text)               # NEW
@@ -622,16 +469,13 @@ class ExpensePayee(db.Model):
 # ============================================================
 
 # ===== UPDATED: Expense with prepared_by, passed_by, status =====
-<<<<<<< HEAD
-=======
-=======
+
     mobile = db.Column(db.String(20))
     email = db.Column(db.String(120))
     address = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
 class Expense(db.Model):
     __tablename__ = 'expenses'
     id = db.Column(db.Integer, primary_key=True)
@@ -641,44 +485,19 @@ class Expense(db.Model):
     amount = db.Column(db.Numeric(10,2))
     expense_date = db.Column(db.Date)
     description = db.Column(db.Text)
-<<<<<<< HEAD
 
-    # NEW fields
-=======
-<<<<<<< HEAD
-
-    # NEW fields
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
     prepared_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     passed_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     status = db.Column(db.Enum('draft','pending','approved','rejected'), default='pending')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-<<<<<<< HEAD
 
-    # relationships
-=======
-<<<<<<< HEAD
-
-    # relationships
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
     category = db.relationship('ExpenseCategory')
     account = db.relationship('ExpenseAccount')
     payee = db.relationship('ExpensePayee')
     prepared_by = db.relationship('User', foreign_keys=[prepared_by_id])
     passed_by = db.relationship('User', foreign_keys=[passed_by_id])
-<<<<<<< HEAD
-# ============================================================
-=======
-<<<<<<< HEAD
-# ============================================================
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
 
 class Attendance(db.Model):
     __tablename__ = 'attendance'
@@ -727,14 +546,7 @@ class Company(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-<<<<<<< HEAD
-# Many-to-many company-zones
-=======
-<<<<<<< HEAD
-# Many-to-many company-zones
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
 company_zones = db.Table('company_zones',
     db.Column('company_id', db.Integer, db.ForeignKey('company.id')),
     db.Column('zone_id', db.Integer, db.ForeignKey('zones.id'))
@@ -760,14 +572,7 @@ class Zone(db.Model):
     whatsapp_url = db.Column(db.String(255))
     whatsapp_attachment_url = db.Column(db.String(255))
     company = db.Column(db.String(100))
-<<<<<<< HEAD
 
-=======
-<<<<<<< HEAD
-
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
     companies = db.relationship('Company', secondary=company_zones, backref='zones')
 
 class Locality(db.Model):
@@ -812,10 +617,7 @@ class ServiceRequest(db.Model):
     status = db.Column(db.Enum('open', 'in_progress', 'resolved', 'closed'), default='open')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     resolved_at = db.Column(db.DateTime)
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
     
     customer = db.relationship('Customer', backref='service_requests')
 
@@ -831,23 +633,18 @@ class MessageTemplate(db.Model):
     Bodies may contain {{placeholders}} - see services/messaging.py for the
     full list (customer_name, username, amount, balance, expiry_date, ...).
     """
-<<<<<<< HEAD
-=======
-=======
+
+
     customer = db.relationship('Customer', backref='service_requests')
 
 class MessageTemplate(db.Model):
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
     __tablename__ = 'message_templates'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     template_type = db.Column(db.String(50), nullable=False, unique=True)
     body = db.Column(db.Text, nullable=False)
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+
     #: whatsapp | sms  - which transport this template is written for
     channel = db.Column(db.String(20), default='whatsapp')
     description = db.Column(db.String(255))
@@ -919,10 +716,6 @@ class OnlinePaymentOrder(db.Model):
     customer = db.relationship('Customer', backref='online_orders')
     invoice = db.relationship('Invoice')
     payment = db.relationship('Payment')
-<<<<<<< HEAD
-=======
-=======
+
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
