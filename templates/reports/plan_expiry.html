@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}{{ heading }}{% endblock %}
+
+{% block content %}
+<style>
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:6px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .panel-head { background:#1a76b8; color:#fff; padding:12px 18px; font-weight:600; font-size:.95rem;
+                display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
+  .tbl { width:100%; font-size:.83rem; border-collapse:collapse; }
+  .tbl th { background:#f8fafc; color:#243447; font-weight:600; padding:11px 12px; border-bottom:1px solid #e2e8f0; white-space:nowrap; }
+  .tbl td { padding:10px 12px; border-bottom:1px solid #f1f5f9; color:#334155; }
+  .tbl tbody tr:hover { background:#f8fafc; }
+  .tbl a { color:#1a76b8; text-decoration:none; }
+  .tbl a:hover { text-decoration:underline; }
+  .mini-date { border:1px solid #cbd5e1; border-radius:4px; padding:3px 6px; font-size:.78rem; width:140px; }
+  .empty { text-align:center; color:#94a3b8; padding:30px 0; }
+  .filters .btn { font-size:.8rem; }
+  .neg { color:#dc2626; font-weight:600; }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h3 class="fw-bold mb-0" style="color:#243447;">{{ heading }}</h3>
+    <div class="text-muted small">
+      {% if on_date %}On {{ on_date.strftime('%d %b, %Y') }}{% else %}Within {{ days }} days of {{ today.strftime('%d %b, %Y') }}{% endif %}
+      &middot; {{ rows|length }} record{{ '' if rows|length == 1 else 's' }}
+    </div>
+  </div>
+  <div class="filters btn-group">
+    <a class="btn btn-sm {{ 'btn-primary' if kind == 'expiring' else 'btn-outline-primary' }}"
+       href="{{ url_for('plan_expiry_report', kind='expiring', days=7) }}">Expiring</a>
+    <a class="btn btn-sm {{ 'btn-primary' if kind == 'expired' else 'btn-outline-primary' }}"
+       href="{{ url_for('plan_expiry_report', kind='expired', days=7) }}">Expired</a>
+    <a class="btn btn-sm {{ 'btn-primary' if kind == 'renewed' else 'btn-outline-primary' }}"
+       href="{{ url_for('plan_expiry_report', kind='renewed', days=7) }}">Renewed</a>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <span>{{ heading }} &mdash; customer detail</span>
+    <span class="small">Click a name to open the profile. Edit the dates and press Save.</span>
+  </div>
+  <div class="table-responsive">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>#</th><th>Customer</th><th>Mobile</th><th>Zone</th><th>Username</th><th>Plan</th>
+          <th>Amount</th><th>Renew Date</th><th>Expiry Date</th><th>Days Left</th>
+          <th>Outstanding</th><th>Status</th><th style="width:190px;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><a href="{{ url_for('customer_view', id=r.customer.id) }}">{{ r.customer.full_name }}</a></td>
+          <td>{{ r.customer.mobile }}</td>
+          <td>{{ r.customer.zone or '-' }}</td>
+          <td>{{ r.customer.username or '-' }}</td>
+          <td>{{ r.plan_name }}</td>
+          <td>&#8377; {{ '%.2f'|format(r.price) }}</td>
+          <td><input form="pf{{ r.plan.id }}" type="date" class="mini-date" name="start_date" value="{{ r.renew_date.isoformat() }}"></td>
+          <td><input form="pf{{ r.plan.id }}" type="date" class="mini-date" name="end_date" value="{{ r.expiry_date.isoformat() }}"></td>
+          <td class="{{ 'neg' if r.days_left < 0 }}">{{ r.days_left }}</td>
+          <td>&#8377; {{ '%.2f'|format(r.outstanding) }}</td>
+          <td>
+            <select form="pf{{ r.plan.id }}" name="status" class="form-select form-select-sm" style="width:120px;">
+              {% for st in ['active','expired','cancelled','terminated'] %}
+              <option value="{{ st }}" {% if r.plan.status == st %}selected{% endif %}>{{ st|capitalize }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td class="text-nowrap">
+            <form id="pf{{ r.plan.id }}" method="POST"
+                  action="{{ url_for('customer_plan_update_dates', plan_id=r.plan.id) }}" style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-primary btn-sm">Save</button>
+            </form>
+            <form method="POST" action="{{ url_for('renew_plan', customer_id=r.customer.id) }}" style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-outline-success btn-sm"
+                      onclick="return confirm('Renew this plan and raise an invoice?')">Renew</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="13" class="empty">Nothing to show for this period.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

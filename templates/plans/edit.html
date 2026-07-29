@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Edit Plan{% endblock %}
+
+{% block content %}
+<style>
+  :root {
+    --primary-color: #0073b7;
+    --bg-body: #f1f5f9;
+    --card-bg: #ffffff;
+    --border-light: #e2e8f0;
+  }
+  .form-card { background:#fff; border:1px solid #e2e8f0; border-radius:6px; padding:24px; max-width:720px; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .form-label { font-weight: 600; font-size: 13px; color: #1e293b; margin-bottom: 6px; }
+  .form-control, .form-select { border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 14px; font-size: 13px; transition: 0.2s; }
+  .form-control:focus, .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(0, 115, 183, 0.15); }
+  .btn-submit { background: var(--primary-color); border: none; border-radius: 6px; padding: 0.6rem 2rem; color: #fff; font-weight: 600; transition: 0.2s; }
+  .btn-submit:hover { background: #005f9e; transform: translateY(-1px); }
+</style>
+<div class="form-card">
+  <h4 class="fw-bold mb-4 text-dark"><i class="fas fa-edit text-primary me-2" style="color: var(--primary-color);"></i> Edit Plan</h4>
+  <form method="POST">
+    {{ form.hidden_tag() }}
+    <div class="row g-3">
+      <div class="col-md-6">{{ form.name.label(class="form-label") }}{{ form.name(class="form-control") }}</div>
+      <div class="col-md-6">{{ form.plan_code.label(class="form-label") }}{{ form.plan_code(class="form-control") }}</div>
+      <div class="col-md-6">{{ form.service_provider_id.label(class="form-label") }}{{ form.service_provider_id(class="form-select") }}</div>
+      <div class="col-md-6">{{ form.plan_type.label(class="form-label") }}{{ form.plan_type(class="form-control") }}</div>
+      <div class="col-md-6">{{ form.speed_mbps.label(class="form-label") }}{{ form.speed_mbps(class="form-control") }}</div>
+      <div class="col-md-6">{{ form.price_monthly.label(class="form-label") }}{{ form.price_monthly(class="form-control") }}</div>
+      <div class="col-md-6">{{ form.isp_amount.label(class="form-label") }}{{ form.isp_amount(class="form-control") }}</div>
+      <div class="col-md-6">{{ form.validity_days.label(class="form-label") }}{{ form.validity_days(class="form-control") }}</div>
+      <div class="col-12 form-check mt-3">
+        {{ form.is_active(class="form-check-input") }}
+        {{ form.is_active.label(class="form-check-label") }}
+      </div>
+    </div>
+    <div class="text-end mt-4">
+      <a href="{{ url_for('plan_list') }}" class="btn btn-secondary rounded px-4 me-2">Cancel</a>
+      {{ form.submit(class="btn-submit") }}
+    </div>
+  </form>
+</div>
+{% endblock %}

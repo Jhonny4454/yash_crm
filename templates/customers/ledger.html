@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Payment Ledger{% endblock %}
+
+{% block content %}
+<style>
+  .ledger-summary-card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .ledger-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    font-size: 13px;
+    color: #495057;
+  }
+  .ledger-table td {
+    font-size: 13px;
+    vertical-align: middle;
+  }
+  .balance-positive { color: #28a745; font-weight: bold; }
+  .balance-negative { color: #dc3545; font-weight: bold; }
+  .text-credit { color: #28a745; }
+  .text-debit { color: #dc3545; }
+  
+  .card-icon {
+    width: 45px;
+    height: 45px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 20px;
+    margin-right: 15px;
+  }
+  .icon-invoice { background: #e9ecef; color: #007bff; }
+  .icon-payment { background: #e6f5ed; color: #28a745; }
+  .icon-balance { background: #fff3cd; color: #856404; }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold text-dark mb-1"><i class="fas fa-book me-2 text-primary"></i> Payment Ledger</h4>
+    <span class="text-muted small">Customer: <strong>{{ customer.full_name }}</strong> ({{ customer.reference_id }})</span>
+  </div>
+  <a href="{{ url_for('customer_view', id=customer.id) }}" class="btn btn-outline-secondary btn-sm">
+    <i class="fas fa-arrow-left me-1"></i> Back to Customer
+  </a>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4 g-3">
+  <div class="col-md-4">
+    <div class="ledger-summary-card d-flex align-items-center">
+      <div class="card-icon icon-invoice"><i class="fas fa-file-invoice"></i></div>
+      <div>
+        <div class="text-muted text-uppercase small fw-bold">Total Invoices</div>
+        <div class="h5 mb-0">₹ {{ "%.2f"|format(invoices|sum(attribute='total_amount') or 0) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="ledger-summary-card d-flex align-items-center">
+      <div class="card-icon icon-payment"><i class="fas fa-money-bill-wave"></i></div>
+      <div>
+        <div class="text-muted text-uppercase small fw-bold">Total Paid</div>
+        <div class="h5 mb-0 text-success">₹ {{ "%.2f"|format(payments|sum(attribute='amount') or 0) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="ledger-summary-card d-flex align-items-center">
+      <div class="card-icon icon-balance"><i class="fas fa-scale-balanced"></i></div>
+      <div>
+        <div class="text-muted text-uppercase small fw-bold">Outstanding Balance</div>
+        <div class="h5 mb-0">
+          {% set total_inv = invoices|sum(attribute='total_amount') or 0 %}
+          {% set total_pay = payments|sum(attribute='amount') or 0 %}
+          {% set balance = total_inv - total_pay %}
+          <span class="{{ 'text-success' if balance <= 0 else 'text-danger' }}">₹ {{ "%.2f"|format(balance) }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="card-header bg-white py-3 border-bottom">
+    <h6 class="mb-0 fw-bold"><i class="fas fa-list-ul me-2 text-primary"></i> Transaction History</h6>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table ledger-table table-hover mb-0">
+        <thead>
+          <tr>
+            <th style="width: 15%;">Date</th>
+            <th style="width: 30%;">Description</th>
+            <th style="width: 20%;" class="text-end text-danger">Debit (Invoice)</th>
+            <th style="width: 20%;" class="text-end text-success">Credit (Payment)</th>
+            <th style="width: 15%;" class="text-end">Running Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {# Use namespace to track running balance #}
+          {% set ns = namespace(running_balance=0) %}
+          
+          {# Loop directly over the ledger_entries passed from app.py #}
+          {% for entry in ledger_entries %}
+            <tr>
+              <td>{{ entry.date.strftime('%d %b, %Y') }}</td>
+              
+              {% if entry.type == 'invoice' %}
+                <td>
+                  <i class="fas fa-file-invoice text-secondary me-2"></i>
+                  <strong>Invoice #{{ entry.object.invoice_no }}</strong>
+                  <div class="small text-muted">Due: {{ entry.object.due_date.strftime('%d-%b-%Y') }}</div>
+                </td>
+                <td class="text-end text-danger fw-bold">₹ {{ "%.2f"|format(entry.object.total_amount) }}</td>
+                <td class="text-end text-muted">-</td>
+                {% set ns.running_balance = ns.running_balance + entry.object.total_amount %}
+                
+              {% elif entry.type == 'payment' %}
+                <td>
+                  <i class="fas fa-credit-card text-success me-2"></i>
+                  <strong>Payment ({{ entry.object.payment_mode }})</strong>
+                  <div class="small text-muted">Ref: {{ entry.object.mode_detail or '-' }}</div>
+                </td>
+                <td class="text-end text-muted">-</td>
+                <td class="text-end text-success fw-bold">₹ {{ "%.2f"|format(entry.object.amount) }}</td>
+                {% set ns.running_balance = ns.running_balance - entry.object.amount %}
+              {% endif %}
+              
+              <td class="text-end fw-bold {{ 'text-danger' if ns.running_balance > 0 else 'text-success' }}">
+                ₹ {{ "%.2f"|format(ns.running_balance) }}
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="5" class="text-center py-4 text-muted">
+                <i class="fas fa-inbox fa-2x d-block mb-2 text-secondary"></i>
+                No invoices or payments found for this customer.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

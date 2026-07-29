@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<style>
+  .dash-head { display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:12px; margin-bottom:18px; }
+  .dash-head h2 { font-size:1.9rem; font-weight:700; letter-spacing:.5px; margin:0; color:#243447; text-transform:uppercase; }
+  .dash-head .sub { color:#7b8794; font-size:.85rem; }
+  .dash-head .stamp { text-align:right; }
+  .dash-head .stamp .d { font-size:1.6rem; font-weight:700; color:#243447; letter-spacing:1px; }
+  .dash-head .stamp .t { color:#7b8794; font-size:.9rem; }
+
+  /* ---- Blue metric strip ---- */
+  .strip { display:grid; grid-template-columns: 1.15fr 1.1fr 1fr 1fr; background:#1a76b8; color:#fff;
+           border-radius:6px; overflow:hidden; box-shadow:0 3px 10px rgba(26,118,184,.25); }
+  .strip > div { padding:20px 22px; border-right:1px solid rgba(255,255,255,.18); }
+  .strip > div:last-child { border-right:none; }
+  .strip .cap { font-size:.72rem; letter-spacing:1.4px; text-transform:uppercase; opacity:.85; }
+  .strip h6 { font-size:1rem; font-weight:600; text-align:center; margin-bottom:14px; }
+
+  .kpi { display:flex; align-items:center; gap:16px; padding:9px 0; }
+  .kpi i { font-size:1.5rem; opacity:.85; width:34px; text-align:center; }
+  .kpi .big { font-size:1.35rem; font-weight:700; line-height:1.1; }
+  .kpi .big small { font-size:.85rem; font-weight:500; opacity:.85; }
+  .kpi .lbl { font-size:.68rem; letter-spacing:1.2px; text-transform:uppercase; opacity:.85; }
+
+  .donut-wrap { display:flex; justify-content:center; }
+  .legend { display:grid; grid-template-columns:1fr 1fr; gap:4px 18px; font-size:.82rem; margin-top:14px; }
+  .legend .sw { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:6px; }
+
+  .auth-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px 18px; font-size:.82rem; text-align:center; }
+  .auth-grid .n { font-size:1.05rem; font-weight:700; }
+  .strip .divider { border-top:1px solid rgba(255,255,255,.2); margin:14px 0; }
+
+  /* ---- Panels ---- */
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:6px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .panel-head { background:#1a76b8; color:#fff; padding:12px 18px; font-weight:600; font-size:.95rem; }
+  .panel-body { padding:16px 18px; }
+
+  /* ---- Lifecycle chips ---- */
+  .life-row { display:flex; align-items:center; gap:12px; padding:10px 0; flex-wrap:wrap; }
+  .life-row .name { min-width:120px; font-size:.82rem; color:#475569; font-weight:600; }
+  .pill-total { background:#1a76b8; color:#fff; border-radius:4px; padding:9px 26px; font-weight:600; font-size:.9rem; text-decoration:none; display:inline-block; }
+  .pill-total:hover { background:#155f93; color:#fff; }
+  .chip { text-align:center; }
+  .chip a.day { display:block; background:#1a76b8; color:#fff; border-radius:4px; padding:5px 12px; font-size:.78rem; text-decoration:none; min-width:66px; }
+  .chip a.day:hover { background:#155f93; }
+  .chip .cnt { color:#1a76b8; font-size:.8rem; margin-top:3px; font-weight:600; }
+  .chip .cnt.zero { color:#94a3b8; font-weight:400; }
+
+  /* ---- Tables ---- */
+  .tbl { width:100%; font-size:.83rem; border-collapse:collapse; }
+  .tbl th { color:#243447; font-weight:600; padding:11px 12px; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
+  .tbl td { padding:10px 12px; border-bottom:1px solid #f1f5f9; color:#334155; }
+  .tbl tbody tr:hover { background:#f8fafc; }
+  .tbl .num { color:#1a76b8; font-weight:600; }
+  .tbl a { color:#1a76b8; text-decoration:none; }
+  .tbl a:hover { text-decoration:underline; }
+  .scroll-y { max-height:330px; overflow-y:auto; }
+  .empty { text-align:center; color:#94a3b8; padding:26px 0; font-size:.85rem; }
+
+  .mini-date { border:1px solid #cbd5e1; border-radius:4px; padding:3px 6px; font-size:.78rem; width:132px; }
+  .btn-mini { font-size:.72rem; padding:4px 10px; }
+
+  @media (max-width: 1200px){ .strip { grid-template-columns:1fr 1fr; } }
+  @media (max-width: 700px){ .strip { grid-template-columns:1fr; } .dash-head .stamp { text-align:left; } }
+</style>
+
+<div class="dash-head">
+  <div>
+    <h2>Dashboard</h2>
+    <div class="sub">overview &amp; stats</div>
+  </div>
+  <div class="stamp">
+    <div class="d">{{ today.strftime('%d-%b-%Y')|upper }}</div>
+    <div class="t" id="clock"></div>
+    <a href="{{ url_for('dashboard_export') }}" class="btn btn-sm btn-outline-primary mt-2">
+      <i class="fas fa-download"></i> Export snapshot
+    </a>
+  </div>
+</div>
+
+<!-- ============ BLUE METRIC STRIP ============ -->
+<div class="strip mb-4">
+
+  <!-- Current month -->
+  <div>
+    <div class="cap mb-2">&bull;&bull;&bull; Current Month</div>
+    <div class="kpi">
+      <i class="fas fa-user"></i>
+      <div><div class="big">{{ new_customers }}</div><div class="lbl">New Customer</div></div>
+    </div>
+    <div class="kpi">
+      <i class="fas fa-chart-bar"></i>
+      <div><div class="big">&#8377; {{ '%.0f'|format(total_amount) }} <small>({{ total_invoices }})</small></div>
+           <div class="lbl">Invoice</div></div>
+    </div>
+    <div class="kpi">
+      <i class="fas fa-credit-card"></i>
+      <div><div class="big">&#8377; {{ '%.0f'|format(payment_amount) }} <small>({{ payment_count }})</small></div>
+           <div class="lbl">Payment</div></div>
+    </div>
+  </div>
+
+  <!-- Payment donut -->
+  <div>
+    <h6>Payment</h6>
+    <div class="text-center" style="font-size:1.05rem;font-weight:600;">&#8377; {{ '%.0f'|format(payment_amount) }}</div>
+    <div class="donut-wrap"><canvas id="paymentDonut" width="150" height="150"></canvas></div>
+    <div class="legend">
+      <div><span class="sw" style="background:#e8f2fa;"></span>Cash : &#8377; {{ '%.0f'|format(payment_breakdown.cash) }}</div>
+      <div><span class="sw" style="background:#9ecbe8;"></span>Cheque : &#8377; {{ '%.0f'|format(payment_breakdown.cheque) }}</div>
+      <div><span class="sw" style="background:#4a9fd4;"></span>Online : &#8377; {{ '%.0f'|format(payment_breakdown.online) }}</div>
+      <div><span class="sw" style="background:#c7ddec;"></span>Other : &#8377; {{ '%.0f'|format(payment_breakdown.other) }}</div>
+    </div>
+  </div>
+
+  <!-- To be Authorized -->
+  <div>
+    <h6>To be Authorized</h6>
+    <div class="text-center mb-3" style="font-size:1.35rem;font-weight:700;">
+      &#8377; {{ '%.0f'|format(to_authorize_total) }}
+    </div>
+    <div class="legend">
+      <div>Cash : &#8377; {{ '%.0f'|format(to_authorize_breakdown.cash) }}</div>
+      <div>Cheque : &#8377; {{ '%.0f'|format(to_authorize_breakdown.cheque) }}</div>
+      <div>Online : &#8377; {{ '%.0f'|format(to_authorize_breakdown.online) }}</div>
+      <div>Other : &#8377; {{ '%.0f'|format(to_authorize_breakdown.other) }}</div>
+    </div>
+    <div class="text-center mt-3">
+      <a href="{{ url_for('payment_authorizations') }}" class="text-white small text-decoration-underline">
+        Open authorization queue ({{ to_authorize_count }})
+      </a>
+    </div>
+  </div>
+
+  <!-- Authorizing Payment -->
+  <div>
+    <h6>Authorizing Payment</h6>
+    <div class="auth-grid mt-4">
+      <div>
+        <div class="n">({{ pending_authorization_count }})</div>
+        <div>Pending<br>Authorization</div>
+      </div>
+      <div>
+        <div class="n">({{ authorization_done_count }})</div>
+        <div>Authorization<br>Done</div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="text-center">
+      <a href="{{ url_for('payment_authorizations') }}" class="text-white small text-decoration-underline">
+        Review payments
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PLAN LIFECYCLE ============ -->
+<div class="panel mb-4">
+  <div class="panel-head">Plan Lifecycle &mdash; next &amp; last 7 days</div>
+  <div class="panel-body">
+
+    <div class="life-row">
+      <span class="name">Plan Expiring</span>
+      <a class="pill-total" href="{{ url_for('plan_expiry_report', kind='expiring', days=7) }}">({{ expiring_total }})</a>
+      {% for d in expiring_days %}
+      <div class="chip">
+        <a class="day" href="{{ url_for('plan_expiry_report', kind='expiring', on=d.date.isoformat()) }}">{{ d.label }}</a>
+        <div class="cnt {% if not d.count %}zero{% endif %}">({{ d.count }})</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="life-row">
+      <span class="name">Plan Expired</span>
+      <a class="pill-total" href="{{ url_for('plan_expiry_report', kind='expired', days=7) }}">({{ expired_total }})</a>
+      {% for d in expired_days %}
+      <div class="chip">
+        <a class="day" href="{{ url_for('plan_expiry_report', kind='expired', on=d.date.isoformat()) }}">{{ d.label }}</a>
+        <div class="cnt {% if not d.count %}zero{% endif %}">({{ d.count }})</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="life-row">
+      <span class="name">Plan Renewed</span>
+      <a class="pill-total" href="{{ url_for('plan_expiry_report', kind='renewed', days=7) }}">({{ renewed_total }})</a>
+      {% for d in renewed_days %}
+      <div class="chip">
+        <a class="day" href="{{ url_for('plan_expiry_report', kind='renewed', on=d.date.isoformat()) }}">{{ d.label }}</a>
+        <div class="cnt {% if not d.count %}zero{% endif %}">({{ d.count }})</div>
+      </div>
+      {% endfor %}
+    </div>
+
+  </div>
+</div>
+
+<!-- ============ EXPIRING IN 7 DAYS - FULL DETAIL, INLINE EDITABLE ============ -->
+<div class="panel mb-4">
+  <div class="panel-head d-flex justify-content-between align-items-center">
+    <span>Plans Expiring in the Next 7 Days</span>
+    <a href="{{ url_for('plan_expiry_report', kind='expiring', days=7) }}"
+       class="text-white small text-decoration-underline">Full report</a>
+  </div>
+  <div class="table-responsive">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>#</th><th>Customer</th><th>Mobile</th><th>Zone</th><th>Plan</th>
+          <th>Amount</th><th>Renew Date</th><th>Expiry Date</th><th>Days Left</th>
+          <th>Outstanding</th><th style="width:120px;">Update</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in expiring_rows %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><a href="{{ url_for('customer_view', id=r.customer.id) }}">{{ r.customer.full_name }}</a></td>
+          <td>{{ r.customer.mobile }}</td>
+          <td>{{ r.customer.zone or '-' }}</td>
+          <td>{{ r.plan_name }}</td>
+          <td class="num">&#8377; {{ '%.2f'|format(r.price) }}</td>
+          <td><input form="planDates{{ r.plan.id }}" type="date" class="mini-date" name="start_date" value="{{ r.renew_date.isoformat() }}"></td>
+          <td><input form="planDates{{ r.plan.id }}" type="date" class="mini-date" name="end_date" value="{{ r.expiry_date.isoformat() }}"></td>
+          <td>{{ r.days_left }}</td>
+          <td class="num">&#8377; {{ '%.2f'|format(r.outstanding) }}</td>
+          <td>
+            <form id="planDates{{ r.plan.id }}" method="POST"
+                  action="{{ url_for('customer_plan_update_dates', plan_id=r.plan.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-primary btn-mini">Save</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="11" class="empty">No plans expiring in the next 7 days.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ============ MONTHLY SUMMARY ============ -->
+<div class="panel mb-4">
+  <div class="panel-head">New Customers, Sales, Collection Summary</div>
+  <div class="table-responsive scroll-y">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>Month</th><th>New Clients</th><th>Total Bills</th><th>Total Amount</th>
+          <th>Pending Bills</th><th>Pending Amount</th><th>Paid Bills</th><th>Paid Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in monthly_summary %}
+        <tr>
+          <td>{{ m.month }}</td>
+          <td class="num">{{ m.new_clients or '' }}</td>
+          <td class="num">{{ m.total_bills or '' }}</td>
+          <td>{{ '%.0f'|format(m.total_amount) if m.total_amount else '' }}</td>
+          <td class="num">{{ m.pending_bills or '' }}</td>
+          <td>{{ '%.0f'|format(m.pending_amount) if m.pending_amount else '' }}</td>
+          <td class="num">{{ m.paid_bills or '' }}</td>
+          <td>{{ '%.0f'|format(m.paid_amount) if m.paid_amount else '' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="empty">No billing data yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ============ TO BE AUTHORIZED + ZONE WISE ============ -->
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="panel h-100">
+      <div class="panel-head">To be Authorized</div>
+      <div class="table-responsive">
+        <table class="tbl">
+          <thead><tr><th>Date</th><th>Count</th><th>Amount</th><th></th></tr></thead>
+          <tbody>
+            {% for r in to_authorize_rows %}
+            <tr>
+              <td>{{ r.date.strftime('%d-%b-%Y') }}</td>
+              <td class="num">({{ r.count }})</td>
+              <td>&#8377; {{ '%.0f'|format(r.amount) }}</td>
+              <td><a href="{{ url_for('payment_authorizations') }}">Review</a></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="empty">Nothing waiting for authorization.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="panel h-100">
+      <div class="panel-head">Current Month Outstanding / Collections</div>
+      <ul class="nav nav-tabs px-3 pt-2" role="tablist">
+        <li class="nav-item">
+          <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#zoneOut" type="button">Zone Wise Outstanding</button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#zoneColl" type="button">Zone Wise Collection</button>
+        </li>
+      </ul>
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="zoneOut">
+          <table class="tbl">
+            <thead><tr><th>Zone</th><th>Total</th><th>Amount</th></tr></thead>
+            <tbody>
+              {% for z in zone_outstanding %}
+              <tr><td>{{ z.zone }}</td><td class="num">({{ z.count }})</td><td>&#8377; {{ '%.0f'|format(z.amount) }}</td></tr>
+              {% else %}
+              <tr><td colspan="3" class="empty">No outstanding invoices.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="tab-pane fade" id="zoneColl">
+          <table class="tbl">
+            <thead><tr><th>Zone</th><th>Total</th><th>Amount</th></tr></thead>
+            <tbody>
+              {% for z in zone_collection %}
+              <tr><td>{{ z.zone }}</td><td class="num">({{ z.count }})</td><td>&#8377; {{ '%.0f'|format(z.amount) }}</td></tr>
+              {% else %}
+              <tr><td colspan="3" class="empty">No collections this month.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var el = document.getElementById('clock');
+    function tick() { el.textContent = new Date().toLocaleTimeString(); }
+    tick(); setInterval(tick, 1000);
+  })();
+
+  (function () {
+    var ctx = document.getElementById('paymentDonut');
+    if (!ctx || typeof Chart === 'undefined') return;
+    var data = [
+      {{ payment_breakdown.cash }},
+      {{ payment_breakdown.cheque }},
+      {{ payment_breakdown.online }},
+      {{ payment_breakdown.other }}
+    ];
+    if (data.reduce(function (a, b) { return a + b; }, 0) === 0) { data = [1, 0, 0, 0]; }
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Cash', 'Cheque', 'Online', 'Other'],
+        datasets: [{
+          data: data,
+          backgroundColor: ['#e8f2fa', '#9ecbe8', '#4a9fd4', '#c7ddec'],
+          borderColor: 'rgba(255,255,255,.35)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        cutout: '62%',
+        plugins: { legend: { display: false } },
+        responsive: false,
+        animation: { duration: 500 }
+      }
+    });
+  })();
+</script>
+{% endblock %}

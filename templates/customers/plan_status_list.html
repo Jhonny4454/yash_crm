@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Plan Status{% endblock %}
+
+{% block content %}
+<style>
+  .panel { background:#fff; border:1px solid #e2e8f0; border-radius:6px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .panel-head { background:#1a76b8; color:#fff; padding:12px 18px; font-weight:600; font-size:.95rem;
+                display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+  .panel-head .btn { --bs-btn-color:#1a76b8; }
+  .tbl { width:100%; font-size:.85rem; border-collapse:collapse; }
+  .tbl th { background:#f8fafc; color:#243447; font-weight:600; padding:11px 12px; border-bottom:1px solid #e2e8f0; white-space:nowrap; }
+  .tbl td { padding:10px 12px; border-bottom:1px solid #f1f5f9; color:#334155; vertical-align:middle; }
+  .tbl tbody tr:hover { background:#f8fafc; }
+  .tbl a { color:#1a76b8; text-decoration:none; }
+  .tbl a:hover { text-decoration:underline; }
+  .empty { text-align:center; color:#94a3b8; padding:30px 0; }
+  .form-card { background:#fff; border:1px solid #e2e8f0; border-radius:6px; padding:24px; max-width:720px; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .tile { display:block; background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:22px; text-decoration:none;
+          color:#243447; transition:.15s; height:100%; }
+  .tile:hover { border-color:#1a76b8; box-shadow:0 4px 12px rgba(26,118,184,.12); transform:translateY(-2px); color:#1a76b8; }
+  .tile i { font-size:1.6rem; color:#1a76b8; margin-bottom:10px; display:block; }
+  .tile h6 { font-weight:700; margin-bottom:4px; font-size:.95rem; }
+  .tile p { font-size:.8rem; color:#64748b; margin:0; }
+</style><div class="panel">
+  <div class="panel-head">
+    <span>Plans &mdash; {{ status|capitalize }}</span>
+    <span>{{ plans|length }} record{{ '' if plans|length == 1 else 's' }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="tbl">
+      <thead>
+        <tr><th>#</th><th>Customer</th><th>Mobile</th><th>Zone</th><th>Plan</th>
+            <th>Renew Date</th><th>Expiry Date</th><th>Days Left</th><th>Status</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        {% for cp in plans %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><a href="{{ url_for('customer_view', id=cp.customer_id) }}">{{ cp.customer.full_name if cp.customer else '-' }}</a></td>
+          <td>{{ cp.customer.mobile if cp.customer else '-' }}</td>
+          <td>{{ cp.customer.zone if cp.customer else '-' }}</td>
+          <td>{{ cp.plan.name if cp.plan else '-' }}</td>
+          <td>{{ cp.start_date.strftime('%d %b, %Y') }}</td>
+          <td>{{ cp.end_date.strftime('%d %b, %Y') }}</td>
+          <td>{{ (cp.end_date - today).days }}</td>
+          <td><span class="badge bg-secondary">{{ cp.status|capitalize }}</span></td>
+          <td><a class="btn btn-outline-primary btn-sm" href="{{ url_for('customer_view', id=cp.customer_id) }}">Open</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="10" class="empty">No plans in this state.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

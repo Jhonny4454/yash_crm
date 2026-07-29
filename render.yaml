@@ -1,0 +1,51 @@
+# Render.com deployment configuration
+# Docs: https://render.com/docs/render-yaml
+
+services:
+  - type: web
+    name: yash-internet-services-crm
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -c gunicorn.conf.py wsgi:application
+    plan: free
+
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true      # Render generates a secure random value
+      - key: DATABASE_URL
+        fromDatabase:
+          name: yash-crm-db
+          property: connectionString
+      - key: CREDENTIAL_KEY
+        generateValue: true
+      - key: WEB_CONCURRENCY
+        value: 1                 # Keep at 1 - scheduler must only run once
+      - key: PORT
+        value: 10000
+      - key: TZ
+        value: Asia/Kolkata
+      - key: RUN_SCHEDULER
+        value: 1
+      # --- Fill these in Render dashboard after first deploy ---
+      # - key: CASHFREE_APP_ID
+      # - key: CASHFREE_SECRET_KEY
+      # - key: CASHFREE_ENV        value: production
+      # - key: WA_ENABLED          value: 1
+      # - key: WA_API_URL
+      # - key: WA_API_TOKEN
+      # - key: WA_INSTANCE_ID
+
+    healthCheckPath: /login
+
+  - type: pserv       # background service alternative if you want scheduler separate
+    # Uncomment if you want to run the scheduler in its own process:
+    # name: yash-crm-scheduler
+    # startCommand: python -c "from wsgi import application"
+
+databases:
+  - name: yash-crm-db
+    plan: free
+    databaseName: yash_crm
+    user: yash_crm_user

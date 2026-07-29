@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#2d323e">
+  <title>{% block page_title_tag %}{{ self.page_title() }}{% endblock %} &middot; YASH Internet Services</title>
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+
+  <!-- Warm up the CDN sockets before the CSS requests actually go out -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --primary-color: #0073b7;
+      --primary-hover: #005f9e;
+      --bg-body: #f4f6f9;
+      --sidebar-bg: #2d323e;
+      --sidebar-hover: #1e2229;
+      --text-main: #1e293b;
+      --text-light: #b8c7ce;
+      --border-light: #e2e8f0;
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,.05), 0 2px 4px -1px rgba(0,0,0,.03);
+      --radius-lg: 16px;
+
+      --sidebar-w: 240px;
+      --sidebar-w-collapsed: 68px;
+      --topbar-h: 58px;
+      --footer-h: 34px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { -webkit-text-size-adjust: 100%; }
+
+    body {
+      background: var(--bg-body);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                   "Helvetica Neue", Arial, sans-serif;
+      margin: 0;
+      /* Room for the fixed top bar and fixed footer */
+      padding-top: var(--topbar-h);
+      padding-bottom: var(--footer-h);
+      overscroll-behavior-y: none;
+    }
+
+    /* Respect the OS "reduce motion" setting, and kill transitions entirely on
+       low-powered phones where they cause visible jank. */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .001ms !important;
+        transition-duration: .001ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
+    /* ==================================================================== */
+    /*  FIXED SIDEBAR                                                        */
+    /* ==================================================================== */
+    .sidebar {
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      width: var(--sidebar-w);
+      background: var(--sidebar-bg);
+      padding: .75rem 0 0;
+      display: flex;
+      flex-direction: column;
+      z-index: 1040;
+      overflow-y: auto;
+      overflow-x: hidden;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      transition: width .18s ease;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,.18) transparent;
+    }
+    .sidebar::-webkit-scrollbar { width: 6px; }
+    .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.18); border-radius: 3px; }
+
+    .sidebar .brand {
+      text-align: center;
+      padding: .25rem 1rem 1rem;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+    }
+    .sidebar .brand img { max-width: 92px; height: auto; }
+    .sidebar .brand h5 {
+      color: #fff; font-weight: 700; margin: .5rem 0 0;
+      letter-spacing: 1px; font-size: 1rem; white-space: nowrap;
+    }
+
+    .sidebar .nav-link {
+      color: var(--text-light);
+      padding: .62rem 1.1rem;
+      margin: .1rem .55rem;
+      border-radius: 6px;
+      transition: background .15s ease, color .15s ease;
+      display: flex; align-items: center; justify-content: space-between;
+      border-left: 3px solid transparent;
+      white-space: nowrap;
+      font-size: .93rem;
+    }
+    .sidebar .nav-link .link-label { display: flex; align-items: center; gap: 12px; }
+    .sidebar .nav-link:hover { background: var(--sidebar-hover); color: #fff; }
+    .sidebar .nav-link.active {
+      background: var(--sidebar-hover); color: #fff;
+      border-left-color: var(--primary-color);
+    }
+    .sidebar .nav-link i { width: 22px; text-align: center; font-size: 1rem; flex: 0 0 22px; }
+
+    .sidebar .dropdown-menu {
+      background: var(--sidebar-hover);
+      border: 1px solid rgba(255,255,255,.05);
+      border-radius: 6px;
+      margin-top: 0; padding: .4rem 0; min-width: 210px;
+    }
+    .sidebar .dropdown-item { color: var(--text-light); padding: .45rem 1.4rem; font-size: .88rem; }
+    .sidebar .dropdown-item:hover { background: rgba(255,255,255,.06); color: #fff; }
+    .sidebar .dropdown-toggle::after { margin-left: auto; }
+
+    .sidebar .footer-text {
+      color: rgba(255,255,255,.25); font-size: .7rem; text-align: center;
+      padding: 1.2rem .5rem .8rem; border-top: 1px solid rgba(255,255,255,.05);
+      margin-top: auto; white-space: nowrap;
+    }
+
+    /* ---- Collapsed (icons-only) state --------------------------------- */
+    body.sidebar-collapsed .sidebar { width: var(--sidebar-w-collapsed); }
+    body.sidebar-collapsed .sidebar .brand h5,
+    body.sidebar-collapsed .sidebar .nav-link .link-text,
+    body.sidebar-collapsed .sidebar .footer-text,
+    body.sidebar-collapsed .sidebar .dropdown-toggle::after { display: none; }
+    body.sidebar-collapsed .sidebar .brand img { max-width: 38px; }
+    body.sidebar-collapsed .sidebar .brand { padding: .25rem .3rem .8rem; }
+    body.sidebar-collapsed .sidebar .nav-link { justify-content: center; padding: .7rem .4rem; margin: .1rem .35rem; }
+    body.sidebar-collapsed .sidebar .nav-link i { margin: 0; }
+    /* Float the submenu out to the right when collapsed */
+    body.sidebar-collapsed .sidebar .dropdown-menu {
+      position: absolute !important;
+      left: 100% !important; top: 0 !important;
+      transform: none !important; margin-left: .35rem;
+    }
+
+    /* ==================================================================== */
+    /*  FIXED TOP BAR                                                        */
+    /* ==================================================================== */
+    .top-bar {
+      position: fixed;
+      top: 0; right: 0; left: var(--sidebar-w);
+      height: var(--topbar-h);
+      background: var(--sidebar-bg);
+      padding: 0 1.25rem;
+      display: flex; justify-content: space-between; align-items: center;
+      gap: .75rem; color: #fff;
+      box-shadow: var(--shadow-md);
+      z-index: 1030;
+      transition: left .18s ease;
+    }
+    body.sidebar-collapsed .top-bar { left: var(--sidebar-w-collapsed); }
+
+    .top-bar h1 {
+      font-size: 1.15rem; font-weight: 500; margin: 0; color: #fff;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .top-bar .top-bar-left { display: flex; align-items: center; gap: .8rem; min-width: 0; }
+    .top-bar .top-bar-right { display: flex; align-items: center; gap: .9rem; }
+
+    .sidebar-toggle {
+      border: none; background: rgba(255,255,255,.1); color: #fff;
+      width: 34px; height: 34px; border-radius: 6px; flex: 0 0 34px;
+      display: inline-flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: background .15s ease;
+    }
+    .sidebar-toggle:hover { background: rgba(255,255,255,.2); }
+
+    .top-bar .search-form {
+      display: flex; align-items: center;
+      background: rgba(255,255,255,.1); border-radius: 6px;
+      padding: .18rem .18rem .18rem .85rem; transition: background .15s;
+    }
+    .top-bar .search-form:focus-within { background: rgba(255,255,255,.2); }
+    .top-bar .search-form input {
+      border: none; background: transparent; outline: none;
+      font-size: .85rem; width: 160px; color: #fff;
+    }
+    .top-bar .search-form input::placeholder { color: rgba(255,255,255,.7); }
+    .top-bar .search-form button {
+      border: none; background: var(--primary-color); color: #fff;
+      width: 28px; height: 28px; border-radius: 6px; font-size: .78rem;
+    }
+    .top-bar .search-form button:hover { background: var(--primary-hover); }
+
+    .top-bar .user-greeting {
+      color: rgba(255,255,255,.9); font-weight: 500; white-space: nowrap;
+      display: flex; align-items: center; gap: 12px; font-size: .9rem;
+    }
+    .top-bar .user-greeting a { color: rgba(255,255,255,.7); text-decoration: none; transition: color .15s; }
+    .top-bar .user-greeting a:hover { color: #fff; }
+
+    /* ==================================================================== */
+    /*  MAIN CONTENT                                                         */
+    /* ==================================================================== */
+    .main-content {
+      margin-left: var(--sidebar-w);
+      min-height: calc(100vh - var(--topbar-h) - var(--footer-h));
+      transition: margin-left .18s ease;
+    }
+    body.sidebar-collapsed .main-content { margin-left: var(--sidebar-w-collapsed); }
+    .content-wrapper { padding: 1.25rem 1.5rem 2rem; }
+
+    /* ==================================================================== */
+    /*  FIXED FOOTER                                                         */
+    /* ==================================================================== */
+    .app-footer {
+      position: fixed; bottom: 0; right: 0; left: var(--sidebar-w);
+      height: var(--footer-h);
+      background: #fff; border-top: 1px solid var(--border-light);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 1.25rem; font-size: .75rem; color: #64748b;
+      z-index: 1020; transition: left .18s ease;
+    }
+    body.sidebar-collapsed .app-footer { left: var(--sidebar-w-collapsed); }
+    .app-footer a { color: #64748b; text-decoration: none; }
+    .app-footer a:hover { color: var(--primary-color); }
+
+    /* ==================================================================== */
+    /*  NESTED SUBMENUS                                                      */
+    /* ==================================================================== */
+    .dropdown-submenu { position: relative; }
+    .dropdown-submenu > .dropdown-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .dropdown-submenu > .dropdown-item i { transition: transform .18s ease; font-size: .7rem; }
+    .dropdown-submenu > .dropdown-menu {
+      display: none; position: static; float: none; width: 100%;
+      margin: 0; padding-left: .75rem; border: none; box-shadow: none;
+      background: rgba(0,0,0,.2); border-radius: 0;
+    }
+    .dropdown-submenu.show > .dropdown-menu { display: block; }
+    .dropdown-submenu.show > .dropdown-item i { transform: rotate(180deg); }
+
+    /* ==================================================================== */
+    /*  MOBILE                                                               */
+    /* ==================================================================== */
+    .mobile-nav {
+      position: fixed; top: 0; left: 0; right: 0; height: var(--topbar-h);
+      background: var(--sidebar-bg); padding: 0 .9rem;
+      display: none; justify-content: space-between; align-items: center;
+      z-index: 1045;
+    }
+    .mobile-nav .navbar-brand img { max-height: 34px; }
+    .mobile-nav .navbar-toggler {
+      border: none; color: #fff; font-size: 1.2rem; padding: .3rem .55rem;
+      background: rgba(255,255,255,.12); border-radius: 6px;
+    }
+    .mobile-nav .navbar-toggler:focus { box-shadow: none; }
+    .mobile-nav .mobile-actions { display: flex; align-items: center; gap: .5rem; }
+    .mobile-nav .mobile-actions a { color: rgba(255,255,255,.85); text-decoration: none; font-size: 1.05rem; }
+
+    .offcanvas { background: var(--sidebar-bg); color: #fff; max-width: 290px; }
+    .offcanvas .offcanvas-header { border-bottom: 1px solid rgba(255,255,255,.05); }
+    .offcanvas .offcanvas-title img { max-height: 34px; }
+    .offcanvas .nav-link {
+      color: var(--text-light); padding: .75rem 1.1rem; border-radius: 6px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .offcanvas .nav-link .link-label { display: flex; align-items: center; gap: 12px; }
+    .offcanvas .nav-link:hover { background: rgba(255,255,255,.05); color: #fff; }
+    .offcanvas .nav-link.active {
+      background: rgba(0,115,183,.2); color: #fff; border-left: 3px solid var(--primary-color);
+    }
+    .offcanvas .nav-link i { width: 22px; text-align: center; flex: 0 0 22px; }
+    .offcanvas .dropdown-menu {
+      background: var(--sidebar-hover); border: none;
+      position: static !important; float: none; width: 100%; transform: none !important;
+    }
+    .offcanvas .dropdown-item { color: var(--text-light); padding: .45rem 1.4rem .45rem 2.4rem; }
+    .offcanvas .dropdown-item:hover { background: rgba(255,255,255,.05); color: #fff; }
+
+    @media (max-width: 991.98px) {
+      .sidebar, .top-bar, .app-footer { display: none !important; }
+      .mobile-nav { display: flex; }
+      .main-content { margin-left: 0 !important; min-height: calc(100vh - var(--topbar-h)); }
+      body { padding-bottom: 0; }
+      .content-wrapper { padding: .9rem .75rem 1.5rem; }
+      /* Any wide table becomes swipeable instead of blowing out the layout */
+      .table-responsive { -webkit-overflow-scrolling: touch; }
+      .card { border-radius: 12px; }
+      h1, .h1 { font-size: 1.3rem; }
+      h2, .h2 { font-size: 1.15rem; }
+    }
+    @media (min-width: 992px) { .offcanvas { display: none !important; } }
+
+    /* --- ALERTS ------------------------------------------------------- */
+    .alert { border-radius: 12px; border: none; padding: .75rem 1.1rem; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
+    .alert-success { background: #d4edda; color: #155724; }
+    .alert-danger  { background: #f8d7da; color: #721c24; }
+    .alert-warning { background: #fff3cd; color: #856404; }
+    .alert-info    { background: #d1ecf1; color: #0c5460; }
+
+    /* Bigger tap targets on touch devices */
+    @media (pointer: coarse) {
+      .btn-sm { padding: .35rem .7rem; }
+      .btn, .nav-link, .dropdown-item { min-height: 38px; }
+    }
+
+    @media print {
+      .sidebar, .top-bar, .app-footer, .mobile-nav, .offcanvas, .no-print { display: none !important; }
+      body { padding: 0; }
+      .main-content { margin-left: 0 !important; }
+    }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+{# ===================================================================== #}
+{#  One definition of the navigation, rendered twice (desktop + mobile)   #}
+{# ===================================================================== #}
+{% macro nav_items() %}
+  {% set ep = request.endpoint or '' %}
+  <li class="nav-item">
+    <a class="nav-link {% if ep == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}" title="Dashboard">
+      <span class="link-label"><i class="fas fa-tachometer-alt"></i><span class="link-text">Dashboard</span></span>
+    </a>
+  </li>
+
+  <li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle {% if ep.startswith('customer_') %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown" title="Customer">
+      <span class="link-label"><i class="fas fa-users"></i><span class="link-text">Customer</span></span>
+    </a>
+    <ul class="dropdown-menu dropdown-menu-dark">
+      <li><a class="dropdown-item" href="{{ url_for('customer_add') }}">Add Customer</a></li>
+      <li><a class="dropdown-item" href="{{ url_for('customer_list') }}">View Customer</a></li>
+    </ul>
+  </li>
+
+  <li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle {% if ep.startswith('plan_') or ep.startswith('service_provider_') %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown" title="Plan Master">
+      <span class="link-label"><i class="fas fa-tags"></i><span class="link-text">Plan Master</span></span>
+    </a>
+    <ul class="dropdown-menu dropdown-menu-dark">
+      <li><a class="dropdown-item" href="{{ url_for('service_provider_list') }}">Service Provider</a></li>
+      <li><a class="dropdown-item" href="{{ url_for('plan_list') }}">Plans</a></li>
+    </ul>
+  </li>
+
+  <li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle {% if ep.startswith('expense') %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown" title="Expenses">
+      <span class="link-label"><i class="fas fa-money-bill-wave"></i><span class="link-text">Expenses</span></span>
+    </a>
+    <ul class="dropdown-menu dropdown-menu-dark">
+      <li><a class="dropdown-item" href="{{ url_for('expenses_index') }}">Expense</a></li>
+      <li><a class="dropdown-item" href="{{ url_for('expense_category_list') }}">Expenses Category</a></li>
+      <li><a class="dropdown-item" href="{{ url_for('expense_account_list') }}">Expenses Account</a></li>
+      <li><a class="dropdown-item" href="{{ url_for('expense_payee_list') }}">Payee</a></li>
+    </ul>
+  </li>
+
+  <li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle {% if ep.startswith('inventory') or ep.startswith('vendor_') or ep.startswith('product_') or ep.startswith('stock_') %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown" title="Inventory">
+      <span class="link-label"><i class="fas fa-boxes"></i><span class="link-text">Inventory</span></span>
+    </a>
+    <ul class="dropdown-menu dropdown-menu-dark">
+      <li><a class="dropdown-item" href="{{ url_for('inventory_index') }}">Overview</a></li>
+      <li><a class="dropdown-item" href="{{ url_for('vendor_list') }}">Vendors</a></li>
+      <li><a class="dropdown-item" href="{{ url_for('product_list') }}">Products</a></li>
+      <li><a class="dropdown-item" href="{{ url_for('stock_list') }}">Stock</a></li>
+      <li><hr class="dropdown-divider"></li>
+      <li><a class="dropdown-item" href="{{ url_for('vendor_bill_list') }}">Vendor Bills</a></li>
+    </ul>
+  </li>
+
+  {% if current_user.is_admin() %}
+  <li class="nav-item">
+    <a class="nav-link {% if ep.startswith('staff_') %}active{% endif %}" href="{{ url_for('staff_list') }}" title="Staff">
+      <span class="link-label"><i class="fas fa-id-badge"></i><span class="link-text">Staff</span></span>
+    </a>
+  </li>
+  {% endif %}
+
+  <li class="nav-item">
+    <a class="nav-link {% if ep.startswith('hr_') or ep.startswith('attendance_') or ep.startswith('leave_') or ep.startswith('payroll_') %}active{% endif %}" href="{{ url_for('hr_index') }}" title="HR &amp; Payroll">
+      <span class="link-label"><i class="fas fa-calendar-check"></i><span class="link-text">HR &amp; Payroll</span></span>
+    </a>
+  </li>
+
+  <li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle {% if ep.startswith('company_') or ep.startswith('zone_') or ep.startswith('tax_') or ep.startswith('building_') or ep.startswith('area_') or ep.startswith('locality_') or ep.startswith('message_template') or ep in ['settings','import_export','database_backup','bulk_messages'] %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown" title="Masters">
+      <span class="link-label"><i class="fas fa-cog"></i><span class="link-text">Masters</span></span>
+    </a>
+    <ul class="dropdown-menu dropdown-menu-dark">
+      <li class="dropdown-submenu">
+        <a class="dropdown-item submenu-toggle" href="#">Company <i class="fas fa-chevron-down"></i></a>
+        <ul class="dropdown-menu dropdown-menu-dark">
+          <li><a class="dropdown-item" href="{{ url_for('company_edit') }}">Company</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('zone_list') }}">Zones</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('settings_bp.settings') }}">Settings</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('tax_list') }}">Tax Master</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('settings_bp.database_backup') }}">Database Backup</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('settings_bp.import_export') }}">Import/Export</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('settings_bp.isp_list') }}">ISP Integrations</a></li>
+        </ul>
+      </li>
+      <li class="dropdown-submenu">
+        <a class="dropdown-item submenu-toggle" href="#">Address <i class="fas fa-chevron-down"></i></a>
+        <ul class="dropdown-menu dropdown-menu-dark">
+          <li><a class="dropdown-item" href="{{ url_for('building_list') }}">Building</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('area_list') }}">Area</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('locality_list') }}">Locality</a></li>
+        </ul>
+      </li>
+      <li class="dropdown-submenu">
+        <a class="dropdown-item submenu-toggle" href="#">Customer Templates <i class="fas fa-chevron-down"></i></a>
+        <ul class="dropdown-menu dropdown-menu-dark">
+          <li><a class="dropdown-item" href="{{ url_for('message_template_list') }}">Manage Templates</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('bulk_messages') }}">Bulk WhatsApp / Reminders</a></li>
+        </ul>
+      </li>
+    </ul>
+  </li>
+
+  <li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle {% if ep.startswith('plan_expiry') or ep == 'payment_authorizations' %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown" title="Reports">
+      <span class="link-label"><i class="fas fa-chart-line"></i><span class="link-text">Reports</span></span>
+    </a>
+    <ul class="dropdown-menu dropdown-menu-dark">
+      <li><a class="dropdown-item" href="{{ url_for('plan_expiry_report', kind='expiring', days=7) }}">Plan Expiring (7 days)</a></li>
+      <li><a class="dropdown-item" href="{{ url_for('plan_expiry_report', kind='expired', days=7) }}">Plan Expired</a></li>
+      <li><a class="dropdown-item" href="{{ url_for('plan_expiry_report', kind='renewed', days=7) }}">Plan Renewed</a></li>
+      <li><hr class="dropdown-divider"></li>
+      <li><a class="dropdown-item" href="{{ url_for('payment_authorizations') }}">Payment Authorization</a></li>
+      <li><hr class="dropdown-divider"></li>
+      <li><a class="dropdown-item" href="{{ url_for('attendance_report') }}">Attendance Report</a></li>
+      <li><a class="dropdown-item" href="{{ url_for('leaves_report') }}">Leaves Report</a></li>
+      <li><a class="dropdown-item" href="{{ url_for('payroll_report') }}">Payroll Report</a></li>
+      <li><hr class="dropdown-divider"></li>
+      <li><a class="dropdown-item" href="{{ url_for('dashboard_export') }}">Export dashboard CSV</a></li>
+    </ul>
+  </li>
+{% endmacro %}
+
+  <!-- ================= MOBILE TOP BAR ================= -->
+  <nav class="mobile-nav">
+    <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-label="Open menu">
+      <i class="fas fa-bars"></i>
+    </button>
+    <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+      <img src="{{ url_for('static', filename='images/logo.jpg') }}" alt="YASH">
+    </a>
+    <div class="mobile-actions">
+      <a href="{{ url_for('customer_list') }}" title="Search customers"><i class="fas fa-search"></i></a>
+      <a href="{{ url_for('logout') }}" title="Logout"><i class="fas fa-sign-out-alt"></i></a>
+    </div>
+  </nav>
+
+  <!-- ================= MOBILE OFFCANVAS ================= -->
+  <div class="offcanvas offcanvas-start" tabindex="-1" id="mobileSidebar">
+    <div class="offcanvas-header">
+      <a class="offcanvas-title" href="{{ url_for('dashboard') }}">
+        <img src="{{ url_for('static', filename='images/logo.jpg') }}" alt="YASH">
+      </a>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+      <form class="d-flex mb-3" action="{{ url_for('customer_search') }}" method="get" role="search">
+        <input class="form-control form-control-sm me-2" type="search" name="q" placeholder="Search customers...">
+        <button class="btn btn-sm btn-primary" type="submit"><i class="fas fa-search"></i></button>
+      </form>
+      <ul class="nav flex-column">
+        {{ nav_items() }}
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('profile') }}"><span class="link-label"><i class="fas fa-user-cog"></i><span class="link-text">My Profile</span></span></a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}"><span class="link-label"><i class="fas fa-sign-out-alt"></i><span class="link-text">Logout</span></span></a></li>
+      </ul>
+      <div class="mt-4 text-center text-white-50 small">&copy; 2026 Sumedh</div>
+    </div>
+  </div>
+
+  <!-- ================= DESKTOP SIDEBAR ================= -->
+  <nav class="sidebar" id="appSidebar">
+    <div class="brand">
+      <img src="{{ url_for('static', filename='images/logo.jpg') }}" alt="YASH">
+      <h5>YASH CRM</h5>
+    </div>
+    <ul class="nav flex-column">
+      {{ nav_items() }}
+    </ul>
+    <div class="footer-text">&copy; 2026 Sumedh</div>
+  </nav>
+
+  <!-- ================= FIXED TOP BAR ================= -->
+  <header class="top-bar">
+    <div class="top-bar-left">
+      <button class="sidebar-toggle" id="sidebarToggle" type="button"
+              aria-label="Toggle sidebar" title="Collapse / expand menu">
+        <i class="fas fa-bars"></i>
+      </button>
+      <h1>{% block page_title %}{% endblock %}</h1>
+    </div>
+    <div class="top-bar-right">
+      <form class="search-form" action="{{ url_for('customer_search') }}" method="get" role="search">
+        <input type="text" name="q" placeholder="Search customers..." aria-label="Search customers">
+        <button type="submit" aria-label="Search"><i class="fas fa-search"></i></button>
+      </form>
+      <span class="user-greeting">
+        <i class="fas fa-user-circle"></i> {{ current_user.full_name }}
+        <a href="{{ url_for('profile') }}" title="My Profile"><i class="fas fa-user-cog"></i></a>
+        <a href="{{ url_for('logout') }}" title="Logout"><i class="fas fa-sign-out-alt"></i></a>
+      </span>
+    </div>
+  </header>
+
+  <!-- ================= MAIN ================= -->
+  <main class="main-content">
+    <div class="content-wrapper">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <!-- ================= FIXED FOOTER ================= -->
+  <footer class="app-footer">
+    <span>YASH Internet Services CRM</span>
+    <span>{{ current_user.full_name }} &middot; {{ today.strftime('%d %b %Y') if today else '' }}</span>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  {% if request.endpoint == 'dashboard' %}
+    <!-- Chart.js is ~200 KB, so it only loads on the one page that draws charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  {% endif %}
+  <script>
+    (function () {
+      'use strict';
+
+      /* ---- Collapsible sidebar, remembered across pages ---------------- */
+      var KEY = 'yash.sidebar.collapsed';
+      var body = document.body;
+      var toggle = document.getElementById('sidebarToggle');
+
+      function apply(collapsed) {
+        body.classList.toggle('sidebar-collapsed', collapsed);
+        if (toggle) {
+          toggle.setAttribute('aria-expanded', String(!collapsed));
+          toggle.title = collapsed ? 'Expand menu' : 'Collapse menu';
+        }
+      }
+
+      try { apply(localStorage.getItem(KEY) === '1'); } catch (e) { /* private mode */ }
+
+      if (toggle) {
+        toggle.addEventListener('click', function () {
+          var collapsed = !body.classList.contains('sidebar-collapsed');
+          apply(collapsed);
+          try { localStorage.setItem(KEY, collapsed ? '1' : '0'); } catch (e) {}
+        });
+      }
+
+      /* ---- Nested submenu toggle (Bootstrap 5 has no built-in support) -- */
+      document.querySelectorAll('.submenu-toggle').forEach(function (el) {
+        el.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          var parent = el.closest('.dropdown-submenu');
+          parent.parentElement.querySelectorAll('.dropdown-submenu').forEach(function (s) {
+            if (s !== parent) s.classList.remove('show');
+          });
+          parent.classList.toggle('show');
+        });
+      });
+
+      document.querySelectorAll('.dropdown').forEach(function (dd) {
+        dd.addEventListener('hidden.bs.dropdown', function () {
+          dd.querySelectorAll('.dropdown-submenu.show').forEach(function (s) {
+            s.classList.remove('show');
+          });
+        });
+      });
+
+      /* ---- Auto-dismiss success flashes so they don't pile up ---------- */
+      setTimeout(function () {
+        document.querySelectorAll('.alert-success.alert-dismissible').forEach(function (a) {
+          try { bootstrap.Alert.getOrCreateInstance(a).close(); } catch (e) {}
+        });
+      }, 6000);
+
+      /* ---- Stop double-submits on slow connections --------------------- */
+      document.querySelectorAll('form[method="post"], form[method="POST"]').forEach(function (f) {
+        f.addEventListener('submit', function () {
+          var btn = f.querySelector('button[type="submit"], input[type="submit"]');
+          if (btn && !btn.dataset.allowRepeat) {
+            setTimeout(function () { btn.disabled = true; }, 10);
+            setTimeout(function () { btn.disabled = false; }, 8000);
+          }
+        });
+      });
+    })();
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
