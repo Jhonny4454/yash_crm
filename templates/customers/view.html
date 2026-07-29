@@ -1036,12 +1036,12 @@
             <table class="tbl">
               <thead>
                 <tr><th>#</th><th>Date</th><th>Receipt</th><th>Book Receipt No.</th><th>Received Amount</th>
-<<<<<<< HEAD
+
                     <th>Against Invoice</th><th>Mode</th><th>Transaction ID</th><th>Type</th>
                     <th>Received By</th><th>Status</th><th>Action</th></tr>
-=======
+
                     <th>Against Invoice</th><th>Mode</th><th>Received By</th><th>Status</th><th>Action</th></tr>
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
+
               </thead>
               <tbody>
                 {% for pay in payments %}
@@ -1053,7 +1053,7 @@
                   <td>&#8377; {{ '%.2f'|format(pay.amount) }}</td>
                   <td>{% if pay.invoice %}<a class="link-blue" target="_blank" href="{{ url_for('invoice_summary', id=pay.invoice_id) }}">{{ pay.invoice.invoice_no }}</a>{% else %}-{% endif %}</td>
                   <td><span class="mode-badge">{{ pay.payment_mode }}</span></td>
-<<<<<<< HEAD
+
 >>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
                   <td class="small text-muted">{{ pay.gateway_transaction_id or '-' }}</td>
                   <td>
@@ -1069,7 +1069,7 @@
                     {% elif pay.needs_authorization %}<span class="badge bg-warning text-dark"
                       title="The money is already credited - this is only waiting for your sign-off">Pending authorization</span>
                     {% else %}<span class="badge bg-success">Authorized</span>{% endif %}
-<<<<<<< HEAD
+
                   </td>
                   <td class="text-nowrap">
                     <button class="btn btn-outline-primary btn-mini" data-bs-toggle="modal" data-bs-target="#viewPaymentModal{{ pay.id }}"><i class="fas fa-eye"></i></button>
@@ -1086,7 +1086,7 @@
                   <td class="text-nowrap">
                     <button class="btn btn-outline-primary btn-mini" data-bs-toggle="modal" data-bs-target="#viewPaymentModal{{ pay.id }}"><i class="fas fa-eye"></i></button>
                     <button class="btn btn-outline-secondary btn-mini" onclick="printReceipt('{{ pay.id }}')"><i class="fas fa-print"></i></button>
-<<<<<<< HEAD
+
 >>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
                     {% if current_user.is_admin() and pay.needs_authorization %}
                     <button class="btn btn-success btn-mini" title="Authorize this payment"
@@ -1099,7 +1099,7 @@
                       <button type="submit" class="btn btn-outline-success btn-mini"
                               title="Send the payment receipt on WhatsApp"><i class="fab fa-whatsapp"></i></button>
                     </form>
-<<<<<<< HEAD
+
                     {% endif %}
                     {% if current_user.is_admin() %}
                     <button class="btn btn-outline-danger btn-mini"
@@ -1373,7 +1373,7 @@
                   </td>
                 </tr>
                 {% else %}
-<<<<<<< HEAD
+
                 <tr><td colspan="12" class="empty">No payment history found.</td></tr>
 =======
                 <tr><td colspan="10" class="empty">No payment history found.</td></tr>
@@ -1629,7 +1629,7 @@
     setTimeout(function () { w.print(); }, 300);
   }
 
-<<<<<<< HEAD
+
 >>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
   // ===== Addon Invoice: charge presets + collapsible vendor block =====
   (function () {
@@ -1677,7 +1677,7 @@
     }
   })();
 
-<<<<<<< HEAD
+
   // ===== Addon Invoice: vendor -> product rows =====
   (function () {
     var vendorSel = document.getElementById('addonVendor');

@@ -18,9 +18,9 @@
 
 <h3 class="fw-bold mb-3" style="color:#243447;">Payment Authorization</h3>
 
-<<<<<<< HEAD
+
 =======
-<<<<<<< HEAD
+
 >>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
 <div class="alert alert-info small">
   <i class="fas fa-circle-info me-1"></i>
@@ -29,7 +29,7 @@
   balance or their connection. Rejecting a payment removes it from the account.
 </div>
 
-<<<<<<< HEAD
+
 =======
 =======
 >>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
@@ -38,16 +38,16 @@
   <div class="panel-head">
     <span>Pending Authorization</span>
     <span>{{ pending|length }} payment{{ '' if pending|length == 1 else 's' }} &middot;
-<<<<<<< HEAD
+
 =======
-<<<<<<< HEAD
+
 >>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
       &#8377; {{ '%.2f'|format(pending_total) }}
       {% if portal_total %}
         &middot; <span class="badge bg-info text-dark">&#8377; {{ '%.2f'|format(portal_total) }} paid online</span>
       {% endif %}
     </span>
-<<<<<<< HEAD
+
 =======
 =======
       &#8377; {{ '%.2f'|format(pending|sum(attribute='amount')|float) }}</span>
@@ -58,11 +58,11 @@
     <table class="tbl">
       <thead>
         <tr><th>#</th><th>Date</th><th>Customer</th><th>Invoice</th><th>Amount</th><th>Mode</th>
-<<<<<<< HEAD
+
             <th>Transaction ID</th><th>Type</th><th>Book Receipt</th><th>Collected By</th>
             <th>Remarks</th><th style="width:170px;">Action</th></tr>
 =======
-<<<<<<< HEAD
+
             <th>Transaction ID</th><th>Type</th><th>Book Receipt</th><th>Collected By</th>
             <th>Remarks</th><th style="width:170px;">Action</th></tr>
 =======
@@ -80,9 +80,9 @@
           <td>{% if p.invoice %}<a target="_blank" href="{{ url_for('invoice_summary', id=p.invoice_id) }}">{{ p.invoice.invoice_no }}</a>{% else %}-{% endif %}</td>
           <td>&#8377; {{ '%.2f'|format(p.amount) }}</td>
           <td><span class="mode-badge">{{ p.payment_mode }}</span></td>
-<<<<<<< HEAD
+
 =======
-<<<<<<< HEAD
+
 >>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
           <td class="small text-muted">{{ p.gateway_transaction_id or '-' }}</td>
           <td>
@@ -94,7 +94,7 @@
           </td>
           <td>{{ p.book_receipt_no or '-' }}</td>
           <td>{{ p.received_by_user.full_name if p.received_by_user else 'Customer (Portal)' }}</td>
-<<<<<<< HEAD
+
 =======
 =======
           <td>{{ p.book_receipt_no or '-' }}</td>
@@ -119,10 +119,10 @@
           </td>
         </tr>
         {% else %}
-<<<<<<< HEAD
+
         <tr><td colspan="12" class="empty">Nothing waiting for authorization.</td></tr>
 =======
-<<<<<<< HEAD
+
         <tr><td colspan="12" class="empty">Nothing waiting for authorization.</td></tr>
 =======
         <tr><td colspan="10" class="empty">Nothing waiting for authorization.</td></tr>

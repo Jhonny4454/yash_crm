@@ -245,17 +245,8 @@ class SalesReturn(db.Model):
     reason = db.Column(db.Text)
 
     # Where the money goes back to
-
-    refund_mode = db.Column(db.Enum('cash', 'bank', 'adjust_next'),
-                            default='adjust_next')
-
-
-    refund_mode = db.Column(db.Enum('cash', 'bank', 'adjust_next'),
-                            default='adjust_next')
-
     refund_mode = db.Column(db.Enum('wallet', 'cash', 'bank', 'adjust_next'),
-                            default='wallet') 
-    
+                            default='wallet')
     status = db.Column(db.Enum('pending', 'approved', 'rejected'),
                        default='pending')
     restock = db.Column(db.Boolean, default=True)
@@ -286,7 +277,9 @@ class SalesReturnItem(db.Model):
         'items', lazy=True, cascade='all, delete-orphan'))
     invoice_item = db.relationship('InvoiceItem')
 
-#  Referral campaign  (templates already exist, routes did not)
+
+# --------------------------------------------------------------------------- #
+#  Referral campaign
 # --------------------------------------------------------------------------- #
 class ReferralCampaign(db.Model):
     __tablename__ = 'referral_campaigns'
@@ -337,6 +330,10 @@ class Referral(db.Model):
     campaign = db.relationship('ReferralCampaign', backref='referrals')
     referrer = db.relationship('Customer', foreign_keys=[referrer_customer_id])
     referee = db.relationship('Customer', foreign_keys=[referee_customer_id])
+
+
+# --------------------------------------------------------------------------- #
+#  ISP Credentials
 # --------------------------------------------------------------------------- #
 class ISPCredential(db.Model, EncryptedSecretMixin):
     """
@@ -460,4 +457,3 @@ class ImportJob(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     created_by = db.relationship('User')
-    
