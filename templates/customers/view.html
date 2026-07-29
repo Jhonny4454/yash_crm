@@ -337,7 +337,8 @@
           <div class="tbl-wrap">
             <table class="tbl">
               <thead>
-                <tr><th>#</th><th>Invoice No</th><th>Caption</th><th>Invoice Date</th><th>Due Date</th><th>Amount</th><th>Discount</th><th>Paid</th><th>Pending</th><th>Status</th><th>Summary Invoice</th><th>Detailed Invoice</th><th>Send</th></tr>
+                <!-- MODIFIED: Replaced "Send" header with "Delete" -->
+                <tr><th>#</th><th>Invoice No</th><th>Caption</th><th>Invoice Date</th><th>Due Date</th><th>Amount</th><th>Discount</th><th>Paid</th><th>Pending</th><th>Status</th><th>Summary Invoice</th><th>Detailed Invoice</th><th>Delete</th></tr>
               </thead>
               <tbody>
                 {% for inv in invoices %}
@@ -352,23 +353,33 @@
                   <td>&#8377; {{ '%.2f'|format(inv.paid_amount) }}</td>
                   <td>&#8377; {{ '%.2f'|format(inv.balance) }}</td>
                   <td>{% if inv.status == 'paid' %}<span class="badge bg-success">Paid</span>{% elif inv.status == 'overdue' %}<span class="badge bg-danger">Overdue</span>{% else %}<span class="badge bg-warning text-dark">{{ inv.status|capitalize }}</span>{% endif %}</td>
-                  <td class="text-nowrap"><a class="btn btn-outline-primary btn-mini" target="_blank" href="{{ url_for('invoice_summary', id=inv.id) }}"><i class="fas fa-print"></i> Print</a></td>
-                  <td class="text-nowrap"><a class="btn btn-outline-primary btn-mini" target="_blank" href="{{ url_for('invoice_detailed', id=inv.id) }}"><i class="fas fa-print"></i> Print</a></td>
+                  
+                  <!-- MODIFIED: Summary Column now has Print + Summary WhatsApp button -->
                   <td class="text-nowrap">
+                    <a class="btn btn-outline-primary btn-mini" target="_blank" href="{{ url_for('invoice_summary', id=inv.id) }}"><i class="fas fa-print"></i> Print</a>
                     {% if customer.mobile %}
-                    <!-- Send Summary Bill -->
                     <form method="POST" action="{{ url_for('invoice_send', id=inv.id) }}" style="display:inline;">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                       <input type="hidden" name="template_type" value="summary_bill">
                       <button type="submit" class="btn btn-outline-success btn-mini" title="Send Summary Bill"><i class="fas fa-file-alt"></i></button>
                     </form>
-                    <!-- Send Detailed Bill -->
+                    {% endif %}
+                  </td>
+
+                  <!-- MODIFIED: Detailed Column now has Print + Detailed WhatsApp button -->
+                  <td class="text-nowrap">
+                    <a class="btn btn-outline-primary btn-mini" target="_blank" href="{{ url_for('invoice_detailed', id=inv.id) }}"><i class="fas fa-print"></i> Print</a>
+                    {% if customer.mobile %}
                     <form method="POST" action="{{ url_for('invoice_send', id=inv.id) }}" style="display:inline;">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                       <input type="hidden" name="template_type" value="detailed_bill">
                       <button type="submit" class="btn btn-outline-info btn-mini text-info" title="Send Detailed Bill"><i class="fas fa-file-lines"></i></button>
                     </form>
-                    {% else %}<span class="text-muted small">No mobile</span>{% endif %}
+                    {% endif %}
+                  </td>
+
+                  <!-- MODIFIED: Delete column now only has the Trash button -->
+                  <td class="text-nowrap">
                     {% if current_user.is_admin() %}
                     <button class="btn btn-outline-danger btn-mini" onclick="if(confirm('Delete invoice {{ inv.invoice_no }}?'))document.getElementById('delInv{{ inv.id }}').submit();"><i class="fas fa-trash-alt"></i></button>
                     {% endif %}
@@ -437,8 +448,12 @@
                   <td>{{ cp.plan.name if cp.plan else '-' }}</td>
                   <td>{{ cp.plan.speed_mbps if cp.plan else '-' }} Mbps</td>
                   <td>&#8377; {{ '%.2f'|format(cp.plan.price_monthly) if cp.plan else '0.00' }}</td>
-                  <td><input form="hist{{ cp.id }}" type="date" class="form-control form-control-sm" name="start_date" value="{{ cp.start_date.isoformat() }}" style="width:145px;"></td>
-                  <td><input form="hist{{ cp.id }}" type="date" class="form-control form-control-sm" name="end_date" value="{{ cp.end_date.isoformat() }}" style="width:145px;"></td>
+                  
+                  <!-- MODIFIED: Dates are now plain text, not editable inputs -->
+                  <td>{{ cp.start_date.strftime('%d-%m-%Y') }}</td>
+                  <td>{{ cp.end_date.strftime('%d-%m-%Y') }}</td>
+                  
+                  <!-- MODIFIED: Only status is editable -->
                   <td>
                     <select form="hist{{ cp.id }}" name="status" class="form-select form-select-sm" style="width:125px;">
                       {% for st in ['active','expired','cancelled','terminated'] %}
