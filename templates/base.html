@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+<<<<<<< HEAD
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#2d323e">
   <title>{% block page_title_tag %}{{ self.page_title() }}{% endblock %} &middot; YASH Internet Services</title>
@@ -17,6 +18,20 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <style>
+=======
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YASH Internet Services</title>
+  <!-- CSRF token for AJAX (if any) -->
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <!-- Bootstrap 5, Font Awesome & Inter -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* --- UNIFIED DASHBOARD CSS VARIABLES --- */
+>>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     :root {
       --primary-color: #0073b7;
       --primary-hover: #005f9e;
@@ -26,6 +41,7 @@
       --text-main: #1e293b;
       --text-light: #b8c7ce;
       --border-light: #e2e8f0;
+<<<<<<< HEAD
       --shadow-md: 0 4px 6px -1px rgba(0,0,0,.05), 0 2px 4px -1px rgba(0,0,0,.03);
       --radius-lg: 16px;
 
@@ -104,10 +120,45 @@
       border-left: 3px solid transparent;
       white-space: nowrap;
       font-size: .93rem;
+=======
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+      --radius-lg: 16px;
+    }
+
+    body {
+      background-color: var(--bg-body);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      margin: 0; padding: 0;
+    }
+
+    /* --- SIDEBAR --- */
+    .sidebar {
+      background: var(--sidebar-bg);
+      min-height: 100vh;
+      padding: 1.5rem 0;
+      display: flex; flex-direction: column;
+      overflow: visible;
+    }
+    .sidebar .brand { text-align: center; padding: 0 1rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .sidebar .brand img { max-width: 110px; height: auto; }
+    .sidebar .brand h5 { color: #fff; font-weight: 700; margin-top: 0.5rem; letter-spacing: 1px; font-size: 1.1rem; }
+
+    .sidebar .nav-link {
+      color: var(--text-light);
+      padding: 0.7rem 1.5rem;
+      margin: 0.1rem 0.8rem;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-left: 3px solid transparent;
+>>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     }
     .sidebar .nav-link .link-label { display: flex; align-items: center; gap: 12px; }
     .sidebar .nav-link:hover { background: var(--sidebar-hover); color: #fff; }
     .sidebar .nav-link.active {
+<<<<<<< HEAD
       background: var(--sidebar-hover); color: #fff;
       border-left-color: var(--primary-color);
     }
@@ -238,10 +289,49 @@
       display: none; position: static; float: none; width: 100%;
       margin: 0; padding-left: .75rem; border: none; box-shadow: none;
       background: rgba(0,0,0,.2); border-radius: 0;
+=======
+      background: var(--sidebar-hover);
+      color: #fff;
+      border-left-color: var(--primary-color);
+    }
+    .sidebar .nav-link i { width: 22px; text-align: center; font-size: 1rem; }
+
+    /* Sidebar Dropdown */
+    .sidebar .dropdown-menu {
+      background: var(--sidebar-hover);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 6px;
+      margin-top: 0;
+      padding: 0.5rem 0;
+      min-width: 210px;
+    }
+    .sidebar .dropdown-item { color: var(--text-light); padding: 0.5rem 1.5rem; }
+    .sidebar .dropdown-item:hover { background: rgba(255,255,255,0.05); color: #fff; }
+    .sidebar .dropdown-toggle::after { margin-left: auto; }
+
+    .sidebar .footer-text { color: rgba(255,255,255,0.25); font-size: 0.7rem; text-align: center; padding: 1.5rem 0 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto; }
+
+    /* --- NESTED SUBMENUS (works in both sidebar & offcanvas) --- */
+    .dropdown-submenu { position: relative; }
+    .dropdown-submenu > .dropdown-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .dropdown-submenu > .dropdown-item i { transition: transform 0.2s ease; font-size: 0.7rem; }
+    .dropdown-submenu > .dropdown-menu {
+      display: none;
+      position: static;
+      float: none;
+      width: 100%;
+      margin: 0;
+      padding-left: 0.75rem;
+      border: none;
+      box-shadow: none;
+      background: rgba(0,0,0,0.2);
+      border-radius: 0;
+>>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     }
     .dropdown-submenu.show > .dropdown-menu { display: block; }
     .dropdown-submenu.show > .dropdown-item i { transform: rotate(180deg); }
 
+<<<<<<< HEAD
     /* ==================================================================== */
     /*  MOBILE                                                               */
     /* ==================================================================== */
@@ -458,11 +548,114 @@
   </nav>
 
   <!-- ================= MOBILE OFFCANVAS ================= -->
+=======
+    /* --- MAIN CONTENT & TOP BAR --- */
+    .main-content {
+      background: var(--bg-body);
+      min-height: 100vh;
+      padding: 0;
+      display: flex; flex-direction: column;
+    }
+
+    .top-bar {
+      background: var(--sidebar-bg);
+      padding: 0.8rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      color: white;
+      box-shadow: var(--shadow-md);
+    }
+    .top-bar h1 { font-size: 1.4rem; font-weight: 500; margin: 0; color: #fff; }
+    .top-bar .top-bar-right { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+
+    .top-bar .search-form {
+      display: flex;
+      align-items: center;
+      background: rgba(255,255,255,0.1);
+      border-radius: 6px;
+      padding: 0.2rem 0.2rem 0.2rem 0.9rem;
+      transition: 0.2s;
+    }
+    .top-bar .search-form:focus-within { background: rgba(255,255,255,0.2); }
+    .top-bar .search-form input {
+      border: none; background: transparent; outline: none; font-size: 0.85rem;
+      width: 160px; color: #fff;
+    }
+    .top-bar .search-form input::placeholder { color: rgba(255,255,255,0.7); }
+    .top-bar .search-form button {
+      border: none; background: var(--primary-color); color: #fff; width: 30px; height: 30px; border-radius: 6px; font-size: 0.8rem;
+    }
+    .top-bar .search-form button:hover { background: var(--primary-hover); }
+
+    .top-bar .user-greeting {
+      color: rgba(255,255,255,0.9); font-weight: 500; white-space: nowrap; display: flex; align-items: center; gap: 12px;
+    }
+    .top-bar .user-greeting a { color: rgba(255,255,255,0.7); transition: 0.2s; text-decoration: none; }
+    .top-bar .user-greeting a:hover { color: #fff; }
+
+    /* --- WRAPPER CONTENT --- */
+    .content-wrapper { padding: 1.5rem 2rem; flex: 1; }
+
+    /* --- MOBILE NAV --- */
+    .mobile-nav { background: var(--sidebar-bg); padding: 0.5rem 1rem; display: flex; justify-content: space-between; align-items: center; }
+    .mobile-nav .navbar-brand img { max-height: 40px; }
+    .mobile-nav .navbar-toggler { border: none; color: #fff; font-size: 1.5rem; padding: 0.2rem 0.5rem; background: rgba(255,255,255,0.1); border-radius: 6px; }
+    .mobile-nav .navbar-toggler:focus { box-shadow: none; }
+
+    .offcanvas { background: var(--sidebar-bg); color: #fff; max-width: 300px; }
+    .offcanvas .offcanvas-header { border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .offcanvas .offcanvas-title img { max-height: 35px; }
+    .offcanvas .nav-link { color: var(--text-light); padding: 0.8rem 1.2rem; border-radius: 6px; transition: all 0.2s; display: flex; align-items: center; justify-content: space-between; }
+    .offcanvas .nav-link .link-label { display: flex; align-items: center; }
+    .offcanvas .nav-link:hover { background: rgba(255,255,255,0.05); color: #fff; }
+    .offcanvas .nav-link.active { background: rgba(0, 115, 183, 0.2); color: #fff; border-left: 3px solid var(--primary-color); }
+    .offcanvas .nav-link i { width: 24px; text-align: center; margin-right: 12px; }
+    .offcanvas .dropdown-menu { background: var(--sidebar-hover); border: none; position: static !important; float: none; width: 100%; transform: none !important; }
+    .offcanvas .dropdown-item { color: var(--text-light); padding: 0.4rem 1.5rem 0.4rem 2.5rem; }
+    .offcanvas .dropdown-item:hover { background: rgba(255,255,255,0.05); color: #fff; }
+    .offcanvas .dropdown-submenu > .dropdown-item i { margin-right: 0; }
+
+    /* --- ALERTS --- */
+    .alert { border-radius: 12px; border: none; padding: 0.8rem 1.2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+    .alert-success { background: #d4edda; color: #155724; }
+    .alert-danger { background: #f8d7da; color: #721c24; }
+    .alert-warning { background: #fff3cd; color: #856404; }
+    .alert-info { background: #d1ecf1; color: #0c5460; }
+
+    /* --- RESPONSIVENESS --- */
+    @media (max-width: 767.98px) {
+      .sidebar { display: none; }
+      .top-bar { padding: 0.6rem 1rem; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+      .top-bar h1 { font-size: 1.2rem; }
+      .content-wrapper { padding: 1rem; }
+      .top-bar .search-form input { width: 120px; }
+    }
+    @media (min-width: 768px) { .mobile-nav { display: none; } .offcanvas { display: none !important; } }
+  </style>
+</head>
+<body>
+
+  <!-- Mobile Nav -->
+  <nav class="mobile-nav d-md-none">
+    <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+      <img src="{{ url_for('static', filename='images/logo.jpg') }}" alt="YASH">
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar">
+      <i class="fas fa-bars"></i>
+    </button>
+  </nav>
+
+  <!-- Mobile Offcanvas -->
+>>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
   <div class="offcanvas offcanvas-start" tabindex="-1" id="mobileSidebar">
     <div class="offcanvas-header">
       <a class="offcanvas-title" href="{{ url_for('dashboard') }}">
         <img src="{{ url_for('static', filename='images/logo.jpg') }}" alt="YASH">
       </a>
+<<<<<<< HEAD
       <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
     <div class="offcanvas-body">
@@ -474,11 +667,129 @@
         {{ nav_items() }}
         <li class="nav-item"><a class="nav-link" href="{{ url_for('profile') }}"><span class="link-label"><i class="fas fa-user-cog"></i><span class="link-text">My Profile</span></span></a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}"><span class="link-label"><i class="fas fa-sign-out-alt"></i><span class="link-text">Logout</span></span></a></li>
+=======
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body">
+      <ul class="nav flex-column">
+        <li class="nav-item"><a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}"><span class="link-label"><i class="fas fa-tachometer-alt"></i> Dashboard</span></a></li>
+
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle {% if request.endpoint and request.endpoint.startswith('customer_') %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
+            <span class="link-label"><i class="fas fa-users"></i> Customer</span>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-dark">
+            <li><a class="dropdown-item" href="{{ url_for('customer_add') }}">Add Customer</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('customer_list') }}">View Customer</a></li>
+          </ul>
+        </li>
+
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('plan_') or request.endpoint.startswith('service_provider_')) %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
+            <span class="link-label"><i class="fas fa-tags"></i> Plan Master</span>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-dark">
+            <li><a class="dropdown-item" href="{{ url_for('service_provider_list') }}">Service Provider</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('plan_list') }}">Plans</a></li>
+          </ul>
+        </li>
+
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('expenses_') or request.endpoint.startswith('expense_')) %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
+            <span class="link-label"><i class="fas fa-money-bill-wave"></i> Expenses</span>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-dark">
+            <li><a class="dropdown-item" href="{{ url_for('expenses_index') }}">Expense</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('expense_category_list') }}">Expenses Category</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('expense_account_list') }}">Expenses Account</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('expense_payee_list') }}">Payee</a></li>
+          </ul>
+        </li>
+
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('inventory') or request.endpoint.startswith('vendor_') or request.endpoint.startswith('product_') or request.endpoint.startswith('stock_')) %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
+            <span class="link-label"><i class="fas fa-boxes"></i> Inventory</span>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-dark">
+            <li><a class="dropdown-item" href="{{ url_for('inventory_index') }}">Overview</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('vendor_list') }}">Vendors</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('product_list') }}">Products</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('stock_list') }}">Stock</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('vendor_bill_list') }}">Vendor Bills</a></li>
+          </ul>
+        </li>
+
+        {% if current_user.is_admin() %}
+        <li class="nav-item"><a class="nav-link {% if request.endpoint and request.endpoint.startswith('staff_') %}active{% endif %}" href="{{ url_for('staff_list') }}"><span class="link-label"><i class="fas fa-id-badge"></i> Staff</span></a></li>
+        {% endif %}
+
+        <li class="nav-item"><a class="nav-link {% if request.endpoint and (request.endpoint.startswith('hr_') or request.endpoint.startswith('attendance_') or request.endpoint.startswith('leave_') or request.endpoint.startswith('payroll_')) %}active{% endif %}" href="{{ url_for('hr_index') }}"><span class="link-label"><i class="fas fa-calendar-check"></i> HR &amp; Payroll</span></a></li>
+
+        <!-- Masters Dropdown with nested submenus -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('company_') or request.endpoint.startswith('zone_') or request.endpoint.startswith('tax_') or request.endpoint.startswith('building_') or request.endpoint.startswith('area_') or request.endpoint.startswith('locality_') or request.endpoint in ['settings','import_export','database_backup','message_template_list']) %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
+            <span class="link-label"><i class="fas fa-cog"></i> Masters</span>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-dark">
+            <li class="dropdown-submenu">
+              <a class="dropdown-item submenu-toggle" href="#">Company <i class="fas fa-chevron-down"></i></a>
+              <ul class="dropdown-menu dropdown-menu-dark">
+                <li><a class="dropdown-item" href="{{ url_for('company_edit') }}">Company</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('zone_list') }}">Zones</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('settings_bp.settings') }}">Settings</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('tax_list') }}">Tax Master</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('settings_bp.database_backup') }}">Database Backup</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('settings_bp.import_export') }}">Import/Export</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('settings_bp.isp_list') }}">ISP Integrations</a></li>
+              </ul>
+            </li>
+            <li class="dropdown-submenu">
+              <a class="dropdown-item submenu-toggle" href="#">Address <i class="fas fa-chevron-down"></i></a>
+              <ul class="dropdown-menu dropdown-menu-dark">
+                <li><a class="dropdown-item" href="{{ url_for('building_list') }}">Building</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('area_list') }}">Area</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('locality_list') }}">Locality</a></li>
+              </ul>
+            </li>
+            <!-- NEW: Customer Templates submenu -->
+            <li class="dropdown-submenu">
+              <a class="dropdown-item submenu-toggle" href="#">Templates <i class="fas fa-chevron-down"></i></a>
+              <ul class="dropdown-menu dropdown-menu-dark">
+                <li><a class="dropdown-item" href="{{ url_for('message_template_list') }}">Customer Templates</a></li>
+              </ul>
+            </li>
+          </ul>
+        </li>
+
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('plan_expiry') or request.endpoint == 'payment_authorizations') %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
+            <span class="link-label"><i class="fas fa-chart-line"></i> Reports</span>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-dark">
+            <li><a class="dropdown-item" href="{{ url_for('plan_expiry_report', kind='expiring', days=7) }}">Plan Expiring (7 days)</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('plan_expiry_report', kind='expired', days=7) }}">Plan Expired</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('plan_expiry_report', kind='renewed', days=7) }}">Plan Renewed</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('payment_authorizations') }}">Payment Authorization</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('attendance_report') }}">Attendance Report</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('leaves_report') }}">Leaves Report</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('payroll_report') }}">Payroll Report</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('dashboard_export') }}">Export dashboard CSV</a></li>
+          </ul>
+        </li>
+
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('profile') }}"><span class="link-label"><i class="fas fa-user-cog"></i> My Profile</span></a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}"><span class="link-label"><i class="fas fa-sign-out-alt"></i> Logout</span></a></li>
+>>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
       </ul>
       <div class="mt-4 text-center text-white-50 small">&copy; 2026 Sumedh</div>
     </div>
   </div>
 
+<<<<<<< HEAD
   <!-- ================= DESKTOP SIDEBAR ================= -->
   <nav class="sidebar" id="appSidebar">
     <div class="brand">
@@ -612,3 +923,190 @@
   {% block scripts %}{% endblock %}
 </body>
 </html>
+=======
+  <!-- Desktop Layout -->
+  <div class="container-fluid">
+    <div class="row">
+      <!-- Desktop Sidebar -->
+      <nav class="col-md-2 sidebar d-none d-md-block">
+        <div class="brand">
+          <img src="{{ url_for('static', filename='images/logo.jpg') }}" alt="YASH">
+          <h5>YASH CRM</h5>
+        </div>
+        <ul class="nav flex-column">
+          <li class="nav-item"><a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}"><span class="link-label"><i class="fas fa-tachometer-alt"></i> Dashboard</span></a></li>
+
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle {% if request.endpoint and request.endpoint.startswith('customer_') %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
+              <span class="link-label"><i class="fas fa-users"></i> Customer</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-dark">
+              <li><a class="dropdown-item" href="{{ url_for('customer_add') }}">Add Customer</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('customer_list') }}">View Customer</a></li>
+            </ul>
+          </li>
+
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('plan_') or request.endpoint.startswith('service_provider_')) %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
+              <span class="link-label"><i class="fas fa-tags"></i> Plan Master</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-dark">
+              <li><a class="dropdown-item" href="{{ url_for('service_provider_list') }}">Service Provider</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('plan_list') }}">Plans</a></li>
+            </ul>
+          </li>
+
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('expenses_') or request.endpoint.startswith('expense_')) %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
+              <span class="link-label"><i class="fas fa-money-bill-wave"></i> Expenses</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-dark">
+              <li><a class="dropdown-item" href="{{ url_for('expenses_index') }}">Expense</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('expense_category_list') }}">Expenses Category</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('expense_account_list') }}">Expenses Account</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('expense_payee_list') }}">Payee</a></li>
+            </ul>
+          </li>
+
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('inventory') or request.endpoint.startswith('vendor_') or request.endpoint.startswith('product_') or request.endpoint.startswith('stock_')) %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
+              <span class="link-label"><i class="fas fa-boxes"></i> Inventory</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-dark">
+              <li><a class="dropdown-item" href="{{ url_for('inventory_index') }}">Overview</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('vendor_list') }}">Vendors</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('product_list') }}">Products</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('stock_list') }}">Stock</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{{ url_for('vendor_bill_list') }}">Vendor Bills</a></li>
+            </ul>
+          </li>
+
+          {% if current_user.is_admin() %}
+          <li class="nav-item"><a class="nav-link {% if request.endpoint and request.endpoint.startswith('staff_') %}active{% endif %}" href="{{ url_for('staff_list') }}"><span class="link-label"><i class="fas fa-id-badge"></i> Staff</span></a></li>
+          {% endif %}
+
+          <li class="nav-item"><a class="nav-link {% if request.endpoint and (request.endpoint.startswith('hr_') or request.endpoint.startswith('attendance_') or request.endpoint.startswith('leave_') or request.endpoint.startswith('payroll_')) %}active{% endif %}" href="{{ url_for('hr_index') }}"><span class="link-label"><i class="fas fa-calendar-check"></i> HR &amp; Payroll</span></a></li>
+
+          <!-- Masters Dropdown with nested submenus -->
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('company_') or request.endpoint.startswith('zone_') or request.endpoint.startswith('tax_') or request.endpoint.startswith('building_') or request.endpoint.startswith('area_') or request.endpoint.startswith('locality_') or request.endpoint in ['settings','import_export','database_backup','message_template_list']) %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
+              <span class="link-label"><i class="fas fa-cog"></i> Masters</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-dark">
+              <li class="dropdown-submenu">
+                <a class="dropdown-item submenu-toggle" href="#">Company <i class="fas fa-chevron-down"></i></a>
+                <ul class="dropdown-menu dropdown-menu-dark">
+                  <li><a class="dropdown-item" href="{{ url_for('company_edit') }}">Company</a></li>
+                  <li><a class="dropdown-item" href="{{ url_for('zone_list') }}">Zones</a></li>
+                  <li><a class="dropdown-item" href="{{ url_for('settings_bp.settings') }}">Settings</a></li>
+                  <li><a class="dropdown-item" href="{{ url_for('tax_list') }}">Tax Master</a></li>
+                  <li><a class="dropdown-item" href="{{ url_for('settings_bp.database_backup') }}">Database Backup</a></li>
+                  <li><a class="dropdown-item" href="{{ url_for('settings_bp.import_export') }}">Import/Export</a></li>
+                  <li><a class="dropdown-item" href="{{ url_for('settings_bp.isp_list') }}">ISP Integrations</a></li>
+                </ul>
+              </li>
+              <li class="dropdown-submenu">
+                <a class="dropdown-item submenu-toggle" href="#">Address <i class="fas fa-chevron-down"></i></a>
+                <ul class="dropdown-menu dropdown-menu-dark">
+                  <li><a class="dropdown-item" href="{{ url_for('building_list') }}">Building</a></li>
+                  <li><a class="dropdown-item" href="{{ url_for('area_list') }}">Area</a></li>
+                  <li><a class="dropdown-item" href="{{ url_for('locality_list') }}">Locality</a></li>
+                </ul>
+              </li>
+              <!-- NEW: Customer Templates submenu -->
+              <li class="dropdown-submenu">
+                <a class="dropdown-item submenu-toggle" href="#">Templates <i class="fas fa-chevron-down"></i></a>
+                <ul class="dropdown-menu dropdown-menu-dark">
+                  <li><a class="dropdown-item" href="{{ url_for('message_template_list') }}">Customer Templates</a></li>
+                </ul>
+              </li>
+            </ul>
+          </li>
+
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('plan_expiry') or request.endpoint == 'payment_authorizations') %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
+              <span class="link-label"><i class="fas fa-chart-line"></i> Reports</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-dark">
+              <li><a class="dropdown-item" href="{{ url_for('plan_expiry_report', kind='expiring', days=7) }}">Plan Expiring (7 days)</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('plan_expiry_report', kind='expired', days=7) }}">Plan Expired</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('plan_expiry_report', kind='renewed', days=7) }}">Plan Renewed</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{{ url_for('payment_authorizations') }}">Payment Authorization</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{{ url_for('attendance_report') }}">Attendance Report</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('leaves_report') }}">Leaves Report</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('payroll_report') }}">Payroll Report</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{{ url_for('dashboard_export') }}">Export dashboard CSV</a></li>
+            </ul>
+          </li>
+        </ul>
+        <div class="footer-text">&copy; 2026 Sumedh</div>
+      </nav>
+
+      <!-- Main Content Area -->
+      <main class="col-md-10 ms-sm-auto main-content">
+        <div class="top-bar">
+          <h1>{% block page_title %}{% endblock %}</h1>
+          <div class="top-bar-right">
+            <form class="search-form" action="{{ url_for('customer_search') }}" method="get" role="search">
+              <input type="text" name="q" placeholder="Search customers..." aria-label="Search customers">
+              <button type="submit" aria-label="Search"><i class="fas fa-search"></i></button>
+            </form>
+            <span class="user-greeting">
+              <i class="fas fa-user-circle"></i> {{ current_user.full_name }}
+              <a href="{{ url_for('profile') }}" title="My Profile"><i class="fas fa-user-cog"></i></a>
+              <a href="{{ url_for('logout') }}" title="Logout"><i class="fas fa-sign-out-alt"></i></a>
+            </span>
+          </div>
+        </div>
+
+        <div class="content-wrapper">
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                  {{ message }}
+                  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+
+          {% block content %}{% endblock %}
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    // Nested submenu toggle (Bootstrap 5 has no built-in support)
+    document.querySelectorAll('.submenu-toggle').forEach(function (el) {
+      el.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var parent = el.closest('.dropdown-submenu');
+        parent.parentElement.querySelectorAll('.dropdown-submenu').forEach(function (s) {
+          if (s !== parent) s.classList.remove('show');
+        });
+        parent.classList.toggle('show');
+      });
+    });
+
+    // Reset open submenus when the parent dropdown closes
+    document.querySelectorAll('.dropdown').forEach(function (dd) {
+      dd.addEventListener('hidden.bs.dropdown', function () {
+        dd.querySelectorAll('.dropdown-submenu.show').forEach(function (s) {
+          s.classList.remove('show');
+        });
+      });
+    });
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
+>>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e

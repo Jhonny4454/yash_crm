@@ -388,12 +388,17 @@ class PlanDatesForm(FlaskForm):
     ], default='active')
     submit = SubmitField('Update Dates')
 
+<<<<<<< HEAD
 # =========================================================== #
 #  NEW FORMS FOR CUSTOMER PORTAL & MESSAGE TEMPLATES          #
 # =========================================================== #
 
 class MessageTemplateForm(FlaskForm):
     """Form for creating/editing WhatsApp/SMS templates."""
+=======
+# ---------- Message Template Forms ----------
+class MessageTemplateForm(FlaskForm):
+>>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     name = StringField('Template Name', validators=[DataRequired(), Length(max=100)])
     template_type = SelectField('Template Type', choices=[
         ('renewal', 'Plan Renewed'),
@@ -408,7 +413,10 @@ class MessageTemplateForm(FlaskForm):
     submit = SubmitField('Save Template')
 
 class BulkMessageForm(FlaskForm):
+<<<<<<< HEAD
     """Form for sending bulk expiry messages to customers within a date range."""
+=======
+>>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     template_id = SelectField('Select Template', coerce=int, validators=[DataRequired()])
     start_date = DateField('Start Date', validators=[DataRequired()])
     end_date = DateField('End Date', validators=[DataRequired()])

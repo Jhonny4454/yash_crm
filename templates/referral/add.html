@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block page_title %}New Referral Campaign{% endblock %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <strong>New Referral Campaign</strong>
+    <a href="{{ url_for('referral_index') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="fas fa-arrow-left"></i> Back</a>
+  </div>
+  <div class="card-body">
+    <form method="POST" novalidate>
+      {{ form.hidden_tag() }}
+      <div class="row g-3">
+        <div class="col-md-8">
+          {{ form.name.label(class="form-label small fw-bold text-muted") }}
+          {{ form.name(class="form-control") }}
+          {% for e in form.name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-4">
+          {{ form.code.label(class="form-label small fw-bold text-muted") }}
+          {{ form.code(class="form-control", placeholder="e.g. YASH2026") }}
+          {% for e in form.code.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-12">
+          {{ form.description.label(class="form-label small fw-bold text-muted") }}
+          {{ form.description(class="form-control", rows="2") }}
+        </div>
+        <div class="col-md-4">
+          {{ form.reward_type.label(class="form-label small fw-bold text-muted") }}
+          {{ form.reward_type(class="form-select") }}
+        </div>
+        <div class="col-md-4">
+          {{ form.referrer_reward.label(class="form-label small fw-bold text-muted") }}
+          {{ form.referrer_reward(class="form-control") }}
+          {% for e in form.referrer_reward.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-4">
+          {{ form.referee_reward.label(class="form-label small fw-bold text-muted") }}
+          {{ form.referee_reward(class="form-control") }}
+          {% for e in form.referee_reward.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+          {{ form.start_date.label(class="form-label small fw-bold text-muted") }}
+          {{ form.start_date(class="form-control") }}
+        </div>
+        <div class="col-md-6">
+          {{ form.end_date.label(class="form-label small fw-bold text-muted") }}
+          {{ form.end_date(class="form-control") }}
+        </div>
+        <div class="col-12 form-check ms-2">
+          {{ form.is_active(class="form-check-input") }}
+          {{ form.is_active.label(class="form-check-label") }}
+        </div>
+      </div>
+      <div class="d-flex gap-2 mt-4">
+        <button class="btn btn-primary"><i class="fas fa-save"></i> Save Campaign</button>
+        <a href="{{ url_for('referral_index') }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

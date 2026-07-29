@@ -1,4 +1,5 @@
 {% extends "customer/base.html" %}
+<<<<<<< HEAD
 {% block title %}My Account{% endblock %}
 {% block content %}
 
@@ -158,3 +159,173 @@
   </div>
 </div>
 {% endblock %}
+=======
+
+{% block content %}
+<div class="row g-4">
+  <!-- Page Title -->
+  <div class="col-12">
+    <h2 class="fw-bold text-dark mb-0"><i class="fas fa-tachometer-alt text-primary me-2"></i> My Dashboard</h2>
+    <p class="text-muted small">Welcome back, {{ customer.full_name }}!</p>
+  </div>
+
+  <!-- ===== PROFILE CARD ===== -->
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100 border-0">
+      <div class="card-body">
+        <h5 class="card-title text-primary fw-bold"><i class="fas fa-user-circle me-2"></i>Profile</h5>
+        <hr>
+        <div class="mb-2"><strong>Name:</strong> {{ customer.full_name }}</div>
+        <div class="mb-2"><strong>Mobile:</strong> {{ customer.mobile }}</div>
+        <div class="mb-2"><strong>Email:</strong> {{ customer.email or '-' }}</div>
+        <div class="mb-2"><strong>Username:</strong> {{ customer.username }}</div>
+        <div class="mb-2"><strong>Connection:</strong> {{ customer.connection_type }}</div>
+        <div class="mb-0"><strong>Address:</strong> {{ customer.primary_address or '-' }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CURRENT PLAN CARD ===== -->
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100 border-0">
+      <div class="card-body">
+        <h5 class="card-title text-primary fw-bold"><i class="fas fa-wifi me-2"></i>Current Plan</h5>
+        <hr>
+        {% if active_plan %}
+          <h4 class="fw-bold text-success">{{ active_plan.plan.name }}</h4>
+          <p class="mb-1"><strong>Speed:</strong> {{ active_plan.plan.speed_mbps }} Mbps</p>
+          <p class="mb-1"><strong>Price:</strong> ₹ {{ '%.2f'|format(active_plan.plan.price_monthly) }}/month</p>
+          <p class="mb-1"><strong>Expiry:</strong> {{ active_plan.end_date.strftime('%d-%b-%Y') }}</p>
+          <p class="mb-3"><span class="badge bg-warning text-dark">{{ (active_plan.end_date - today).days }} days left</span></p>
+          
+          <form action="{{ url_for('customer_renew_plan') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-primary w-100">
+              <i class="fas fa-sync me-2"></i> Renew Now
+            </button>
+          </form>
+        {% else %}
+          <p class="text-muted mb-0">You currently have no active plan.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== FINANCIAL SUMMARY CARD ===== -->
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100 border-0">
+      <div class="card-body text-center">
+        <h5 class="card-title text-primary fw-bold"><i class="fas fa-credit-card me-2"></i>Financial Summary</h5>
+        <hr>
+        <div class="row g-2">
+          <div class="col-6">
+            <div class="p-2 bg-light rounded">
+              <small class="text-muted">Billed</small>
+              <h6 class="fw-bold text-info mb-0">₹ {{ '%.2f'|format(total_billed) }}</h6>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-2 bg-light rounded">
+              <small class="text-muted">Paid</small>
+              <h6 class="fw-bold text-success mb-0">₹ {{ '%.2f'|format(total_paid) }}</h6>
+            </div>
+          </div>
+          <div class="col-12 mt-2">
+            <div class="p-2 bg-light rounded">
+              <small class="text-muted">Outstanding Balance</small>
+              <h6 class="fw-bold text-danger mb-0">₹ {{ '%.2f'|format(balance) }}</h6>
+            </div>
+          </div>
+        </div>
+        <a href="{{ url_for('customer_profile') }}" class="btn btn-outline-primary w-100 mt-3">
+          <i class="fas fa-lock me-2"></i> Reset Password
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== INVOICE HISTORY ===== -->
+  <div class="col-lg-6">
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white fw-bold text-primary">
+        <i class="fas fa-file-invoice me-2"></i> Recent Invoices
+      </div>
+      <div class="card-body p-0 table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>#</th><th>Invoice</th><th>Date</th><th>Amount</th><th>Status</th><th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for inv in invoices[:10] %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ inv.invoice_no }}</td>
+              <td>{{ inv.issue_date.strftime('%d-%b-%Y') }}</td>
+              <td>₹ {{ '%.2f'|format(inv.total_amount) }}</td>
+              <td>
+                {% if inv.status == 'paid' %}
+                  <span class="badge bg-success">Paid</span>
+                {% elif inv.status == 'overdue' %}
+                  <span class="badge bg-danger">Overdue</span>
+                {% else %}
+                  <span class="badge bg-warning text-dark">{{ inv.status|capitalize }}</span>
+                {% endif %}
+              </td>
+              <td>
+                <a href="{{ url_for('customer_invoice_download', id=inv.id) }}" class="btn btn-sm btn-outline-primary">
+                  <i class="fas fa-download"></i> Download
+                </a>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center text-muted py-3">No invoices available.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PAYMENT HISTORY ===== -->
+  <div class="col-lg-6">
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white fw-bold text-primary">
+        <i class="fas fa-history me-2"></i> Payment History
+      </div>
+      <div class="card-body p-0 table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>#</th><th>Date</th><th>Amount</th><th>Mode</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for pay in payments[:10] %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ pay.payment_date.strftime('%d-%b-%Y') }}</td>
+              <td>₹ {{ '%.2f'|format(pay.amount) }}</td>
+              <td>{{ pay.payment_mode }}</td>
+              <td>
+                {% if pay.status == 'approved' %}
+                  <span class="badge bg-success">Authorized</span>
+                {% elif pay.status == 'pending' %}
+                  <span class="badge bg-warning text-dark">Pending</span>
+                {% else %}
+                  <span class="badge bg-danger">Rejected</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-muted py-3">No payment history found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+>>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e

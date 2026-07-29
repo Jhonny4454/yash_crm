@@ -245,8 +245,13 @@ class SalesReturn(db.Model):
     reason = db.Column(db.Text)
 
     # Where the money goes back to
+<<<<<<< HEAD
     refund_mode = db.Column(db.Enum('cash', 'bank', 'adjust_next'),
                             default='adjust_next')
+=======
+    refund_mode = db.Column(db.Enum('wallet', 'cash', 'bank', 'adjust_next'),
+                            default='wallet')
+>>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 
     status = db.Column(db.Enum('pending', 'approved', 'rejected'),
                        default='pending')
@@ -280,6 +285,64 @@ class SalesReturnItem(db.Model):
 
 
 # --------------------------------------------------------------------------- #
+<<<<<<< HEAD
+=======
+#  Referral campaign  (templates already exist, routes did not)
+# --------------------------------------------------------------------------- #
+class ReferralCampaign(db.Model):
+    __tablename__ = 'referral_campaigns'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    code = db.Column(db.String(40), unique=True)
+    description = db.Column(db.Text)
+
+    reward_type = db.Column(db.Enum('fixed', 'percent', 'days'), default='fixed')
+    referrer_reward = db.Column(db.Numeric(10, 2), default=0)
+    referee_reward = db.Column(db.Numeric(10, 2), default=0)
+
+    start_date = db.Column(db.Date)
+    end_date = db.Column(db.Date)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @property
+    def is_running(self):
+        today = date.today()
+        if not self.is_active:
+            return False
+        if self.start_date and today < self.start_date:
+            return False
+        if self.end_date and today > self.end_date:
+            return False
+        return True
+
+
+class Referral(db.Model):
+    __tablename__ = 'referrals'
+
+    id = db.Column(db.Integer, primary_key=True)
+    campaign_id = db.Column(db.Integer, db.ForeignKey('referral_campaigns.id'))
+    referrer_customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'),
+                                     nullable=False)
+    referee_customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'))
+    referee_name = db.Column(db.String(120))
+    referee_mobile = db.Column(db.String(20))
+
+    status = db.Column(db.Enum('pending', 'converted', 'rewarded', 'rejected'),
+                       default='pending')
+    reward_credited = db.Column(db.Numeric(10, 2), default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    converted_at = db.Column(db.DateTime)
+
+    campaign = db.relationship('ReferralCampaign', backref='referrals')
+    referrer = db.relationship('Customer', foreign_keys=[referrer_customer_id])
+    referee = db.relationship('Customer', foreign_keys=[referee_customer_id])
+
+
+# --------------------------------------------------------------------------- #
+#  Multi-ISP credentials  (Log2Space, Synnefo, and anything you add later)
+>>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 # --------------------------------------------------------------------------- #
 class ISPCredential(db.Model, EncryptedSecretMixin):
     """
