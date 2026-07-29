@@ -1,48 +1,79 @@
-# Python
+# ── Python ───────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+*.pyc
 .Python
-*.egg
-*.egg-info/
-dist/
-build/
 
-# Virtual environments
+# ── Virtual environments ──────────────────────────────────────────────────────
 venv/
 .venv/
 env/
 ENV/
+.env/
 
-# Environment variables - NEVER commit secrets
+# ── Secrets — NEVER commit these ─────────────────────────────────────────────
 .env
 .env.local
 .env.*.local
+*.key
+*.pem
+*.p12
 
-# Database files
+# ── Database / instance data ──────────────────────────────────────────────────
 instance/
 *.db
 *.sqlite3
 *.sqlite
 backups/
 
-# Uploaded files (user data - not for git)
+# ── User-uploaded files (customer data — not for git) ────────────────────────
 static/uploads/
 
-# OS
+# ── OS junk ──────────────────────────────────────────────────────────────────
 .DS_Store
+.DS_Store?
+._*
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-# IDE
+# ── IDE / editor ─────────────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*~
 
-# Logs
+# ── Logs ─────────────────────────────────────────────────────────────────────
 *.log
 logs/
+pip-log.txt
 
-# Render / Railway
+# ── Build / dist ─────────────────────────────────────────────────────────────
+*.egg-info/
+dist/
+build/
+.eggs/
+MANIFEST
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+nosetests.xml
+coverage.xml
+
+# ── Render / Railway / Heroku ─────────────────────────────────────────────────
 .render/
+.railway/
+
+# ── Keep these placeholder folders tracked ───────────────────────────────────
+!static/uploads/.gitkeep
+!instance/.gitkeep
