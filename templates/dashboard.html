@@ -2,6 +2,13 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
+<!-- Quick Actions -->
+<div class="d-flex flex-wrap gap-2 mb-3 no-print">
+  <a href="{{ url_for('customer_add') }}" class="btn btn-primary btn-sm"><i class="fas fa-user-plus me-1"></i> Add Customer</a>
+  <a href="{{ url_for('addon_category_list') }}" class="btn btn-outline-primary btn-sm"><i class="fas fa-layer-group me-1"></i> Addon Categories</a>
+  <a href="{{ url_for('payment_authorizations') }}" class="btn btn-outline-warning btn-sm"><i class="fas fa-check-circle me-1"></i> Authorize Payments</a>
+  <a href="{{ url_for('bulk_messages') }}" class="btn btn-outline-success btn-sm"><i class="fab fa-whatsapp me-1"></i> Bulk Messages</a>
+</div>
 <style>
   .dash-head { display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:12px; margin-bottom:18px; }
   .dash-head h2 { font-size:1.9rem; font-weight:700; letter-spacing:.5px; margin:0; color:#243447; text-transform:uppercase; }

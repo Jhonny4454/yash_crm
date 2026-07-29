@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 {% extends "base.html" %}
 {% block title %}Customer Profile{% endblock %}
 
@@ -36,46 +35,6 @@
   .addon-bar .fld label { font-size:10.5px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:#64748b; margin-bottom:5px; }
   .addon-bar input, .addon-bar select { border:1px solid #cbd5e1; border-radius:5px; padding:7px 10px; font-size:13px; background:#fff; }
   .addon-bar input:focus, .addon-bar select:focus { outline:none; border-color:#1a76b8; box-shadow:0 0 0 2px rgba(26,118,184,.12); }
-=======
-{% extends "base.html" %}
-{% block title %}Customer Profile{% endblock %}
-
-{% block content %}
-<style>
-  .cust-sidebar { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,.05); }
-  .cust-sidebar h5 { font-size:13px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:#243447;
-                     border-bottom:1px solid #e2e8f0; padding-bottom:12px; margin-bottom:14px; }
-  .drow { display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid #f1f5f9; font-size:12.5px; }
-  .drow:last-child { border-bottom:none; }
-  .drow .label { color:#64748b; font-weight:500; }
-  .drow .value { color:#1e293b; font-weight:600; text-align:right; word-break:break-word; }
-
-  .tabs-container { background:#fff; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.05); }
-  .nav-tabs { border-bottom:1px solid #e2e8f0; background:#fbfcfd; padding:4px 10px 0; flex-wrap:wrap; }
-  .nav-tabs .nav-link { border:none; color:#64748b; padding:12px 16px; font-size:12.5px; font-weight:500; border-radius:6px 6px 0 0; }
-  .nav-tabs .nav-link:hover { color:#1e293b; background:rgba(26,118,184,.06); }
-  .nav-tabs .nav-link.active { background:#fff; color:#1a76b8; font-weight:600; box-shadow:inset 0 -3px 0 #1a76b8; }
-  .tab-body { padding:20px; min-height:320px; }
-
-  .section-title { display:inline-block; background:#1a76b8; color:#fff; padding:9px 22px; margin-bottom:16px;
-                   font-weight:600; font-size:13px; border-radius:5px; letter-spacing:.4px; text-transform:uppercase; }
-
-  .tbl { width:100%; font-size:12.5px; border-collapse:collapse; }
-  .tbl th { background:#f8fafc; color:#243447; font-weight:600; padding:11px 12px; border-bottom:1px solid #e2e8f0; white-space:nowrap; }
-  .tbl td { padding:11px 12px; border-bottom:1px solid #f1f5f9; color:#334155; vertical-align:middle; }
-  .tbl tbody tr:hover { background:#f8fafc; }
-  .tbl-wrap { border:1px solid #e2e8f0; border-radius:8px; overflow:auto; margin-bottom:20px; }
-  .empty { text-align:center; color:#94a3b8; padding:26px 0; }
-
-  /* Addon invoice bar — mirrors the CRM layout */
-  .addon-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; background:#f8fafc;
-               border:1px solid #e2e8f0; border-radius:8px; padding:16px; margin-bottom:14px; }
-  .addon-bar .fld { display:flex; flex-direction:column; flex:1 1 150px; }
-  .addon-bar .fld label { font-size:10.5px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:#64748b; margin-bottom:5px; }
-  .addon-bar input, .addon-bar select { border:1px solid #cbd5e1; border-radius:5px; padding:7px 10px; font-size:13px; background:#fff; }
-  .addon-bar input:focus, .addon-bar select:focus { outline:none; border-color:#1a76b8; box-shadow:0 0 0 2px rgba(26,118,184,.12); }
-<<<<<<< HEAD
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
   /* ===== Addon Invoice: white panel, matching the UniCRM entry screen ===== */
   .addon-panel {
     background:#fff; border:1px solid #e2e8f0; border-radius:10px;
@@ -175,7 +134,6 @@
     .charge-presets { gap:6px; }
     .cp-chip { font-size:11.5px; padding:4px 10px; }
   }
-<<<<<<< HEAD
   .text-end { text-align:right; }
 
   .info-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin-bottom:20px; }
@@ -269,15 +227,6 @@
             </div>
             <div class="info-card"><h6>Total Billed</h6><p>&#8377; {{ '%.2f'|format(total_billed) }}</p><span>{{ invoices|length }} invoices</span></div>
             <div class="info-card"><h6>Total Paid</h6><p>&#8377; {{ '%.2f'|format(total_paid) }}</p><span>{{ payments|selectattr('status','equalto','approved')|list|length }} payments</span></div>
-=======
-=======
-  .vendor-items { border:1px solid #e2e8f0; border-radius:8px; padding:12px 14px; margin:14px 0 18px; background:#fff; }
-  .vi-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:10px; }
-  .vi-head span { font-size:12.5px; font-weight:700; color:#334155; }
-  .vi-head small { display:block; font-weight:400; color:#94a3b8; font-size:11px; margin-top:2px; max-width:520px; }
-  .vendor-items table.tbl th { background:#f8fafc; }
-  .vendor-items input, .vendor-items select { width:100%; border:1px solid #cbd5e1; border-radius:5px; padding:5px 7px; font-size:12.5px; }
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
   .text-end { text-align:right; }
 
   .info-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin-bottom:20px; }
@@ -356,10 +305,7 @@
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#invoice-history" type="button">Invoice History</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#payment-history" type="button">Payment History</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#plan-history" type="button">Plan History</button></li>
-<<<<<<< HEAD
         <li class="nav-item"><a class="nav-link" href="{{ url_for('customer_message_log', id=customer.id) }}">SMS / WhatsApp Log</a></li>
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
       </ul>
 
       <div class="tab-content tab-body">
@@ -374,8 +320,6 @@
             </div>
             <div class="info-card"><h6>Total Billed</h6><p>&#8377; {{ '%.2f'|format(total_billed) }}</p><span>{{ invoices|length }} invoices</span></div>
             <div class="info-card"><h6>Total Paid</h6><p>&#8377; {{ '%.2f'|format(total_paid) }}</p><span>{{ payments|selectattr('status','equalto','approved')|list|length }} payments</span></div>
-<<<<<<< HEAD
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
             <div class="info-card">
               <div class="d-flex justify-content-between align-items-start">
                 <h6 class="mb-0">Outstanding</h6>
@@ -394,7 +338,6 @@
               <p style="color:{{ '#dc2626' if total_outstanding > 0 else '#16a34a' }};">&#8377; {{ '%.2f'|format(total_outstanding) }}</p>
               <span>{{ pending_invoices|length }} pending invoices</span>
             </div>
-<<<<<<< HEAD
             <div class="info-card"><h6>Discount</h6><p>{{ '%.2f'|format(customer.discount_percent or 0) }}%</p><span>&#8377; {{ '%.2f'|format(customer.discount_amount or 0) }} flat</span></div>
           </div>
 
@@ -436,10 +379,6 @@
                   <td class="text-nowrap">
                     <form id="planDatesForm" method="POST" action="{{ url_for('customer_plan_update_dates', plan_id=active_plan.id) }}" style="display:inline;">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-=======
-=======
-            <div class="info-card"><h6>Outstanding</h6><p style="color:{{ '#dc2626' if total_outstanding > 0 else '#16a34a' }};">&#8377; {{ '%.2f'|format(total_outstanding) }}</p><span>{{ pending_invoices|length }} pending invoices</span></div>
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
             <div class="info-card"><h6>Discount</h6><p>{{ '%.2f'|format(customer.discount_percent or 0) }}%</p><span>&#8377; {{ '%.2f'|format(customer.discount_amount or 0) }} flat</span></div>
           </div>
 
@@ -469,10 +408,7 @@
                 <tr>
                   <td>1</td>
                   <td>{{ customer.username or '-' }}</td>
-<<<<<<< HEAD
                   <!-- FIXED: Use service_provider_name to avoid <ServiceProvider 1> bug -->
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
                   <td>{{ service_provider_name or '-' }}</td>
                   <td>{{ active_plan.plan.name }}</td>
                   <td>&#8377; {{ '%.2f'|format(active_plan.plan.price_monthly) }}</td>
@@ -484,8 +420,6 @@
                   <td class="text-nowrap">
                     <form id="planDatesForm" method="POST" action="{{ url_for('customer_plan_update_dates', plan_id=active_plan.id) }}" style="display:inline;">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-<<<<<<< HEAD
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
                       <button type="submit" class="btn btn-outline-primary btn-mini" title="Save the dates you edited above">
                         <i class="fas fa-pen"></i> Edit
                       </button>
@@ -514,7 +448,6 @@
                       </ul>
                     </div>
                     {% endif %}
-<<<<<<< HEAD
                   </td>
                 </tr>
                 {% else %}
@@ -530,13 +463,6 @@
 
         <!-- ===== PENDING INVOICE ===== -->
         <div class="tab-pane fade" id="pending-invoice">
-=======
-=======
-                      <button type="submit" class="btn btn-outline-primary btn-mini">Save dates</button>
-                    </form>
-                    <button class="btn btn-primary btn-mini" data-bs-toggle="modal" data-bs-target="#renewPlanModal">Renew</button>
-                    <button class="btn btn-primary btn-mini" data-bs-toggle="modal" data-bs-target="#assignPlanModal">Change plan</button>
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
                   </td>
                 </tr>
                 {% else %}
@@ -552,8 +478,6 @@
 
         <!-- ===== PENDING INVOICE ===== -->
         <div class="tab-pane fade" id="pending-invoice">
-<<<<<<< HEAD
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
           <!-- ================= ADDON INVOICE (white panel) ================= -->
           <div class="addon-panel">
             <div class="addon-panel-head">
@@ -681,7 +605,6 @@
                 </button>
               </div>
             </form>
-<<<<<<< HEAD
           </div>
 
           <div class="tbl-wrap">
@@ -704,91 +627,6 @@
                   <td class="text-nowrap">
                     <button class="btn btn-success btn-mini" data-bs-toggle="modal" data-bs-target="#paymentModal{{ inv.id }}">
                       <i class="fas fa-money-bill-wave"></i> Collect</button>
-=======
-          </div>
-=======
-          <div class="section-title">Addon Invoice</div>
-
-          <form method="POST" action="{{ url_for('add_customer_invoice', id=customer.id) }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="addon-bar">
-              <div class="fld"><label>Reference</label>
-                <input type="text" value="{{ customer.reference_id or customer.mobile }}" readonly></div>
-              <div class="fld"><label>Detailed Invoice</label>
-                <input type="text" name="detailed_invoice" placeholder="Discount"></div>
-              <div class="fld"><label>Caption</label>
-                <input type="text" name="caption" placeholder="Caption"></div>
-              <div class="fld" style="flex:0 1 110px;"><label>Amount</label>
-                <input type="number" step="0.01" min="0" name="invoice_amount" value="0"></div>
-              <div class="fld" style="flex:0 1 110px;"><label>Discount</label>
-                <input type="number" step="0.01" min="0" name="discount_amount" value="0"></div>
-              <div class="fld" style="flex:0 1 150px;"><label>Invoice Date</label>
-                <input type="date" name="invoice_date" value="{{ today.isoformat() }}"></div>
-              <div class="fld" style="flex:0 1 170px;"><label>Mode</label>
-                <select name="payment_mode">
-                  {% for value, label in payment_modes %}
-                  <option value="{{ value }}">{{ label }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="fld" style="flex:0 1 190px;"><label>Vendor</label>
-                <select name="vendor_id" id="addonVendor">
-                  <option value="">-- No vendor --</option>
-                  {% for v in vendors %}
-                  <option value="{{ v.id }}">{{ v.name }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-            </div>
-
-            <!-- ===== Vendor product lines ===== -->
-            <div class="vendor-items">
-              <div class="vi-head">
-                <span>Vendor Products
-                  <small>Pick a vendor, then add the devices being billed. Each row
-                  reduces stock and raises a purchase bill against that vendor.</small>
-                </span>
-                <button type="button" class="btn btn-outline-primary btn-mini" id="addItemRow">
-                  <i class="fas fa-plus"></i> Add Product</button>
-              </div>
-              <div class="tbl-wrap">
-                <table class="tbl" id="itemsTable">
-                  <thead>
-                    <tr>
-                      <th style="width:34%">Product</th><th style="width:20%">Serial No.</th>
-                      <th style="width:11%">Qty</th><th style="width:15%">Rate</th>
-                      <th style="width:15%" class="text-end">Line Total</th><th style="width:46px"></th>
-                    </tr>
-                  </thead>
-                  <tbody id="itemsBody">
-                    <tr class="no-items"><td colspan="6" class="empty">
-                      No products added. Billing only the Amount above is fine too.
-                    </td></tr>
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <th colspan="4" class="text-end">Products Total</th>
-                      <th class="text-end" id="itemsTotal">&#8377; 0.00</th><th></th>
-                    </tr>
-                    <tr>
-                      <th colspan="4" class="text-end">Invoice Total (products + amount &minus; discount)</th>
-                      <th class="text-end" id="invoiceTotal">&#8377; 0.00</th><th></th>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
-
-            <div class="row g-2 mb-4">
-              <div class="col-md-4"><label class="small text-muted fw-bold">Book Receipt No.</label>
-                <input type="text" class="form-control" name="book_receipt_no" placeholder="Book Receipt No."></div>
-              <div class="col-md-5"><label class="small text-muted fw-bold">Remark</label>
-                <input type="text" class="form-control" name="remark" placeholder="Remark"></div>
-              <div class="col-md-3 d-flex align-items-end">
-                <button type="submit" class="btn btn-primary w-100">Submit</button></div>
-            </div>
-          </form>
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 
           <div class="tbl-wrap">
             <table class="tbl">
@@ -810,8 +648,6 @@
                   <td class="text-nowrap">
                     <button class="btn btn-success btn-mini" data-bs-toggle="modal" data-bs-target="#paymentModal{{ inv.id }}">
                       <i class="fas fa-money-bill-wave"></i> Collect</button>
-<<<<<<< HEAD
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
                     {% if customer.mobile %}
                     <form method="POST" action="{{ url_for('invoice_send', id=inv.id) }}" style="display:inline;">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -826,7 +662,6 @@
                               title="Send a due reminder"><i class="fas fa-bell"></i></button>
                     </form>
                     {% endif %}
-<<<<<<< HEAD
                     {% if current_user.is_admin() %}
                     <button class="btn btn-outline-danger btn-mini"
                             onclick="if(confirm('Delete invoice {{ inv.invoice_no }}?'))document.getElementById('delInv{{ inv.id }}').submit();">
@@ -883,9 +718,6 @@
                   <td class="text-nowrap">
                     <a class="btn btn-outline-primary btn-mini" target="_blank"
                        href="{{ url_for('invoice_summary', id=inv.id) }}"><i class="fas fa-print"></i> Print</a>
-=======
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
                     {% if current_user.is_admin() %}
                     <button class="btn btn-outline-danger btn-mini"
                             onclick="if(confirm('Delete invoice {{ inv.invoice_no }}?'))document.getElementById('delInv{{ inv.id }}').submit();">
@@ -914,11 +746,7 @@
                 <tr>
                   <th>#</th><th>Invoice No</th><th>Caption</th><th>Invoice Date</th><th>Due Date</th>
                   <th>Amount</th><th>Discount</th><th>Paid</th><th>Pending</th><th>Status</th>
-<<<<<<< HEAD
                   <th>Summary Invoice</th><th>Detailed Invoice</th><th>Send</th>
-=======
-                  <th>Summary Invoice</th><th>Detailed Invoice</th>
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
                 </tr>
               </thead>
               <tbody>
@@ -946,20 +774,10 @@
                   <td class="text-nowrap">
                     <a class="btn btn-outline-primary btn-mini" target="_blank"
                        href="{{ url_for('invoice_summary', id=inv.id) }}"><i class="fas fa-print"></i> Print</a>
-<<<<<<< HEAD
-=======
-                    <a class="btn btn-outline-secondary btn-mini"
-                       href="{{ url_for('invoice_summary', id=inv.id, download=1) }}"><i class="fas fa-download"></i></a>
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
                   </td>
                   <td class="text-nowrap">
                     <a class="btn btn-outline-primary btn-mini" target="_blank"
                        href="{{ url_for('invoice_detailed', id=inv.id) }}"><i class="fas fa-print"></i> Print</a>
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
                   </td>
                   <td class="text-nowrap">
                     {% if customer.mobile %}
@@ -981,7 +799,6 @@
                     {% endif %}
                     {% else %}<span class="text-muted small">No mobile</span>{% endif %}
                   </td>
-<<<<<<< HEAD
                 </tr>
                 {% else %}
                 <tr><td colspan="13" class="empty">No invoices yet.</td></tr>
@@ -1011,18 +828,6 @@
                   <td>&#8377; {{ '%.2f'|format(pay.amount) }}</td>
                   <td>{% if pay.invoice %}<a class="link-blue" target="_blank" href="{{ url_for('invoice_summary', id=pay.invoice_id) }}">{{ pay.invoice.invoice_no }}</a>{% else %}-{% endif %}</td>
                   <td><span class="mode-badge">{{ pay.payment_mode }}</span></td>
-=======
-                </tr>
-                {% else %}
-                <tr><td colspan="13" class="empty">No invoices yet.</td></tr>
-=======
-                    <a class="btn btn-outline-secondary btn-mini"
-                       href="{{ url_for('invoice_detailed', id=inv.id, download=1) }}"><i class="fas fa-download"></i></a>
-                  </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="12" class="empty">No invoices yet.</td></tr>
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
                 {% endfor %}
               </tbody>
             </table>
@@ -1054,7 +859,6 @@
                   <td>{% if pay.invoice %}<a class="link-blue" target="_blank" href="{{ url_for('invoice_summary', id=pay.invoice_id) }}">{{ pay.invoice.invoice_no }}</a>{% else %}-{% endif %}</td>
                   <td><span class="mode-badge">{{ pay.payment_mode }}</span></td>
 
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
                   <td class="small text-muted">{{ pay.gateway_transaction_id or '-' }}</td>
                   <td>
                     {% if pay.source == 'portal' %}
@@ -1074,20 +878,16 @@
                   <td class="text-nowrap">
                     <button class="btn btn-outline-primary btn-mini" data-bs-toggle="modal" data-bs-target="#viewPaymentModal{{ pay.id }}"><i class="fas fa-eye"></i></button>
                     <button class="btn btn-outline-secondary btn-mini" onclick="printReceipt('{{ pay.id }}')"><i class="fas fa-print"></i></button>
-=======
-=======
                   <td>{{ pay.received_by_user.full_name if pay.received_by_user else 'System' }}</td>
                   <td>
                     {% if pay.status == 'approved' %}<span class="badge bg-success">Authorized</span>
                     {% elif pay.status == 'pending' %}<span class="badge bg-warning text-dark">Pending authorization</span>
                     {% else %}<span class="badge bg-danger">Rejected</span>{% endif %}
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
                   </td>
                   <td class="text-nowrap">
                     <button class="btn btn-outline-primary btn-mini" data-bs-toggle="modal" data-bs-target="#viewPaymentModal{{ pay.id }}"><i class="fas fa-eye"></i></button>
                     <button class="btn btn-outline-secondary btn-mini" onclick="printReceipt('{{ pay.id }}')"><i class="fas fa-print"></i></button>
 
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
                     {% if current_user.is_admin() and pay.needs_authorization %}
                     <button class="btn btn-success btn-mini" title="Authorize this payment"
                             onclick="document.getElementById('approvePay{{ pay.id }}').submit();"><i class="fas fa-check"></i></button>
@@ -1360,24 +1160,6 @@
     setTimeout(function () { w.print(); }, 300);
   }
 
-=======
-=======
-                    {% if current_user.is_admin() and pay.status == 'pending' %}
-                    <button class="btn btn-success btn-mini" onclick="document.getElementById('approvePay{{ pay.id }}').submit();"><i class="fas fa-check"></i></button>
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
-                    {% endif %}
-                    {% if current_user.is_admin() %}
-                    <button class="btn btn-outline-danger btn-mini"
-                            onclick="if(confirm('Delete this payment? The invoice balance will reopen.'))document.getElementById('deletePaymentForm{{ pay.id }}').submit();"><i class="fas fa-trash-alt"></i></button>
-                    {% endif %}
-                  </td>
-                </tr>
-                {% else %}
-
-                <tr><td colspan="12" class="empty">No payment history found.</td></tr>
-=======
-                <tr><td colspan="10" class="empty">No payment history found.</td></tr>
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
                 {% endfor %}
               </tbody>
             </table>
@@ -1630,7 +1412,6 @@
   }
 
 
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
   // ===== Addon Invoice: charge presets + collapsible vendor block =====
   (function () {
     var caption = document.getElementById('addonCaption');
@@ -1819,9 +1600,6 @@
     if (btn) new bootstrap.Tab(btn).show();
   })();
 </script>
-=======
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
   // ===== Addon Invoice: vendor -> product rows =====
   (function () {
     var vendorSel = document.getElementById('addonVendor');
@@ -1963,5 +1741,4 @@
     if (btn) new bootstrap.Tab(btn).show();
   })();
 </script>
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
 {% endblock %}

@@ -1,6 +1,3 @@
-
-
-
 {% extends "base.html" %}
 {% block title %}Service Provider{% endblock %}
 
@@ -48,53 +45,4 @@
     </div>
   </form>
 </div>
-=======
-{% extends "base.html" %}
-{% block title %}Service Provider{% endblock %}
-
-{% block content %}
-<style>
-  .form-card { background:#fff; border:1px solid #e2e8f0; border-radius:6px; padding:24px; max-width:720px; box-shadow:0 1px 3px rgba(0,0,0,.05); margin: 0 auto; }
-  .btn-submit { background: #0073b7; border: none; border-radius: 6px; padding: 0.6rem 2rem; color: #fff; font-weight: 600; transition: 0.2s; }
-  .btn-submit:hover { background: #005f9e; }
-</style>
-<div class="form-card">
-  <h4 class="fw-bold mb-4" style="color:#243447;">{% if provider %}Edit{% else %}Add{% endif %} Service Provider</h4>
-  <form method="POST" enctype="multipart/form-data" novalidate>
-    {{ form.hidden_tag() }}
-    <div class="row g-3">
-      <div class="col-md-6">
-        {{ form.name.label(class="form-label") }}<br>
-        {{ form.name(class="form-control") }}
-      </div>
-      <div class="col-md-6 d-flex align-items-center">
-        <div class="form-check mt-4">
-          {{ form.is_active(class="form-check-input") }}
-          {{ form.is_active.label(class="form-check-label") }}
-        </div>
-      </div>
-      <div class="col-md-12">
-        {{ form.api_url.label(class="form-label") }}<br>
-        {{ form.api_url(class="form-control", placeholder="https://api.example.com") }}
-      </div>
-      <div class="col-md-6">
-        {{ form.api_username.label(class="form-label") }}<br>
-        {{ form.api_username(class="form-control") }}
-      </div>
-      <div class="col-md-6">
-        {{ form.api_password.label(class="form-label") }}<br>
-        {{ form.api_password(class="form-control") }}
-      </div>
-      <div class="col-md-6">
-        {{ form.confirm_password.label(class="form-label") }}<br>
-        {{ form.confirm_password(class="form-control") }}
-      </div>
-    </div>
-    <div class="mt-4 text-end">
-      <a class="btn btn-secondary" href="{{ url_for('service_provider_list') }}">Cancel</a>
-      {{ form.submit(class="btn-submit") }}
-    </div>
-  </form>
-</div>
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
 {% endblock %}

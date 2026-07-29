@@ -1,0 +1,39 @@
+{% extends "customer/base.html" %}
+{% block title %}Customer Login{% endblock %}
+{% block content %}
+<div class="row justify-content-center" style="margin-top:6vh">
+  <div class="col-12 col-sm-9 col-md-6 col-lg-5">
+    <div class="text-center mb-4">
+      <img src="{{ url_for('static', filename='images/logo.jpg') }}" alt="YASH"
+           style="max-width:120px;border-radius:8px">
+      <h4 class="mt-3 mb-1 fw-bold">Customer Login</h4>
+      <p class="text-muted small mb-0">Check your plan, download bills and renew online.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-body p-4">
+        <form method="post" novalidate>
+          {{ form.hidden_tag() }}
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">User Name</label>
+            {{ form.username(class="form-control", placeholder="e.g. rizwan@yn", autocomplete="username", autocapitalize="none") }}
+            {% for e in form.username.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Password</label>
+            {{ form.password(class="form-control", placeholder="Password", autocomplete="current-password") }}
+            {% for e in form.password.errors %}<div class="text-danger small mt-1">{{ e }}</div>{% endfor %}
+          </div>
+          <button type="submit" class="btn btn-brand w-100 py-2">
+            <i class="fas fa-right-to-bracket me-1"></i> Login
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <p class="text-center text-muted small mt-3 mb-0">
+      Forgot your password? Call <a href="tel:9029508777">9029508777</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

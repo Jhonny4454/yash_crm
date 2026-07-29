@@ -1,4 +1,3 @@
-
 {% extends "base.html" %}
 {% block title %}Tax Form{% endblock %}
 
@@ -68,75 +67,4 @@
     </div>
   </form>
 </div>
-=======
-{% extends "base.html" %}
-{% block title %}Tax Form{% endblock %}
-
-{% block content %}
-<style>
-  .glass-form {
-    background: rgba(255,255,255,0.6);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(255,255,255,0.3);
-    border-radius: 24px;
-    padding: 1.5rem;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.04);
-  }
-  .glass-form label {
-    font-weight: 600;
-    color: #1a0f2e;
-  }
-  .glass-form .form-control {
-    background: rgba(255,255,255,0.7);
-    border: 1px solid rgba(255,255,255,0.3);
-    border-radius: 16px;
-    padding: 0.8rem 1rem;
-    transition: all 0.3s;
-  }
-  .glass-form .form-control:focus {
-    background: rgba(255,255,255,0.9);
-    border-color: #764ba2;
-    box-shadow: 0 0 0 4px rgba(118,75,162,0.15);
-  }
-  .btn-submit {
-    background: linear-gradient(135deg, #764ba2, #667eea);
-    border: none;
-    border-radius: 50px;
-    padding: 0.8rem 2.5rem;
-    color: #fff;
-    font-weight: 600;
-    transition: all 0.3s;
-  }
-  .btn-submit:hover {
-    transform: scale(1.02);
-    box-shadow: 0 8px 24px rgba(118,75,162,0.4);
-  }
-</style>
-
-<h4 class="mb-3">
-  <i class="fas {% if tax %}fa-edit{% else %}fa-plus-circle{% endif %} me-2 text-primary"></i>
-  {% if tax %}Edit{% else %}Add{% endif %} Tax
-</h4>
-
-<div class="glass-form">
-  <form method="POST">
-    {{ form.hidden_tag() }}
-    <div class="row g-3">
-      <div class="col-md-6 col-lg-4">
-        {{ form.name.label(class="form-label") }}
-        {{ form.name(class="form-control", placeholder="e.g. CGST, SGST") }}
-      </div>
-      <div class="col-md-6 col-lg-4">
-        {{ form.value.label(class="form-label") }}
-        {{ form.value(class="form-control", placeholder="e.g. 9.00") }}
-        <small class="text-muted">Enter percentage value</small>
-      </div>
-    </div>
-    <div class="mt-4">
-      <a href="{{ url_for('tax_list') }}" class="btn btn-secondary rounded-pill px-4 me-2">Cancel</a>
-      {{ form.submit(class="btn-submit") }}
-    </div>
-  </form>
-</div>
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
 {% endblock %}

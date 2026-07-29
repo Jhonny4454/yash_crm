@@ -1,4 +1,3 @@
-
 {% extends "base.html" %}
 {% block title %}Service Providers{% endblock %}
 
@@ -34,41 +33,4 @@
     </table>
   </div>
 </div>
-=======
-{% extends "base.html" %}
-{% block title %}Service Providers{% endblock %}
-
-{% block content %}
-<style>/* Panel reuse from dashboard */</style>
-<div class="panel" style="background:#fff; border:1px solid #e2e8f0; border-radius:6px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.05);">
-  <div class="panel-head" style="background:#1a76b8; color:#fff; padding:12px 18px; font-weight:600; font-size:.95rem; display:flex; justify-content:space-between; align-items:center;">
-    <span>Service Providers</span>
-    <a class="btn btn-light btn-sm" href="{{ url_for('service_provider_add') }}"><i class="fas fa-plus"></i> Add Provider</a>
-  </div>
-  <div class="table-responsive">
-    <table class="tbl" style="width:100%; font-size:.83rem; border-collapse:collapse;">
-      <thead><tr><th>#</th><th>Name</th><th>API URL</th><th>Status</th><th>Action</th></tr></thead>
-      <tbody>
-        {% for sp in providers %}
-        <tr>
-          <td>{{ loop.index }}</td>
-          <td>{{ sp.name }}</td>
-          <td>{{ sp.api_url or '-' }}</td>
-          <td><span class="badge {{ 'bg-success' if sp.is_active else 'bg-danger' }}">{{ 'Active' if sp.is_active else 'Inactive' }}</span></td>
-          <td class="text-nowrap">
-            <a class="btn btn-outline-primary btn-sm" href="{{ url_for('service_provider_edit', id=sp.id) }}"><i class="fas fa-edit"></i></a>
-            <form method="POST" action="{{ url_for('service_provider_delete', id=sp.id) }}" style="display:inline;">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete this provider?')"><i class="fas fa-trash-alt"></i></button>
-            </form>
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="5" class="empty" style="text-align:center;color:#94a3b8;padding:30px 0;">No service providers added yet.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
 {% endblock %}

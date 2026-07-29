@@ -571,6 +571,17 @@ class ServiceRequest(db.Model):
 # =============================================================================
 #  Messaging: editable customer templates + a delivery log
 # =============================================================================
+
+class AddonCategory(db.Model):
+    """Preset categories for addon invoices (installation, shifting, ONT, ONU, etc.)."""
+    __tablename__ = 'addon_categories'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    default_price = db.Column(db.Numeric(10, 2), default=0.00)
+    description = db.Column(db.String(255))
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 class MessageTemplate(db.Model):
     """
     An editable WhatsApp / SMS message. `template_type` is the stable key the

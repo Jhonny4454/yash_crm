@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block page_title %}Addon Invoice Categories{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h5 class="mb-0 fw-bold">Addon Invoice Categories</h5>
+  <a href="{{ url_for('addon_category_add') }}" class="btn btn-primary btn-sm">
+    <i class="fas fa-plus me-1"></i> Add Category
+  </a>
+</div>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr><th class="ps-3">Name</th><th class="text-end">Default Price</th><th>Description</th><th>Status</th><th class="text-end pe-3">Action</th></tr>
+      </thead>
+      <tbody>
+        {% for c in categories %}
+        <tr>
+          <td class="ps-3 fw-semibold">{{ c.name }}</td>
+          <td class="text-end">&#8377; {{ '%.2f'|format(c.default_price or 0) }}</td>
+          <td class="text-muted small">{{ c.description or '-' }}</td>
+          <td>{% if c.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Off</span>{% endif %}</td>
+          <td class="text-end pe-3">
+            <a href="{{ url_for('addon_category_edit', id=c.id) }}" class="btn btn-sm btn-outline-primary"><i class="fas fa-pen"></i></a>
+            <form method="POST" action="{{ url_for('addon_category_delete', id=c.id) }}" style="display:inline" onsubmit="return confirm('Delete this category?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-4">No categories yet. Add one to use as a preset in addon invoices.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

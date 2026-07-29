@@ -569,7 +569,10 @@ def dashboard():
     payment_breakdown = _bucket_payments(approved_payments)
 
     # ===== To be Authorized (all pending payments, any date) =====
-    all_pending = Payment.query.filter_by(status='pending').all()
+    all_pending = Payment.query.filter(
+        Payment.status.in_(['approved', 'pending']),
+        Payment.authorized_at.is_(None)
+    ).all()
     to_authorize_breakdown = _bucket_payments(all_pending)
     to_authorize_total = sum(to_authorize_breakdown.values())
     to_authorize_count = len(all_pending)
@@ -1269,6 +1272,75 @@ def address_delete(id):
 def masters_index():
     return render_template('masters/index.html')
 
+
+# ---------- Addon Invoice Categories ----------
+@app.route('/masters/addon-categories')
+@login_required
+@admin_required
+def addon_category_list():
+    from models import AddonCategory
+    categories = AddonCategory.query.order_by(AddonCategory.name).all()
+    return render_template('masters/addon_categories.html', categories=categories)
+
+@app.route('/masters/addon-categories/add', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def addon_category_add():
+    from models import AddonCategory
+    if request.method == 'POST':
+        name = (request.form.get('name') or '').strip()
+        price = request.form.get('price', type=float) or 0
+        description = (request.form.get('description') or '').strip()
+        if name:
+            cat = AddonCategory(name=name, default_price=price, description=description)
+            db.session.add(cat)
+            db.session.commit()
+            log_audit('Add Addon Category', f"Added addon category {name}")
+            flash('Addon category added.', 'success')
+            return redirect(url_for('addon_category_list'))
+        flash('Name is required.', 'danger')
+    return render_template('masters/addon_category_form.html')
+
+@app.route('/masters/addon-categories/edit/<int:id>', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def addon_category_edit(id):
+    from models import AddonCategory
+    cat = AddonCategory.query.get_or_404(id)
+    if request.method == 'POST':
+        cat.name = (request.form.get('name') or '').strip()
+        cat.default_price = request.form.get('price', type=float) or 0
+        cat.description = (request.form.get('description') or '').strip()
+        db.session.commit()
+        log_audit('Edit Addon Category', f"Edited addon category {cat.name}")
+        flash('Addon category updated.', 'success')
+        return redirect(url_for('addon_category_list'))
+    return render_template('masters/addon_category_form.html', category=cat)
+
+@app.route('/masters/addon-categories/delete/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def addon_category_delete(id):
+    from models import AddonCategory
+    cat = AddonCategory.query.get_or_404(id)
+    db.session.delete(cat)
+    db.session.commit()
+    log_audit('Delete Addon Category', f"Deleted addon category {cat.name}")
+    flash('Addon category deleted.', 'success')
+    return redirect(url_for('addon_category_list'))
+
+@app.route('/api/addon-categories')
+@login_required
+def api_addon_categories():
+    """JSON endpoint for the addon invoice form to fetch category presets."""
+    from models import AddonCategory
+    cats = AddonCategory.query.filter_by(is_active=True).order_by(AddonCategory.name).all()
+    return jsonify(categories=[{
+        'id': c.id, 'name': c.name,
+        'price': float(c.default_price or 0),
+        'description': c.description or ''
+    } for c in cats])
+
 # ---------- Message Templates CRUD (NEW) ----------
 @app.route('/masters/templates')
 @login_required
@@ -1734,7 +1806,14 @@ def customer_view(id):
     if active_plan and active_plan.plan and active_plan.plan.service_provider:
         service_provider_name = active_plan.plan.service_provider.name
 
+    try:
+        from models import AddonCategory
+        addon_categories = AddonCategory.query.filter_by(is_active=True).order_by(AddonCategory.name).all()
+    except Exception:
+        addon_categories = []
+
     return render_template('customers/view.html',
+                           addon_categories=addon_categories,
                            vendors=vendors,
                            service_providers=service_providers,
                            customer=customer,

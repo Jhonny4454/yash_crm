@@ -1,6 +1,6 @@
-<<<<<<< HEAD
 {% extends "base.html" %}
 {% block page_title %}Products{% endblock %}
+
 {% block content %}
 <div class="card shadow-sm">
   <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -67,73 +67,3 @@
   </div>
 </div>
 {% endblock %}
-=======
-{% extends "base.html" %}
-{% block page_title %}Products{% endblock %}
-{% block content %}
-<div class="card shadow-sm">
-  <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
-    <strong>Products</strong>
-    {% if current_user.is_admin() %}
-    <a href="{{ url_for('product_add') }}" class="btn btn-sm btn-primary">
-      <i class="fas fa-plus"></i> Add Product</a>
-    {% endif %}
-  </div>
-  <div class="table-responsive">
-    <table class="table table-hover mb-0 align-middle">
-      <thead class="table-light">
-        <tr><th>#</th><th>Product</th><th>SKU</th><th>Vendor</th><th>HSN</th>
-            <th class="text-end">Cost</th><th class="text-end">Selling</th>
-            <th class="text-end">Tax %</th><th class="text-center">In Stock</th>
-            <th class="text-center">Status</th><th class="text-end">Actions</th></tr>
-      </thead>
-      <tbody>
-        {% for p in products %}
-        <tr class="{{ '' if p.is_active else 'text-muted' }}">
-          <td>{{ loop.index }}</td>
-          <td><strong>{{ p.name }}</strong>
-            {% if p.description %}<div class="small text-muted">{{ p.description|truncate(60) }}</div>{% endif %}
-          </td>
-          <td>{{ p.sku or '-' }}</td>
-          <td>
-            {% if p.vendor %}<span class="badge bg-light text-dark border">{{ p.vendor.name }}</span>
-            {% else %}<span class="badge bg-warning text-dark">No vendor</span>{% endif %}
-          </td>
-          <td>{{ p.hsn_code or '-' }}</td>
-          <td class="text-end">&#8377; {{ '%.2f'|format(p.cost_price|float if p.cost_price else 0) }}</td>
-          <td class="text-end">&#8377; {{ '%.2f'|format(p.unit_price|float if p.unit_price else 0) }}</td>
-          <td class="text-end">{{ '%.2f'|format(p.tax_percent|float if p.tax_percent else 0) }}</td>
-          <td class="text-center">
-            {% set oh = p.on_hand %}
-            <span class="badge bg-{{ 'success' if oh > 5 else ('warning text-dark' if oh > 0 else 'danger') }}">
-              {{ oh }}</span>
-          </td>
-          <td class="text-center">
-            {% if p.is_active %}<span class="badge bg-success">Active</span>
-            {% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}
-          </td>
-          <td class="text-end text-nowrap">
-            {% if current_user.is_admin() %}
-            <a href="{{ url_for('product_edit', id=p.id) }}" class="btn btn-sm btn-outline-primary">
-              <i class="fas fa-edit"></i></a>
-            {% if p.is_active %}
-            <form method="POST" action="{{ url_for('product_delete', id=p.id) }}" class="d-inline"
-                  onsubmit="return confirm('Deactivate {{ p.name }}?');">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button class="btn btn-sm btn-outline-danger"><i class="fas fa-trash-alt"></i></button>
-            </form>
-            {% endif %}
-            {% else %}<span class="text-muted small">-</span>{% endif %}
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="11" class="text-center text-muted py-4">
-          No products yet. Add a vendor first, then add its products.
-        </td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-{% endblock %}
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
