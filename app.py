@@ -879,6 +879,16 @@ def customer_plan_update_dates(plan_id):
 
     if status in ('active', 'expired', 'cancelled', 'terminated'):
         cp.status = status
+
+        # NEW: If plan is cancelled, cancel all unpaid invoices for this customer
+        if status == 'cancelled':
+            unpaid_invoices = Invoice.query.filter(
+                Invoice.customer_id == cp.customer_id,
+                Invoice.status.in_(['draft', 'sent', 'overdue'])
+            ).all()
+            for inv in unpaid_invoices:
+                inv.status = 'cancelled'
+
     db.session.commit()
     log_audit('Update Plan Dates',
               f"Plan #{cp.id} for customer {cp.customer_id}: "

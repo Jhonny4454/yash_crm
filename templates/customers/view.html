@@ -42,12 +42,6 @@
   .addon-panel-head small { color:#64748b; font-size:11.5px; }
   .addon-form { padding:16px; }
 
-  .charge-presets { display:flex; align-items:center; gap:7px; flex-wrap:wrap; padding-bottom:14px; margin-bottom:14px; border-bottom:1px dashed #e2e8f0; }
-  .charge-presets .cp-label { font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:#64748b; font-weight:700; margin-right:2px; }
-  .cp-chip { border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:999px; padding:4px 12px; font-size:12px; cursor:pointer; transition:background .15s, border-color .15s, color .15s; }
-  .cp-chip:hover { background:#eff6ff; border-color:#1a76b8; color:#1a76b8; }
-  .cp-chip.active { background:#1a76b8; border-color:#1a76b8; color:#fff; }
-
   .addon-grid { display:flex; flex-wrap:wrap; gap:12px; }
   .addon-grid .fld, .addon-foot .fld { flex:1 1 150px; min-width:0; }
   .addon-grid .fld-wide { flex:2 1 230px; }
@@ -88,8 +82,6 @@
     .addon-foot .fld { flex:1 1 100%; }
     .addon-total { margin-left:0; text-align:left; width:100%; }
     .addon-submit { width:100%; }
-    .charge-presets { gap:6px; }
-    .cp-chip { font-size:11.5px; padding:4px 10px; }
   }
 </style>
 
@@ -233,23 +225,6 @@
                     </form>
                     <button class="btn btn-primary btn-mini" data-bs-toggle="modal" data-bs-target="#renewPlanModal">Renew</button>
                     <button class="btn btn-primary btn-mini" data-bs-toggle="modal" data-bs-target="#assignPlanModal">Change plan</button>
-                    {% if customer.mobile %}
-                    <div class="btn-group" style="display:inline-block;">
-                      <button type="button" class="btn btn-success btn-mini dropdown-toggle" data-bs-toggle="dropdown"><i class="fab fa-whatsapp"></i></button>
-                      <ul class="dropdown-menu dropdown-menu-end">
-                        <li class="dropdown-header small">Send on WhatsApp</li>
-                        {% for tt, label in [('renewal','Plan Renewed'), ('expiry_3d','Expiring in 3 days'), ('expiry_2d','Expiring in 2 days'), ('expired','Plan Expired'), ('due_reminder','Due Reminder')] %}
-                        <li>
-                          <form method="POST" action="{{ url_for('customer_send_template', id=customer.id) }}">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="template_type" value="{{ tt }}">
-                            <button type="submit" class="dropdown-item small">{{ label }}</button>
-                          </form>
-                        </li>
-                        {% endfor %}
-                      </ul>
-                    </div>
-                    {% endif %}
                   </td>
                 </tr>
                 {% else %}
@@ -270,13 +245,20 @@
             </div>
             <form method="POST" action="{{ url_for('add_customer_invoice', id=customer.id) }}" class="addon-form">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <div class="charge-presets">
-                <span class="cp-label">Charge for</span>
-                {% for label in ['Installation Charges', 'Shifting Charges', 'Extra Device', 'Router', 'Repair / Service Visit', 'Cable / Wiring'] %}
-                  <button type="button" class="cp-chip" data-caption="{{ label }}">{{ label }}</button>
-                {% endfor %}
-              </div>
+              
               <div class="addon-grid">
+                <div class="fld fld-md">
+                  <label>Preset Caption</label>
+                  <select name="preset_caption" id="presetCaption">
+                    <option value="">-- Select Preset --</option>
+                    <option value="Installation Charges">Installation Charges</option>
+                    <option value="Shifting Charges">Shifting Charges</option>
+                    <option value="Extra Device">Extra Device</option>
+                    <option value="Router">Router</option>
+                    <option value="Repair / Service Visit">Repair / Service Visit</option>
+                    <option value="Cable / Wiring">Cable / Wiring</option>
+                  </select>
+                </div>
                 <div class="fld"><label>Reference</label><input type="text" value="{{ customer.reference_id or customer.mobile }}" readonly></div>
                 <div class="fld fld-wide"><label>Caption <span class="req">*</span></label><input type="text" name="caption" id="addonCaption" placeholder="e.g. Installation Charges" required></div>
                 <div class="fld fld-wide"><label>Detailed Invoice</label><input type="text" name="detailed_invoice" placeholder="Longer description for the printed bill"></div>
@@ -286,11 +268,11 @@
                 <div class="fld fld-md"><label>Mode</label><select name="payment_mode">{% for value, label in payment_modes %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
               </div>
 
-              <!-- Vendor Products -->
+              <!-- Vendor Products (Optional, Collapsed) -->
               <div class="vendor-block">
                 <button type="button" class="vendor-toggle" id="vendorToggle" aria-expanded="false" aria-controls="vendorBody">
                   <i class="fas fa-chevron-right chev"></i><i class="fas fa-boxes-stacked"></i> Bill from Vendor
-                  <small>Add devices from stock</small>
+                  <small>Add devices from stock (optional)</small>
                 </button>
                 <div class="vendor-body" id="vendorBody" hidden>
                   <div class="vendor-pick">
@@ -334,13 +316,6 @@
                   <td>&#8377; {{ '%.2f'|format(inv.balance) }}</td>
                   <td class="text-nowrap">
                     <button class="btn btn-success btn-mini" data-bs-toggle="modal" data-bs-target="#paymentModal{{ inv.id }}"><i class="fas fa-money-bill-wave"></i> Collect</button>
-                    {% if customer.mobile %}
-                    <form method="POST" action="{{ url_for('invoice_send', id=inv.id) }}" style="display:inline;">
-                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <input type="hidden" name="template_type" value="bill">
-                      <button type="submit" class="btn btn-outline-success btn-mini" title="Send bill"><i class="fab fa-whatsapp"></i></button>
-                    </form>
-                    {% endif %}
                     {% if current_user.is_admin() %}
                     <button class="btn btn-outline-danger btn-mini" onclick="if(confirm('Delete invoice {{ inv.invoice_no }}?'))document.getElementById('delInv{{ inv.id }}').submit();"><i class="fas fa-trash-alt"></i></button>
                     {% endif %}
@@ -380,18 +355,18 @@
                   <td class="text-nowrap"><a class="btn btn-outline-primary btn-mini" target="_blank" href="{{ url_for('invoice_detailed', id=inv.id) }}"><i class="fas fa-print"></i> Print</a></td>
                   <td class="text-nowrap">
                     {% if customer.mobile %}
+                    <!-- Send Summary Bill -->
                     <form method="POST" action="{{ url_for('invoice_send', id=inv.id) }}" style="display:inline;">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <input type="hidden" name="template_type" value="bill">
-                      <button type="submit" class="btn btn-success btn-mini" title="Send bill"><i class="fab fa-whatsapp"></i></button>
+                      <input type="hidden" name="template_type" value="summary_bill">
+                      <button type="submit" class="btn btn-outline-success btn-mini" title="Send Summary Bill"><i class="fas fa-file-alt"></i></button>
                     </form>
-                    {% if inv.balance > 0 %}
+                    <!-- Send Detailed Bill -->
                     <form method="POST" action="{{ url_for('invoice_send', id=inv.id) }}" style="display:inline;">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <input type="hidden" name="template_type" value="due_reminder">
-                      <button type="submit" class="btn btn-outline-warning btn-mini" title="Send reminder"><i class="fas fa-bell"></i></button>
+                      <input type="hidden" name="template_type" value="detailed_bill">
+                      <button type="submit" class="btn btn-outline-info btn-mini text-info" title="Send Detailed Bill"><i class="fas fa-file-lines"></i></button>
                     </form>
-                    {% endif %}
                     {% else %}<span class="text-muted small">No mobile</span>{% endif %}
                     {% if current_user.is_admin() %}
                     <button class="btn btn-outline-danger btn-mini" onclick="if(confirm('Delete invoice {{ inv.invoice_no }}?'))document.getElementById('delInv{{ inv.id }}').submit();"><i class="fas fa-trash-alt"></i></button>
@@ -435,13 +410,6 @@
                     <button class="btn btn-outline-secondary btn-mini" onclick="printReceipt('{{ pay.id }}')"><i class="fas fa-print"></i></button>
                     {% if current_user.is_admin() and pay.needs_authorization %}
                     <button class="btn btn-success btn-mini" onclick="document.getElementById('approvePay{{ pay.id }}').submit();"><i class="fas fa-check"></i></button>
-                    {% endif %}
-                    {% if customer.mobile and pay.invoice %}
-                    <form method="POST" action="{{ url_for('invoice_send', id=pay.invoice_id) }}" style="display:inline;">
-                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <input type="hidden" name="template_type" value="payment_received">
-                      <button type="submit" class="btn btn-outline-success btn-mini" title="Send receipt"><i class="fab fa-whatsapp"></i></button>
-                    </form>
                     {% endif %}
                     {% if current_user.is_admin() %}
                     <button class="btn btn-outline-danger btn-mini" onclick="if(confirm('Delete this payment?'))document.getElementById('deletePaymentForm{{ pay.id }}').submit();"><i class="fas fa-trash-alt"></i></button>
@@ -613,34 +581,15 @@
     setTimeout(function () { w.print(); }, 300);
   }
 
+  // Preset dropdown populates Caption field
+  document.getElementById('presetCaption').addEventListener('change', function() {
+      document.getElementById('addonCaption').value = this.value;
+  });
+
+  // Vendor section toggle
   (function () {
-    var caption = document.getElementById('addonCaption');
-    var chips = document.querySelectorAll('.cp-chip');
-    var amount = document.getElementById('addonAmount');
-
-    chips.forEach(function (chip) {
-      chip.addEventListener('click', function () {
-        var label = chip.getAttribute('data-caption');
-        var alreadyOn = chip.classList.contains('active');
-        chips.forEach(function (c) { c.classList.remove('active'); });
-        if (alreadyOn) { if (caption) caption.value = ''; return; }
-        chip.classList.add('active');
-        if (caption) { caption.value = label; caption.focus(); }
-        if (amount && parseFloat(amount.value || '0') === 0) { amount.select(); }
-      });
-    });
-
-    if (caption) {
-      caption.addEventListener('input', function () {
-        var v = caption.value.trim().toLowerCase();
-        chips.forEach(function (c) {
-          c.classList.toggle('active', c.getAttribute('data-caption').toLowerCase() === v);
-        });
-      });
-    }
-
     var toggle = document.getElementById('vendorToggle');
-    var vbody = document.getElementById('vendorBody');
+    var vbody  = document.getElementById('vendorBody');
     if (toggle && vbody) {
       toggle.addEventListener('click', function () {
         var open = toggle.getAttribute('aria-expanded') === 'true';
@@ -650,10 +599,11 @@
     }
   })();
 
+  // Vendor product rows logic
   (function () {
     var vendorSel = document.getElementById('addonVendor');
-    var body = document.getElementById('itemsBody');
-    var addBtn = document.getElementById('addItemRow');
+    var body      = document.getElementById('itemsBody');
+    var addBtn    = document.getElementById('addItemRow');
     if (!vendorSel || !body || !addBtn) return;
 
     var cache = {};

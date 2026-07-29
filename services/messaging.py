@@ -7,24 +7,11 @@ Design goals
 ------------
 * **Nothing is hard-coded.** Every endpoint, credential and payload shape is
   read from the `settings` table (editable from Settings -> Messaging in the
-  admin UI) with an environment-variable fallback. You can therefore point the
-  CRM at wabassist.com today and swap to the Meta Cloud API tomorrow without a
-  redeploy.
+  admin UI) with an environment-variable fallback.
 * **Fails soft.** If the gateway is not configured, or the HTTP call fails, we
   log the attempt and return a failure result. We never raise into a request
-  handler, so a WhatsApp outage can never break renewals or billing.
-* **Everything is logged.** Every send attempt is written to `message_logs`, so
-  the customer's "SMS / WhatsApp Log" tab and the audit trail always show what
-  actually went out.
-
-Placeholders available in every template body
----------------------------------------------
-    {{customer_name}}   {{first_name}}   {{username}}     {{mobile}}
-    {{amount}}          {{balance}}      {{paid_amount}}  {{due_amount}}
-    {{plan_name}}       {{speed}}        {{days}}
-    {{expiry_date}}     {{renew_date}}   {{invoice_no}}   {{receipt_no}}
-    {{transaction_id}}  {{company_name}} {{company_phone}} {{app_link}}
-    {{web_link}}        {{today}}
+  handler.
+* **Everything is logged.** Every send attempt is written to `message_logs`.
 """
 
 from __future__ import annotations
@@ -35,16 +22,15 @@ import re
 from datetime import date, datetime
 from decimal import Decimal
 
-try:  # requests is in requirements.txt, but never let an import break boot
+try:
     import requests
-except Exception:  # pragma: no cover
+except Exception:
     requests = None
 
 
 # --------------------------------------------------------------------------- #
 #  Configuration
 # --------------------------------------------------------------------------- #
-#: Settings keys this module reads. Seeded by blueprints/settings_bp.seed_settings.
 SETTING_KEYS = {
     'enabled':       'wa_enabled',
     'provider':      'wa_provider',
@@ -66,8 +52,6 @@ DEFAULTS = {
     'wa_instance_id':      '',
     'wa_sender':           '',
     'wa_http_method':      'POST',
-    # JSON body template. {phone} and {message} are substituted (URL-encoded
-    # automatically when they land in a query string).
     'wa_payload_template': '{"number": "{phone}", "type": "text", "message": "{message}", "instance_id": "{instance_id}", "access_token": "{token}"}',
     'wa_country_code':     '91',
     'wa_document_url':     '',
@@ -101,13 +85,6 @@ def is_configured() -> bool:
 def normalize_phone(raw: str, country_code: str | None = None) -> str | None:
     """
     Turn whatever the operator typed into a bare international MSISDN.
-
-        '98765 43210'    -> '919876543210'
-        '+91-9876543210' -> '919876543210'
-        '09876543210'    -> '919876543210'
-        '919876543210'   -> '919876543210'
-
-    Returns None when there aren't enough digits to be a real number.
     """
     if not raw:
         return None
@@ -115,7 +92,6 @@ def normalize_phone(raw: str, country_code: str | None = None) -> str | None:
     digits = re.sub(r'\D', '', str(raw))
     if not digits:
         return None
-    # Strip a single leading trunk zero (common in Indian data entry)
     if digits.startswith('0'):
         digits = digits.lstrip('0')
     if len(digits) < 8:
@@ -162,7 +138,6 @@ def build_context(customer=None, plan=None, customer_plan=None,
         'company_phone': '9029508777',
     }
 
-    # Company master overrides the built-in defaults when present
     try:
         from models import Company
         company = Company.query.first()
@@ -293,10 +268,7 @@ def send_whatsapp(phone, message, customer_id=None, template_type=None,
                   channel='whatsapp') -> SendResult:
     """
     Send one WhatsApp message. Always returns a SendResult; never raises.
-
-    When the gateway is not configured the message is printed to the log and
-    recorded with status 'dry-run' so you can still see exactly what *would*
-    have been sent while you are wiring up the provider.
+    Supports generic gateways (via payload template) and WebAssist.com natively.
     """
     msisdn = normalize_phone(phone)
     if not msisdn:
@@ -315,33 +287,45 @@ def send_whatsapp(phone, message, customer_id=None, template_type=None,
         _log(customer_id, msisdn, message, channel, res, template_type)
         return res
 
-    url = _substitute_transport(_setting('wa_api_url'), msisdn, message)
-    method = (_setting('wa_http_method') or 'POST').upper()
-    payload_tpl = _setting('wa_payload_template') or ''
+    provider = _setting('wa_provider', 'generic').lower()
+    api_url = _setting('wa_api_url')
     token = _setting('wa_api_token')
-
     headers = {'Accept': 'application/json'}
-    if token and '{token}' not in (_setting('wa_api_url') + payload_tpl):
-        # Token wasn't placed anywhere explicitly -> send it as a bearer header
-        headers['Authorization'] = f"Bearer {token}"
 
     try:
-        if method == 'GET':
-            resp = requests.get(url, headers=headers, timeout=15)
+        if provider == 'webassist':
+            # WebAssist.com specific API integration
+            url = "https://wabassist.com/api/send"  # Update if API endpoint changes
+            payload = {
+                "api_key": token,
+                "number": msisdn,
+                "message": message
+            }
+            resp = requests.post(url, json=payload, headers=headers, timeout=15)
         else:
-            raw = _substitute_transport(payload_tpl, msisdn, _json_escape(message))
-            try:
-                data = json.loads(raw) if raw.strip() else {}
-                headers['Content-Type'] = 'application/json'
-                resp = requests.post(url, json=data, headers=headers, timeout=15)
-            except json.JSONDecodeError:
-                # Not JSON -> post as form-encoded
-                resp = requests.post(url, data=_parse_form(raw), headers=headers, timeout=15)
+            # Generic gateway logic (Gupshup, Ultramsg, custom)
+            url = _substitute_transport(api_url, msisdn, message)
+            method = (_setting('wa_http_method') or 'POST').upper()
+            payload_tpl = _setting('wa_payload_template') or ''
+
+            if token and '{token}' not in (api_url + payload_tpl):
+                headers['Authorization'] = f"Bearer {token}"
+
+            if method == 'GET':
+                resp = requests.get(url, headers=headers, timeout=15)
+            else:
+                raw = _substitute_transport(payload_tpl, msisdn, _json_escape(message))
+                try:
+                    data = json.loads(raw) if raw.strip() else {}
+                    headers['Content-Type'] = 'application/json'
+                    resp = requests.post(url, json=data, headers=headers, timeout=15)
+                except json.JSONDecodeError:
+                    resp = requests.post(url, data=_parse_form(raw), headers=headers, timeout=15)
 
         ok = 200 <= resp.status_code < 300
         detail = f"HTTP {resp.status_code}: {resp.text[:200]}"
         res = SendResult(ok, 'sent' if ok else 'failed', detail, msisdn, message)
-    except Exception as exc:  # network error, DNS, timeout, bad URL...
+    except Exception as exc:
         res = SendResult(False, 'failed', f"{type(exc).__name__}: {exc}", msisdn, message)
 
     _log(customer_id, msisdn, message, channel, res, template_type)
@@ -374,8 +358,6 @@ def send_template(customer, template_type, *, plan=None, customer_plan=None,
                   invoice=None, payment=None, extra=None) -> SendResult:
     """
     Render `template_type` for `customer` and deliver it over WhatsApp.
-
-    Returns a SendResult. Safe to call from any request handler.
     """
     if customer is None:
         return SendResult(False, 'skipped', 'No customer')
@@ -393,6 +375,7 @@ def send_template(customer, template_type, *, plan=None, customer_plan=None,
 
 # --------------------------------------------------------------------------- #
 #  Default template bodies (seeded on first boot)
+#  INCLUDES the new Summary and Detailed bill templates!
 # --------------------------------------------------------------------------- #
 DEFAULT_TEMPLATES = [
     dict(
@@ -499,9 +482,34 @@ DEFAULT_TEMPLATES = [
             "{{company_name}}"
         ),
     ),
+    # --- NEW TEMPLATES ADDED FOR UI BUTTONS ---
+    dict(
+        name='Summary Bill',
+        template_type='summary_bill',
+        body=(
+            "\U0001f4dc Summary Invoice {{invoice_no}}\n\n"
+            "Dear {{customer_name}}, here is your summary invoice:\n\n"
+            "Amount : Rs.{{amount}}\n"
+            "Due    : Rs.{{due_amount}}\n\n"
+            "For Online Payment\n\n"
+            "App {{app_link}}\n\n"
+            "Web: {{web_link}}\n\n"
+            "{{company_name}}"
+        ),
+    ),
+    dict(
+        name='Detailed Bill',
+        template_type='detailed_bill',
+        body=(
+            "\U0001f4dc Detailed Invoice {{invoice_no}}\n\n"
+            "Dear {{customer_name}}, please find the detailed breakdown of your invoice below.\n\n"
+            "Total Amount : Rs.{{amount}}\n"
+            "Amount Due   : Rs.{{due_amount}}\n\n"
+            "Thank you for choosing us.\n\n"
+            "{{company_name}}"
+        ),
+    ),
 ]
-
-
 def seed_default_templates():
     """Insert the standard message templates once, on first boot."""
     from models import db, MessageTemplate
