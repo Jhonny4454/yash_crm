@@ -128,7 +128,8 @@
           <button class="btn btn-primary btn-sm px-3 dropdown-toggle" data-bs-toggle="dropdown">Options</button>
           <ul class="dropdown-menu dropdown-menu-end">
             <li><a class="dropdown-item" href="{{ url_for('customer_edit', id=customer.id) }}"><i class="fas fa-edit me-2"></i>Edit</a></li>
-            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#addonInvoiceModal"><i class="fas fa-file-invoice me-2"></i>Addon Invoice</a></li>
+            <!-- FIXED: Opens the Pending Invoice tab where the form actually lives -->
+            <li><a class="dropdown-item" href="#pending-invoice" onclick="document.querySelector('[data-bs-target=\'#pending-invoice\']').click();"><i class="fas fa-file-invoice me-2"></i>Addon Invoice</a></li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#addDiscountModal"><i class="fas fa-percent me-2"></i>Add Discount</a></li>
             <li><a class="dropdown-item" href="#" onclick="document.getElementById('removeDiscountForm').submit();return false;"><i class="fas fa-times-circle me-2"></i>Cancel Discount</a></li>

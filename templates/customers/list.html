@@ -166,7 +166,11 @@
                 <td>{{ customer.zone or '-' }}</td>
                 <td>
                   {% set active = customer.plans|selectattr('status', 'equalto', 'active')|first %}
-                  {{ active.plan.name if active else '<span class="text-muted">None</span>' }}
+                  {% if active %}
+                    {{ active.plan.name }}
+                  {% else %}
+                    <span class="text-muted">None</span>
+                  {% endif %}
                 </td>
                 <td>
                   {% if customer.is_active %}
