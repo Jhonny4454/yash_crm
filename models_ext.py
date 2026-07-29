@@ -245,19 +245,17 @@ class SalesReturn(db.Model):
     reason = db.Column(db.Text)
 
     # Where the money goes back to
-<<<<<<< HEAD
-    refund_mode = db.Column(db.Enum('cash', 'bank', 'adjust_next'),
-                            default='adjust_next')
-=======
-<<<<<<< HEAD
-    refund_mode = db.Column(db.Enum('cash', 'bank', 'adjust_next'),
-                            default='adjust_next')
-=======
-    refund_mode = db.Column(db.Enum('wallet', 'cash', 'bank', 'adjust_next'),
-                            default='wallet')
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
 
+    refund_mode = db.Column(db.Enum('cash', 'bank', 'adjust_next'),
+                            default='adjust_next')
+
+
+    refund_mode = db.Column(db.Enum('cash', 'bank', 'adjust_next'),
+                            default='adjust_next')
+
+    refund_mode = db.Column(db.Enum('wallet', 'cash', 'bank', 'adjust_next'),
+                            default='wallet') 
+    
     status = db.Column(db.Enum('pending', 'approved', 'rejected'),
                        default='pending')
     restock = db.Column(db.Boolean, default=True)
@@ -288,12 +286,6 @@ class SalesReturnItem(db.Model):
         'items', lazy=True, cascade='all, delete-orphan'))
     invoice_item = db.relationship('InvoiceItem')
 
-
-# --------------------------------------------------------------------------- #
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
 #  Referral campaign  (templates already exist, routes did not)
 # --------------------------------------------------------------------------- #
 class ReferralCampaign(db.Model):
@@ -345,12 +337,6 @@ class Referral(db.Model):
     campaign = db.relationship('ReferralCampaign', backref='referrals')
     referrer = db.relationship('Customer', foreign_keys=[referrer_customer_id])
     referee = db.relationship('Customer', foreign_keys=[referee_customer_id])
-
-
-# --------------------------------------------------------------------------- #
-#  Multi-ISP credentials  (Log2Space, Synnefo, and anything you add later)
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
 # --------------------------------------------------------------------------- #
 class ISPCredential(db.Model, EncryptedSecretMixin):
     """
