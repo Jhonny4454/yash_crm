@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # ── Python ───────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
@@ -78,16 +77,3 @@ coverage.xml
 # ── Keep these placeholder folders tracked ───────────────────────────────────
 !static/uploads/.gitkeep
 !instance/.gitkeep
-=======
-__pycache__/
-*.py[cod]
-venv/
-.venv/
-.env
-instance/
-backups/
-static/uploads/
-*.db
-*.sqlite3
-.DS_Store
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
