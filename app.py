@@ -541,9 +541,6 @@ def _bucket_payments(payments):
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    # ---- TEMPORARY FIX: force a fresh session for this request ----
-    db.session.remove()
-
     today = date.today()
     month_start, month_end = _month_bounds(today)
 
