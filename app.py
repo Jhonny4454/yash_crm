@@ -16,6 +16,9 @@ from flask_wtf.csrf import CSRFProtect, CSRFError
 from werkzeug.middleware.proxy_fix import ProxyFix
 from urllib.parse import urlsplit
 
+# ---------- Flask-Migrate (added) ----------
+from flask_migrate import Migrate
+
 from models import (
     db, User, Customer, Plan, CustomerPlan, Invoice, Payment, AuditLog,
     StaffType, Attendance, Leave, Payroll,
@@ -86,6 +89,9 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 db.init_app(app)
+# ---------- Flask-Migrate initialization (added) ----------
+migrate = Migrate(app, db)
+
 csrf = CSRFProtect(app)
 
 login_manager = LoginManager()

@@ -1,1 +1,1 @@
-ALTER TABLE invoices ADD COLUMN vendor VARCHAR(100);
+DESCRIBE payments;
