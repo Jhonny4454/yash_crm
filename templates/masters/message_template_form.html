@@ -1,4 +1,8 @@
 {% extends "base.html" %}
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
 {% block page_title %}{{ 'Edit Template' if template else 'New Template' }}{% endblock %}
 {% block content %}
 
@@ -117,3 +121,65 @@
   })();
 </script>
 {% endblock %}
+<<<<<<< HEAD
+=======
+=======
+
+{% block page_title %}{% if template %}Edit{% else %}Add{% endif %} Customer Template{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm border-0" style="max-width: 800px; margin: 0 auto;">
+    <div class="card-header bg-white fw-bold">
+        <i class="fas fa-envelope me-2"></i> {% if template %}Edit{% else %}Add New{% endif %} Message Template
+    </div>
+    <div class="card-body">
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            
+            <div class="mb-3">
+                <label class="form-label fw-bold">Template Name</label>
+                <input type="text" name="name" class="form-control" value="{{ template.name if template else '' }}" required placeholder="e.g. 3-Day Expiry Reminder">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">Template Type</label>
+                <select name="template_type" class="form-select" required>
+                    <option value="">-- Select Type --</option>
+                    <option value="renewal" {% if template and template.template_type == 'renewal' %}selected{% endif %}>Plan Renewed</option>
+                    <option value="payment_received" {% if template and template.template_type == 'payment_received' %}selected{% endif %}>Payment Received</option>
+                    <option value="expiry_3d" {% if template and template.template_type == 'expiry_3d' %}selected{% endif %}>Expiry Reminder (3 Days)</option>
+                    <option value="expiry_2d" {% if template and template.template_type == 'expiry_2d' %}selected{% endif %}>Expiry Reminder (2 Days)</option>
+                    <option value="expired" {% if template and template.template_type == 'expired' %}selected{% endif %}>Plan Expired</option>
+                </select>
+                <div class="form-text">Each type has a unique trigger (e.g., auto-expiry, manual renewal).</div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">Message Body</label>
+                <textarea name="body" class="form-control" rows="6" required placeholder="Enter your message here...">{{ template.body if template else '' }}</textarea>
+                <div class="form-text">
+                    <strong>Placeholders you can use:</strong><br>
+                    <code>{{'{{customer_name}}'}}</code> - Customer's full name<br>
+                    <code>{{'{{username}}'}}</code> - Customer's username<br>
+                    <code>{{'{{amount}}'}}</code> - Price amount (for renewal)<br>
+                    <code>{{'{{paid_amount}}'}}</code> - Paid amount (for payment)<br>
+                    <code>{{'{{balance}}'}}</code> - Remaining balance<br>
+                    <code>{{'{{days}}'}}</code> - Days remaining (for expiry reminders)
+                </div>
+            </div>
+
+            <div class="mb-4 form-check">
+                <input type="checkbox" name="is_active" class="form-check-input" id="isActive" {% if not template or template.is_active %}checked{% endif %}>
+                <label class="form-check-label" for="isActive">Active (enabled for auto-sending)</label>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save Template</button>
+                <a href="{{ url_for('message_template_list') }}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+>>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
+>>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5

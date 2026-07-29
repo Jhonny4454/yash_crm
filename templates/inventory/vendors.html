@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {% extends "base.html" %}
 {% block page_title %}Vendors{% endblock %}
 {% block content %}
@@ -59,3 +60,66 @@
   </div>
 </div>
 {% endblock %}
+=======
+{% extends "base.html" %}
+{% block page_title %}Vendors{% endblock %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <strong>Vendors</strong>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('vendor_bill_list') }}" class="btn btn-sm btn-outline-primary">
+        <i class="fas fa-file-invoice"></i> Vendor Bills</a>
+      {% if current_user.is_admin() %}
+      <a href="{{ url_for('vendor_add') }}" class="btn btn-sm btn-primary">
+        <i class="fas fa-plus"></i> Add Vendor</a>
+      {% endif %}
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr><th>#</th><th>Vendor</th><th>Contact</th><th>Mobile</th><th>Email</th>
+            <th>GSTIN</th><th class="text-center">Products</th>
+            <th class="text-center">Status</th><th class="text-end">Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for v in vendors %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><strong>{{ v.name }}</strong></td>
+          <td>{{ v.contact_person or '-' }}</td>
+          <td>{{ v.mobile or '-' }}</td>
+          <td>{{ v.email or '-' }}</td>
+          <td>{{ v.gstin or '-' }}</td>
+          <td class="text-center">
+            <a href="{{ url_for('product_list') }}" class="badge bg-info text-dark text-decoration-none">
+              {{ v.products|length }}</a>
+          </td>
+          <td class="text-center">
+            {% if v.is_active %}<span class="badge bg-success">Active</span>
+            {% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}
+          </td>
+          <td class="text-end text-nowrap">
+            {% if current_user.is_admin() %}
+            <a href="{{ url_for('vendor_edit', id=v.id) }}" class="btn btn-sm btn-outline-primary">
+              <i class="fas fa-edit"></i></a>
+            <form method="POST" action="{{ url_for('vendor_delete', id=v.id) }}" class="d-inline"
+                  onsubmit="return confirm('Remove vendor {{ v.name }}?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger"><i class="fas fa-trash-alt"></i></button>
+            </form>
+            {% else %}<span class="text-muted small">-</span>{% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="text-center text-muted py-4">
+          No vendors yet. Add one, then attach products to it.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+>>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5

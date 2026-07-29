@@ -7,6 +7,7 @@ Flask-WTF==1.2.1
 WTForms==3.1.2
 Werkzeug==3.0.3
 Jinja2==3.1.4
+<<<<<<< HEAD
 setuptools>=80
 
 # ---- Database ----
@@ -25,3 +26,31 @@ requests==2.32.3
 
 # ---- Production WSGI ----
 gunicorn==22.0.0
+=======
+setuptools>=80 
+
+# ---- Database drivers ----
+PyMySQL==1.1.1          # MySQL / MariaDB
+cryptography==42.0.8    # required by PyMySQL auth AND by models_ext secret storage
+
+# ---- Config ----
+python-dotenv==1.0.1
+email-validator==2.1.1  # WTForms Email() validator
+
+# ---- Scheduled jobs (auto-invoice, grace reminders, auto-suspend) ----
+APScheduler==3.10.4
+
+# ---- HTTP / Payment ----
+requests==2.32.3
+razorpay==1.4.2
+
+# ---- Production WSGI server ----
+gunicorn==22.0.0
+
+# ---- Optional: PDF export of invoices ----
+# WeasyPrint gives the best output but needs system libraries
+# (libpango, libcairo). xhtml2pdf is a pure-python fallback.
+# The app serves HTML and still prints correctly if neither is installed.
+# weasyprint==62.3
+# xhtml2pdf==0.2.16
+>>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5

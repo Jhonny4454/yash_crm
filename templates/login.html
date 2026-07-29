@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -280,4 +281,338 @@
     }
   </script>
 </body>
+=======
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - YASH Internet Services</title>
+  <!-- Bootstrap 5 & Font Awesome (needed for icons and layout) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+<<<<<<< HEAD
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #f5576c);
+      /* animation removed for performance */
+=======
+    /* Animated gradient background */
+    @keyframes gradientMove {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #f5576c);
+      background-size: 400% 400%;
+      animation: gradientMove 15s ease infinite;
+>>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 1rem;
+    }
+
+    /* Glass card – fully responsive */
+    .login-card {
+<<<<<<< HEAD
+      background: rgba(255, 255, 255, 0.16);
+=======
+      backdrop-filter: blur(16px) saturate(180%);
+      background: rgba(255, 255, 255, 0.12);
+>>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 32px;
+      box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.6), 
+                  0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+      padding: 2rem 1.5rem;
+      width: 100%;
+      max-width: 440px;
+<<<<<<< HEAD
+      transition: box-shadow .15s ease;
+      margin: 1rem;
+    }
+    .login-card:hover {
+      /* hover lift removed */
+=======
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), 
+                  box-shadow 0.4s ease;
+      animation: float 6s ease-in-out infinite;
+      margin: 1rem;
+    }
+    @keyframes float {
+      0% { transform: translateY(0px); }
+      50% { transform: translateY(-6px); }
+      100% { transform: translateY(0px); }
+    }
+    .login-card:hover {
+      transform: translateY(-6px) scale(1.01);
+>>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
+      box-shadow: 0 40px 80px -20px rgba(0, 0, 0, 0.7);
+    }
+
+    .login-logo {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    .login-logo img {
+      max-width: 180px;
+      width: 100%;
+      height: auto;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.25));
+      transition: transform 0.3s ease;
+    }
+    .login-logo img:hover {
+<<<<<<< HEAD
+      /* logo zoom removed */
+=======
+      transform: scale(1.05);
+>>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
+    }
+    .login-logo .tagline {
+      color: rgba(255,255,255,0.85);
+      font-size: 0.95rem;
+      letter-spacing: 0.5px;
+      display: block;
+      margin-top: 0.5rem;
+    }
+
+    /* Form fields – mobile‑friendly */
+    .form-floating {
+      margin-bottom: 1.2rem;
+    }
+    .form-floating .form-control {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      color: #fff;
+      border-radius: 16px;
+      padding: 1rem 1.25rem;
+      height: 60px;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(4px);
+    }
+    .form-floating .form-control:focus {
+      background: rgba(255,255,255,0.25);
+      border-color: #fff;
+      box-shadow: 0 0 0 4px rgba(255,255,255,0.15);
+      color: #fff;
+    }
+    .form-floating .form-control::placeholder {
+      color: rgba(255,255,255,0.6);
+    }
+    .form-floating label {
+      color: rgba(255,255,255,0.9);
+      font-weight: 500;
+      margin-left: 12px;
+      padding-left: 0;
+    }
+
+    /* Password toggle */
+    .input-group-text {
+      background: transparent;
+      border: none;
+      color: rgba(255,255,255,0.7);
+      position: absolute;
+      right: 18px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 10;
+      cursor: pointer;
+      font-size: 1.2rem;
+      transition: color 0.2s;
+    }
+    .input-group-text:hover {
+      color: #fff;
+    }
+    .form-floating .form-control {
+      padding-right: 50px;
+    }
+
+    /* Checkbox & links */
+    .form-check {
+      color: #fff;
+      margin-bottom: 1.2rem;
+    }
+    .form-check-input:checked {
+      background-color: #764ba2;
+      border-color: #764ba2;
+      box-shadow: 0 0 0 2px rgba(118, 75, 162, 0.4);
+    }
+    .forgot-password {
+      color: rgba(255,255,255,0.8);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+      font-weight: 500;
+    }
+    .forgot-password:hover {
+      color: #fff;
+      text-decoration: underline;
+    }
+
+    /* Login button */
+    .btn-login {
+      background: linear-gradient(135deg, #764ba2, #667eea);
+      border: none;
+      border-radius: 50px;
+      padding: 0.9rem;
+      font-weight: 600;
+      font-size: 1.1rem;
+      letter-spacing: 0.5px;
+      color: #fff;
+      transition: all 0.3s ease;
+      box-shadow: 0 8px 24px rgba(118, 75, 162, 0.4);
+      width: 100%;
+    }
+    .btn-login:hover {
+<<<<<<< HEAD
+      /* button zoom removed */
+=======
+      transform: scale(1.02);
+>>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
+      box-shadow: 0 12px 32px rgba(118, 75, 162, 0.6);
+      background: linear-gradient(135deg, #5e3a85, #5a6fd8);
+      color: #fff;
+    }
+    .btn-login:active {
+<<<<<<< HEAD
+      /* button press removed */
+=======
+      transform: scale(0.98);
+>>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
+    }
+    .btn-login i {
+      transition: transform 0.2s;
+    }
+    .btn-login:hover i {
+<<<<<<< HEAD
+      /* link slide removed */
+=======
+      transform: translateX(4px);
+>>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
+    }
+
+    /* Flash alerts */
+    .alert {
+      border-radius: 16px;
+      background: rgba(255, 0, 0, 0.15);
+      border: 1px solid rgba(255, 0, 0, 0.25);
+      color: #fff;
+      padding: 0.75rem 1.2rem;
+      margin-bottom: 1.2rem;
+      backdrop-filter: blur(4px);
+    }
+    .alert-success {
+      background: rgba(0, 255, 0, 0.1);
+      border-color: rgba(0, 255, 0, 0.2);
+    }
+
+    /* Footer */
+    .footer-text {
+      color: rgba(255,255,255,0.5);
+      font-size: 0.8rem;
+      margin-top: 1.5rem;
+      text-align: center;
+      letter-spacing: 0.3px;
+    }
+
+    /* Extra small devices */
+    @media (max-width: 576px) {
+      .login-card {
+        padding: 1.5rem 1rem;
+        border-radius: 24px;
+        margin: 0.5rem;
+      }
+      .login-logo img {
+        max-width: 140px;
+      }
+      .form-floating .form-control {
+        height: 50px;
+        font-size: 0.95rem;
+      }
+      .btn-login {
+        font-size: 1rem;
+        padding: 0.8rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-card">
+    <div class="login-logo">
+      <!-- Logo – make sure the path matches your file -->
+      <img src="{{ url_for('static', filename='images/logo.jpg') }}" alt="YASH INTERNETSERVICES">
+      <span class="tagline">Secure Login</span>
+    </div>
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('login') }}">
+      {{ form.hidden_tag() }}
+
+      <div class="form-floating mb-3">
+        {{ form.username(class="form-control", placeholder="Username", id="username") }}
+        {{ form.username.label }}
+      </div>
+
+      <div class="form-floating mb-3 position-relative">
+        {{ form.password(class="form-control", placeholder="Password", id="password") }}
+        {{ form.password.label }}
+        <span class="input-group-text" onclick="togglePassword()">
+          <i class="fas fa-eye" id="toggleIcon"></i>
+        </span>
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+        <div class="form-check">
+          {{ form.remember(class="form-check-input", id="remember") }}
+          <label class="form-check-label" for="remember">Keep me signed in</label>
+        </div>
+        <a href="#" class="forgot-password">Forgot password?</a>
+      </div>
+
+      <button type="submit" class="btn-login">
+        <i class="fas fa-sign-in-alt me-2"></i>Login
+      </button>
+    </form>
+
+    <div class="footer-text">
+      &copy; 2026 Sumedh. All rights reserved.
+    </div>
+  </div>
+
+  <!-- Bootstrap JS (for dismissible alerts and offcanvas if needed) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    function togglePassword() {
+      const passwordField = document.getElementById('password');
+      const icon = document.getElementById('toggleIcon');
+      if (passwordField.type === 'password') {
+        passwordField.type = 'text';
+        icon.classList.replace('fa-eye', 'fa-eye-slash');
+      } else {
+        passwordField.type = 'password';
+        icon.classList.replace('fa-eye-slash', 'fa-eye');
+      }
+    }
+  </script>
+</body>
+>>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
 </html>

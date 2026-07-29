@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {% extends "base.html" %}
 {% block page_title %}{{ 'Edit Product' if product else 'Add Product' }}{% endblock %}
 {% block content %}
@@ -65,3 +66,72 @@
   </div>
 </div>
 {% endblock %}
+=======
+{% extends "base.html" %}
+{% block page_title %}{{ 'Edit Product' if product else 'Add Product' }}{% endblock %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <strong>{{ 'Edit Product' if product else 'Add Product' }}</strong>
+    <a href="{{ url_for('product_list') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="fas fa-arrow-left"></i> Back</a>
+  </div>
+  <div class="card-body">
+    <div class="alert alert-info small">
+      <i class="fas fa-info-circle"></i>
+      Assign a <strong>Vendor</strong> so this product appears in the Addon Invoice
+      product list and rolls up into that vendor's purchase bill.
+    </div>
+    <form method="POST" novalidate>
+      {{ form.hidden_tag() }}
+      <div class="row g-3">
+        <div class="col-md-6">
+          {{ form.name.label(class="form-label small fw-bold text-muted") }}
+          {{ form.name(class="form-control") }}
+          {% for e in form.name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+          {{ form.vendor_id.label(class="form-label small fw-bold text-muted") }}
+          {{ form.vendor_id(class="form-select") }}
+        </div>
+        <div class="col-md-4">
+          {{ form.sku.label(class="form-label small fw-bold text-muted") }}
+          {{ form.sku(class="form-control") }}
+        </div>
+        <div class="col-md-4">
+          {{ form.hsn_code.label(class="form-label small fw-bold text-muted") }}
+          {{ form.hsn_code(class="form-control") }}
+        </div>
+        <div class="col-md-4">
+          {{ form.tax_percent.label(class="form-label small fw-bold text-muted") }}
+          {{ form.tax_percent(class="form-control") }}
+          {% for e in form.tax_percent.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+          {{ form.cost_price.label(class="form-label small fw-bold text-muted") }}
+          {{ form.cost_price(class="form-control") }}
+          <div class="form-text">Used to value the vendor's purchase bill.</div>
+        </div>
+        <div class="col-md-6">
+          {{ form.unit_price.label(class="form-label small fw-bold text-muted") }}
+          {{ form.unit_price(class="form-control") }}
+          <div class="form-text">Default rate charged on the customer's invoice.</div>
+        </div>
+        <div class="col-12">
+          {{ form.description.label(class="form-label small fw-bold text-muted") }}
+          {{ form.description(class="form-control", rows="2") }}
+        </div>
+        <div class="col-12 form-check ms-2">
+          {{ form.is_active(class="form-check-input") }}
+          {{ form.is_active.label(class="form-check-label") }}
+        </div>
+      </div>
+      <div class="d-flex gap-2 mt-4">
+        <button class="btn btn-primary"><i class="fas fa-save"></i> Save Product</button>
+        <a href="{{ url_for('product_list') }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+>>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
