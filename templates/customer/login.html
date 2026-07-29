@@ -130,8 +130,9 @@
       {% endif %}
     {% endwith %}
 
-    <form method="POST" action="{{ url_for('customer_login') }}">
+    <form method="POST" action="{{ url_for('customer_login', next=request.args.get('next')) }}">
       {{ form.hidden_tag() }}
+      {% if request.args.get('next') %}<input type="hidden" name="next" value="{{ request.args.get('next') }}">{% endif %}
 
       <div class="mb-3">
         {{ form.username(class="form-control", placeholder="Username") }}

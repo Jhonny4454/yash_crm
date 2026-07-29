@@ -461,6 +461,8 @@ def login():
         return render_template('login.html', form=form), 429
 
     if form.validate_on_submit():
+        # Ensure a fresh database session to avoid stale connection issues
+        db.session.remove()
         user = User.query.filter_by(username=form.username.data).first()
         if user and user.is_active and user.check_password(form.password.data):
             session.permanent = True
@@ -541,6 +543,9 @@ def _bucket_payments(payments):
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    # ---- Force a fresh session for this request ----
+    db.session.remove()
+
     today = date.today()
     month_start, month_end = _month_bounds(today)
 
