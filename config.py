@@ -1,31 +1,10 @@
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
-"""
-config.py - application configuration for YASH Internet Services CRM.
-
-Every value can be overridden with an environment variable, which is how you
-should configure Render / Railway. Nothing secret is committed here.
-"""
 import os
 from datetime import timedelta
-
-<<<<<<< HEAD
-=======
-=======
-import os
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
 from dotenv import load_dotenv
 
 load_dotenv()
 
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
 def _flag(name, default=False):
     raw = os.environ.get(name)
     if raw is None:
@@ -40,23 +19,21 @@ class Config:
     # ---------------------------------------------------------------- core --
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-me'
 
-    # SQLite by default. For MySQL set, e.g.
-    #   DATABASE_URL=mysql+pymysql://user:pass@host/dbname?charset=utf8mb4
-    # On Render/Railway the platform supplies DATABASE_URL; the normalisation
-    # below turns the legacy 'postgres://' prefix into the form SQLAlchemy 2.x
-    # expects.
+    # Database URL – supports SQLite, PostgreSQL, and MySQL.
+    # Normalises common prefix variants for SQLAlchemy 2.x compatibility.
     _db_url = os.environ.get('DATABASE_URL') or 'sqlite:///app.db'
     if _db_url.startswith('postgres://'):
         _db_url = _db_url.replace('postgres://', 'postgresql+psycopg2://', 1)
+    elif _db_url.startswith('mysql://'):
+        _db_url = _db_url.replace('mysql://', 'mysql+pymysql://', 1)
     SQLALCHEMY_DATABASE_URI = _db_url
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = False
 
     # --------------------------------------------------- connection pooling --
-    # The single biggest win for slow page loads on Render/Railway: recycle
-    # connections before the managed database drops them, and check they are
-    # alive before handing them to a request.
+    # Recycle connections before the managed database drops them, and check they
+    # are alive before handing them to a request.
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True,
         'pool_recycle': 280,
@@ -92,6 +69,11 @@ class Config:
     CASHFREE_SECRET_KEY = os.environ.get('CASHFREE_SECRET_KEY', '')
     CASHFREE_ENV = os.environ.get('CASHFREE_ENV', 'sandbox')   # sandbox|production
 
+    # ---------------------------------------------- Razorpay payment gateway --
+    # Set these to enable Razorpay payments (if you use Razorpay instead of/in addition to Cashfree).
+    RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID')
+    RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET')
+
     # -------------------------------------------- WhatsApp / SMS gateway ----
     # Seeded into the `settings` table on first boot so they can be edited from
     # the admin UI afterwards without a redeploy.
@@ -109,40 +91,4 @@ class Config:
     # ---------------------------------------------------------- scheduler ---
     # Set to 0 on extra workers so cron jobs only run once across the fleet.
     RUN_SCHEDULER = _flag('RUN_SCHEDULER', True)
-<<<<<<< HEAD
-=======
-=======
-class Config:
-    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
-
-    # Database
-    DATABASE_URL = os.environ.get("DATABASE_URL") or "sqlite:///app.db"
-
-    # Convert old MySQL URL to PyMySQL
-    if DATABASE_URL.startswith("mysql://"):
-        DATABASE_URL = DATABASE_URL.replace(
-            "mysql://",
-            "mysql+pymysql://",
-            1
-        )
-
-    SQLALCHEMY_DATABASE_URI = DATABASE_URL
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_ECHO = False
-
-    # Security
-    SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SECURE = os.environ.get("FLASK_ENV") == "production"
-    SESSION_COOKIE_SAMESITE = "Lax"
-
-    REMEMBER_COOKIE_HTTPONLY = True
-    REMEMBER_COOKIE_SECURE = os.environ.get("FLASK_ENV") == "production"
-
-    PREFERRED_URL_SCHEME = "https"
-    WTF_CSRF_TIME_LIMIT = 3600
-
-    # Razorpay
-    RAZORPAY_KEY_ID = os.environ.get("RAZORPAY_KEY_ID")
-    RAZORPAY_KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET")
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
->>>>>>> eaddab7a9b6609413ac527248b3d5a68cc7057f5
+    

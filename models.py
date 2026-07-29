@@ -351,17 +351,6 @@ class InventoryAssignment(db.Model):
     customer = db.relationship('Customer', backref='inventory_assignments')
     product = db.relationship('Product')
 
-# ===== Vendor purchase bills (created when vendor products are billed) =====
-class VendorBill(db.Model):
-    """A purchase bill raised against a Vendor for products supplied.
-
-    Created automatically when an addon invoice bills products belonging to a
-    vendor, and also creatable by hand from Inventory -> Vendor Bills.
-    """
-
-    customer = db.relationship('Customer', backref='inventory_assignments')
-    product = db.relationship('Product')
-
 class VendorBill(db.Model):
 
     __tablename__ = 'vendor_bills'

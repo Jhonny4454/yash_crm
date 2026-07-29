@@ -3610,9 +3610,7 @@ def vendor_bill_export():
                     headers={'Content-Disposition':
                              'attachment; filename=vendor-bills.csv'})
 
-# ===========================================================================
 #  OUTBOUND MESSAGING  (bills, due reminders, bulk campaigns)
-# ===========================================================================
 def _bill_context(invoice):
     """Placeholder values for a bill/receipt message."""
     cp = invoice.customer_plan
@@ -3801,9 +3799,7 @@ def _bulk_audience(audience, start, end):
         out.append((cust, cp))
     return out
 
-# ===========================================================================
 #  CUSTOMER SELF-SERVICE PORTAL
-# ===========================================================================
 def _current_customer():
     return db.session.get(Customer, session.get('customer_id'))
 

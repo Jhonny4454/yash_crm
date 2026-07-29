@@ -1,35 +1,39 @@
 """Gunicorn configuration for YASH Internet Services CRM."""
-
 import os
 
-# Render sets PORT automatically. Default is 5000 for local development.
+# ── Binding ─────────────────────────────────────────────────────────────────
+# Render sets PORT automatically; default 5000 for local dev
 bind = f"0.0.0.0:{os.environ.get('PORT', '5000')}"
 
-# APScheduler runs inside the Flask application.
-# Keep a single worker unless the scheduler is moved to a separate process.
-workers = int(os.environ.get("WEB_CONCURRENCY", 1))
-threads = int(os.environ.get("WEB_THREADS", 4))
-worker_class = "gthread"
+# ── Workers ──────────────────────────────────────────────────────────────────
+# KEEP AT 1 — APScheduler runs inside the Flask process.
+# More workers = duplicate auto-invoices and duplicate WhatsApp reminders.
+workers = int(os.environ.get('WEB_CONCURRENCY', 1))
+threads = int(os.environ.get('WEB_THREADS', 4))
+worker_class = 'gthread'
 
-# Timeouts
+# ── Timeouts ─────────────────────────────────────────────────────────────────
+# 120 s covers slow first boot on Render free tier (cold start + db.create_all)
 timeout = 120
 graceful_timeout = 30
 keepalive = 5
 
-# Logging
-accesslog = "-"
-errorlog = "-"
-loglevel = os.environ.get("LOG_LEVEL", "info")
+# ── Logging ──────────────────────────────────────────────────────────────────
+accesslog = '-'   # stdout → visible in Render logs
+errorlog  = '-'
+loglevel  = os.environ.get('LOG_LEVEL', 'info')
 
-# Restart workers periodically to reduce memory growth
-max_requests = 1000
+# ── Request recycling (memory leak protection) ───────────────────────────────
+max_requests        = 1000
 max_requests_jitter = 100
 
-# Must remain False when using APScheduler
+# ── IMPORTANT: must be False when APScheduler is used ────────────────────────
+# preload_app = True would start the scheduler BEFORE workers fork,
+# causing the scheduler thread to die silently and never fire jobs.
 preload_app = False
 
-# Trust Render's reverse proxy
-forwarded_allow_ips = "*"
-secure_scheme_headers = {
-    "X-Forwarded-Proto": "https",
-}
+# ── Render / Railway: forward the real client IP ─────────────────────────────
+# The app's ProxyFix middleware already handles this, but gunicorn
+# needs to trust the proxy header too.
+forwarded_allow_ips = '*'
+secure_scheme_headers = {'X-Forwarded-Proto': 'https'}
