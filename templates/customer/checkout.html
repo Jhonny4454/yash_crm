@@ -1,0 +1,80 @@
+{% extends "customer/base.html" %}
+{% block title %}Complete Payment{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-8 col-lg-6">
+    <div class="card">
+      <div class="card-body text-center p-4">
+        <div class="mb-3"><i class="fas fa-lock fa-2x text-success"></i></div>
+        <h5 class="fw-bold mb-1">Complete your payment</h5>
+        <p class="text-muted small mb-3">
+          {{ order.note }}<br>Invoice {{ invoice.invoice_no }}
+        </p>
+        <div class="display-6 fw-bold mb-1">&#8377; {{ '%.2f'|format(order.amount) }}</div>
+        <p class="text-muted small">Order reference: {{ order.order_id }}</p>
+
+        <div id="cf-status" class="alert alert-info small mb-3">
+          Opening the secure Cashfree payment window&hellip;
+        </div>
+
+        <button id="cf-pay" class="btn btn-brand w-100 py-2">
+          <i class="fas fa-credit-card me-1"></i> Pay Now
+        </button>
+
+        <a href="{{ url_for('customer_dashboard') }}" class="btn btn-link btn-sm mt-3 text-muted">
+          Cancel and go back
+        </a>
+
+        <p class="text-muted mt-3 mb-0" style="font-size:.75rem">
+          Do not close this window while the payment is in progress. If money leaves
+          your account but the plan does not renew, it will be credited automatically
+          within a few minutes.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ sdk_url }}"></script>
+<script>
+  (function () {
+    var statusBox = document.getElementById('cf-status');
+    var payBtn = document.getElementById('cf-pay');
+    var sessionId = {{ order.payment_session_id | tojson }};
+
+    function fail(msg) {
+      statusBox.className = 'alert alert-danger small mb-3';
+      statusBox.textContent = msg;
+    }
+
+    if (typeof Cashfree !== 'function') {
+      fail('The payment library could not be loaded. Please check your internet connection and try again.');
+      payBtn.disabled = true;
+      return;
+    }
+
+    var cashfree = Cashfree({ mode: {{ cf_mode | tojson }} });
+
+    function startCheckout() {
+      statusBox.className = 'alert alert-info small mb-3';
+      statusBox.textContent = 'Redirecting you to the secure payment page\u2026';
+      cashfree.checkout({
+        paymentSessionId: sessionId,
+        redirectTarget: '_self'
+      }).then(function (result) {
+        if (result && result.error) {
+          fail(result.error.message || 'The payment could not be started. Please try again.');
+        }
+      }).catch(function () {
+        fail('The payment could not be started. Please try again.');
+      });
+    }
+
+    payBtn.addEventListener('click', startCheckout);
+    // Auto-open so the customer does not need a second tap
+    setTimeout(startCheckout, 600);
+  })();
+</script>
+{% endblock %}

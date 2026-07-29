@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Plan Master{% endblock %}
+
+{% block content %}
+<style>
+  .search-box {
+    background: rgba(255,255,255,0.7);
+    backdrop-filter: blur(8px);
+    border-radius: 50px;
+    padding: 0.3rem 1rem;
+    border: 1px solid rgba(255,255,255,0.3);
+  }
+  .search-box input {
+    border: none;
+    background: transparent;
+    padding: 0.6rem 0;
+    outline: none;
+    width: 200px;
+  }
+  .search-box button {
+    background: none;
+    border: none;
+    color: #764ba2;
+  }
+  .table-modern thead th {
+    background: rgba(118, 75, 162, 0.1);
+    color: #1a0f2e;
+    font-weight: 600;
+    border: none;
+    padding: 0.8rem 0.5rem;
+  }
+  .table-modern tbody tr {
+    background: rgba(255,255,255,0.5);
+    backdrop-filter: blur(4px);
+    border-radius: 12px;
+    transition: background 0.2s;
+  }
+  .table-modern tbody tr:hover {
+    background: rgba(255,255,255,0.8);
+  }
+  .table-modern td {
+    border: none;
+    padding: 0.8rem 0.5rem;
+    vertical-align: middle;
+  }
+  .btn-glass {
+    background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 50px;
+    padding: 0.3rem 1rem;
+    transition: all 0.3s;
+  }
+  .btn-glass:hover {
+    background: rgba(255,255,255,0.9);
+    transform: translateY(-2px);
+  }
+  .badge-status {
+    padding: 0.2rem 0.8rem;
+    border-radius: 50px;
+    font-size: 0.75rem;
+    background: #764ba2;
+    color: #fff;
+  }
+  .badge-active { background: #28a745; }
+  .badge-inactive { background: #dc3545; }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+  <h4 class="mb-0"><i class="fas fa-tags me-2 text-primary"></i>Plan Master</h4>
+  <div class="d-flex gap-2">
+    <div class="search-box d-flex align-items-center">
+      <input type="text" id="searchInput" placeholder="Search plans..." onkeyup="filterTable()">
+      <button><i class="fas fa-search"></i></button>
+    </div>
+    <a href="{{ url_for('plan_add') }}" class="btn btn-primary rounded-pill px-4">
+      <i class="fas fa-plus me-2"></i>Add New Plan
+    </a>
+  </div>
+</div>
+
+<div class="table-responsive">
+  <table class="table table-modern" id="planTable">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Provider</th>
+        <th>Speed (Mbps)</th>
+        <th>Price (₹)</th>
+        <th>Validity (days)</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for plan in plans %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td><strong>{{ plan.name }}</strong></td>
+        <td>{{ plan.service_provider or '-' }}</td>
+        <td>{{ plan.speed_mbps }}</td>
+        <td>₹{{ "%.2f"|format(plan.price_monthly) }}</td>
+        <td>{{ plan.validity_days }}</td>
+        <td>
+          <span class="badge-status {% if plan.is_active %}badge-active{% else %}badge-inactive{% endif %}">
+            {{ 'Active' if plan.is_active else 'Inactive' }}
+          </span>
+        </td>
+        <td>
+          <a href="{{ url_for('plan_edit', id=plan.id) }}" class="btn btn-sm btn-glass" title="Edit">
+            <i class="fas fa-edit"></i>
+          </a>
+          <form method="POST" action="{{ url_for('plan_delete', id=plan.id) }}" style="display:inline;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-sm btn-glass text-danger" title="Deactivate" onclick="return confirm('Deactivate this plan?')">
+              <i class="fas fa-trash"></i>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+  function filterTable() {
+    const input = document.getElementById('searchInput');
+    const filter = input.value.toLowerCase();
+    const rows = document.querySelectorAll('#planTable tbody tr');
+    rows.forEach(row => {
+      const text = row.textContent.toLowerCase();
+      row.style.display = text.includes(filter) ? '' : 'none';
+    });
+  }
+</script>
+{% endblock %}

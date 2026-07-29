@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block page_title %}Message Log &middot; {{ customer.full_name }}{% endblock %}
+{% block content %}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+  <h5 class="mb-0 fw-bold">{{ customer.full_name }}</h5>
+  <a href="{{ url_for('customer_view', id=customer.id) }}" class="btn btn-sm btn-outline-secondary">
+    <i class="fas fa-arrow-left me-1"></i> Back to customer
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+    <span><i class="fab fa-whatsapp text-success me-2"></i>WhatsApp / SMS Log</span>
+    <span class="text-muted small fw-normal">Last {{ logs|length }} message(s)</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3">Sent At</th><th>Channel</th><th>Type</th>
+          <th>To</th><th>Status</th><th class="pe-3">Message</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td class="ps-3 small">{{ log.created_at.strftime('%d %b %Y %H:%M') }}</td>
+          <td><span class="badge bg-light text-dark border">{{ log.channel|title }}</span></td>
+          <td class="small text-muted">{{ log.template_type or '-' }}</td>
+          <td class="small">{{ log.phone }}</td>
+          <td>
+            {% if log.status == 'sent' %}<span class="badge bg-success">Sent</span>
+            {% elif log.status == 'dry-run' %}<span class="badge bg-secondary" title="Gateway not configured - logged only">Logged</span>
+            {% elif log.status == 'skipped' %}<span class="badge bg-warning text-dark">Skipped</span>
+            {% else %}<span class="badge bg-danger" title="{{ log.error }}">Failed</span>{% endif %}
+          </td>
+          <td class="pe-3 small" style="max-width:420px">
+            <div style="white-space:pre-wrap;max-height:4.2em;overflow:hidden">{{ log.body }}</div>
+            {% if log.error %}<div class="text-danger" style="font-size:.72rem">{{ log.error }}</div>{% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">No messages sent to this customer yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

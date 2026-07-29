@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block page_title %}Attendance Report{% endblock %}
+{% block content %}
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label small fw-bold text-muted">Month</label>
+        <input type="month" name="month" value="{{ month }}" class="form-control">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-bold text-muted">Employee</label>
+        <select name="employee_id" class="form-select">
+          <option value="">All employees</option>
+          {% for e in employees %}
+          <option value="{{ e.id }}" {% if selected_employee == e.id %}selected{% endif %}>
+            {{ e.full_name or e.username }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4 d-flex gap-2">
+        <button class="btn btn-primary flex-fill"><i class="fas fa-filter"></i> Apply</button>
+        <a href="{{ url_for('attendance_report') }}" class="btn btn-outline-secondary">Reset</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <strong>Attendance for {{ month_display }}</strong>
+    <a href="{{ url_for('hr_index') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="fas fa-arrow-left"></i> Back to HR</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>#</th><th>Employee</th><th>Role</th>
+          <th class="text-center">Present</th>
+          <th class="text-center">Half Day</th>
+          <th class="text-center">Absent</th>
+          <th class="text-center">Total Marked</th>
+          <th class="text-center">Attendance %</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in report_rows %}
+        {% set eff = row.present + (row.half * 0.5) %}
+        {% set pct = (eff / row.total * 100) if row.total else 0 %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><strong>{{ row.user.full_name or row.user.username }}</strong></td>
+          <td><span class="badge bg-secondary">{{ row.user.role|capitalize }}</span></td>
+          <td class="text-center text-success fw-bold">{{ row.present }}</td>
+          <td class="text-center text-warning fw-bold">{{ row.half }}</td>
+          <td class="text-center text-danger fw-bold">{{ row.absent }}</td>
+          <td class="text-center">{{ row.total }}</td>
+          <td class="text-center">
+            <span class="badge bg-{{ 'success' if pct >= 90 else ('warning text-dark' if pct >= 75 else 'danger') }}">
+              {{ '%.1f'|format(pct) }}%
+            </span>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">
+          No attendance recorded for {{ month_display }}.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
