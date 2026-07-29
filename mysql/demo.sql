@@ -1,1 +1,2 @@
-DESCRIBE payments;
+ALTER TABLE payments
+ADD COLUMN source VARCHAR(50) NULL;
