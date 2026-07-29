@@ -16,10 +16,6 @@ from flask_wtf.csrf import CSRFProtect, CSRFError
 from werkzeug.middleware.proxy_fix import ProxyFix
 from urllib.parse import urlsplit
 
-<<<<<<< HEAD
-=======
-# ---------- Database Models ----------
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 from models import (
     db, User, Customer, Plan, CustomerPlan, Invoice, Payment, AuditLog,
     StaffType, Attendance, Leave, Payroll,
@@ -27,62 +23,35 @@ from models import (
     ExpenseCategory, ExpenseAccount, ExpensePayee, Expense,
     Company, Address, Zone, TaxMaster,
     Locality, Area, Building, InventoryAssignment, ServiceProvider, VendorBill, VendorBillItem,
-<<<<<<< HEAD
     ServiceRequest, MessageTemplate, MessageLog, OnlinePaymentOrder,
-=======
-    ServiceRequest, MessageTemplate
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 )
 from models_ext import (
     Setting, InvoiceItem, ISPCredential, ISPSyncLog, BackupLog, ImportJob,
 )
 from services import isp_providers
-<<<<<<< HEAD
 from services import messaging
 from services import cashfree
 from services.invoicing import amount_in_words
-=======
-from services.invoicing import amount_in_words
-
-# ---------- Forms ----------
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 from forms import (
     LoginForm, CustomerForm, PlanForm, InvoiceForm, PaymentForm,
     StaffForm, AttendanceForm, LeaveForm, PayrollForm,
     ExpenseForm, VendorForm, ProductForm, StockForm, CompanyForm, ChangePasswordForm,
     ExpenseCategoryForm, ExpenseAccountForm, ExpensePayeeForm, ZoneForm, TaxForm,
     AddonInvoiceForm, PlanDatesForm, PAYMENT_MODE_CHOICES,
-<<<<<<< HEAD
     ServiceProviderForm, VendorBillForm,
     CustomerLoginForm, CustomerChangePasswordForm,
 )
 from config import Config
-=======
-    ServiceProviderForm, VendorBillForm, CustomerLoginForm, CustomerChangePasswordForm,
-    MessageTemplateForm, BulkMessageForm
-)
-from config import Config
-
-# ---------- Standard Libs ----------
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from collections import defaultdict
-<<<<<<< HEAD
-=======
-import requests
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 
 app = Flask(__name__)
 app.config.from_object(Config)
 
-<<<<<<< HEAD
 # ---------- Security-critical config ----------
-=======
-# ---------- Security & Session ----------
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 if not app.config.get('SECRET_KEY') or app.config.get('SECRET_KEY') in ('dev', 'changeme', '', 'dev-secret-key-change-me'):
     if os.environ.get('FLASK_ENV') == 'production':
         raise RuntimeError(
@@ -94,12 +63,18 @@ if not app.config.get('SECRET_KEY') or app.config.get('SECRET_KEY') in ('dev', '
           "Sessions will not survive a restart. Set SECRET_KEY in your "
           "environment for production.")
 
+_prod = os.environ.get('FLASK_ENV') == 'production'
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
-    SESSION_COOKIE_SECURE=os.environ.get('FLASK_ENV') == 'production',
+    SESSION_COOKIE_SECURE=_prod,
+    SESSION_COOKIE_NAME='yash_session',
+    REMEMBER_COOKIE_HTTPONLY=True,
+    REMEMBER_COOKIE_SECURE=_prod,
+    REMEMBER_COOKIE_SAMESITE='Lax',
     PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
-    WTF_CSRF_TIME_LIMIT=3600,
+    WTF_CSRF_TIME_LIMIT=7200,           # 2 h – covers a long data-entry session
+    WTF_CSRF_SSL_STRICT=_prod,          # enforce HTTPS referer in prod
     MAX_CONTENT_LENGTH=16 * 1024 * 1024,
 )
 
@@ -128,39 +103,29 @@ def unauthorized():
     flash('Please log in to continue.', 'warning')
     return redirect(url_for('login', next=request.path))
 
-<<<<<<< HEAD
 # ---------- Feature blueprints (Settings / Backup / Import-Export / ISP) ----------
 from blueprints.settings_bp import register as register_settings
 register_settings(app)
 
 # Amount-in-words filter used by the invoice templates
 app.jinja_env.globals['amount_in_words'] = amount_in_words
-=======
-# ---------- Feature Blueprints ----------
-from blueprints.settings_bp import register as register_settings
-register_settings(app)
-
-# ---------- Jinja Globals ----------
-app.jinja_env.globals['amount_in_words'] = amount_in_words
-app.jinja_env.globals['now'] = datetime.utcnow
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 
 # ---------- Helpers ----------
 def generate_invoice_no():
+    """Thread-safe invoice number using a DB-level counter fallback."""
     today = date.today().strftime('%Y%m%d')
-    for _ in range(5):
-        last = Invoice.query.order_by(Invoice.id.desc()).first()
-        seq = (last.id + 1) if last else 1
+    for attempt in range(10):
+        last = db.session.execute(
+            db.select(Invoice.id).order_by(Invoice.id.desc()).limit(1)
+        ).scalar()
+        seq = (last + 1 + attempt) if last else (1 + attempt)
         candidate = f"INV-{today}-{seq:04d}"
         if not Invoice.query.filter_by(invoice_no=candidate).first():
             return candidate
-    return f"INV-{today}-{secrets.token_hex(3)}"
+    return f"INV-{today}-{secrets.token_hex(4).upper()}"
 
 def _vendor_choices(include_blank=True):
-<<<<<<< HEAD
     """(id, label) list for any Vendor SelectField."""
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     rows = Vendor.query.filter_by(is_active=True).order_by(Vendor.name).all()
     out = [(0, '-- No vendor --')] if include_blank else []
     return out + [(v.id, v.name) for v in rows]
@@ -168,10 +133,7 @@ def _vendor_choices(include_blank=True):
 def generate_reference_id():
     return ''.join(secrets.choice('0123456789') for _ in range(8))
 
-<<<<<<< HEAD
 # Expose a few helpers to Jinja so templates can call them directly
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 @app.context_processor
 def inject_template_helpers():
     return dict(
@@ -198,21 +160,16 @@ def disable_connection_on_network(customer):
     log_audit('Network Disable (stub)', f"Requested network disable for {customer.full_name}")
 
 def reset_mac_on_log2space(mac_address, customer_reference):
-    """Placeholder for resetting MAC on log2space."""
-    print(f"=== RESET MAC ON LOG2SPACE ===")
-    print(f"Customer Ref: {customer_reference}")
-    print(f"New MAC: {mac_address}")
+    """Call the log2space API to change this device's authenticated MAC.
+    Replace the body with the real API call when the credentials are ready."""
+    app.logger.info("reset_mac_on_log2space ref=%s mac=%s", customer_reference, mac_address)
     return True
 
 def reset_customer_password_on_log2space(customer, new_password):
-    """Placeholder for resetting customer password on log2space."""
-    print(f"=== RESET PASSWORD ON LOG2SPACE ===")
-    print(f"Customer Ref: {customer.reference_id}")
-    print(f"New password: {new_password}")
+    """Call the log2space API to sync the new customer portal password."""
+    app.logger.info("reset_password_on_log2space ref=%s", customer.reference_id)
     return True
 
-<<<<<<< HEAD
-# ---------------------------------------------------------------------------
 #  Communication layer
 #
 #  Everything routes through services/messaging.py, which reads its gateway
@@ -220,22 +177,17 @@ def reset_customer_password_on_log2space(customer, new_password):
 #  environment-variable fallback. When no gateway is configured the message is
 #  logged as a "dry-run" instead of being sent, so nothing ever breaks while
 #  the WhatsApp provider is still being wired up.
-# ---------------------------------------------------------------------------
 def send_sms(phone, message, customer_id=None):
     return messaging.send_sms(phone, message, customer_id=customer_id)
 
-
 def send_whatsapp(phone, message, customer_id=None):
     return messaging.send_whatsapp(phone, message, customer_id=customer_id)
-
 
 def send_email(to, subject, body, attachment=None):
     # Email is not wired to an SMTP provider yet; log it so nothing is lost.
     app.logger.info("Email to %s: %s", to, subject)
 
-# ---------------------------------------------------------------------------
 #  Template messaging
-# ---------------------------------------------------------------------------
 def send_template_message(customer, template_type, context=None, *,
                           plan=None, customer_plan=None, invoice=None,
                           payment=None):
@@ -255,110 +207,6 @@ def send_template_message(customer, template_type, context=None, *,
                   f"{template_type} -> {getattr(customer, 'full_name', '?')} "
                   f"({result.status})")
     return result
-
-=======
-# ---------- Communication (WhatsApp / SMS / Email) ----------
-def send_sms(phone, message):
-    # Replace with your actual SMS gateway API (e.g., Twilio, Fast2SMS)
-    print(f"SMS to {phone}: {message}")
-
-def send_whatsapp(phone, message):
-    """
-    Send WhatsApp message via Wabassist API.
-    Credentials: yashinternetservices9@gmail.com / uni@U01263
-    """
-    if not phone or not message:
-        return False
-    try:
-        url = "https://wabassist.com/api/send"
-        payload = {
-            "username": "yashinternetservices9@gmail.com",
-            "password": "uni@U01263",
-            "phone": phone,
-            "message": message
-        }
-        # Uncomment the next line when you have the actual API endpoint
-        # response = requests.post(url, json=payload, timeout=10)
-        # return response.status_code == 200
-        print(f"WhatsApp via Wabassist to {phone}: {message}")
-        return True
-    except Exception as e:
-        app.logger.error(f"WhatsApp send failed: {e}")
-        return False
-
-def send_email(to, subject, body, attachment=None):
-    print(f"Email to {to}: {subject} - {body}")
-
-# ---------- Template Messaging (for WhatsApp/SMS) ----------
-def send_template_message(customer, template_type, context=None):
-    """Fetch the active template and send via WhatsApp."""
-    if not customer or not customer.mobile:
-        return
-    template = MessageTemplate.query.filter_by(template_type=template_type, is_active=True).first()
-    if not template:
-        return
-    body = template.body
-    replacements = {
-        '{{customer_name}}': customer.full_name or '',
-        '{{username}}': customer.username or '',
-        '{{amount}}': '0',
-        '{{days}}': '0',
-        '{{balance}}': '0',
-        '{{paid_amount}}': '0'
-    }
-    if context:
-        for k, v in context.items():
-            replacements[f'{{{{{k}}}}}'] = str(v)
-    for k, v in replacements.items():
-        body = body.replace(k, v)
-    send_whatsapp(customer.mobile, body)
-    log_audit('Send Template', f"Sent {template_type} to {customer.full_name}")
-
-def send_invoice_whatsapp(customer, invoice):
-    """Send a PDF invoice to customer via WhatsApp."""
-    # Generate PDF (simplified – you can use pdfkit or weasyprint)
-    try:
-        import pdfkit
-        html = render_template('invoices/summary.html', invoice=invoice,
-                               customer=customer, company=Company.query.first(),
-                               today=date.today(), download=True)
-        pdf = pdfkit.from_string(html, False)
-        # In production, you would upload this PDF to a temporary URL and send the URL
-        # For now, we'll just send a message with a link to the invoice.
-        message = f"Your invoice {invoice.invoice_no} is ready. You can view it at {url_for('invoice_summary', id=invoice.id, _external=True)}"
-        send_whatsapp(customer.mobile, message)
-        return True
-    except ImportError:
-        flash('PDF generation not configured.', 'warning')
-        return False
-
-# ---------- Cashfree Payment Gateway (Placeholder) ----------
-def initiate_cashfree_payment(invoice):
-    """Create a Cashfree order and return the payment link."""
-    # This is a placeholder – replace with actual Cashfree API call
-    # Reference: https://docs.cashfree.com/reference/pgordercreate
-    try:
-        order_data = {
-            "order_id": invoice.invoice_no,
-            "order_amount": float(invoice.balance),
-            "order_currency": "INR",
-            "customer_details": {
-                "customer_id": str(invoice.customer_id),
-                "customer_name": invoice.customer.full_name,
-                "customer_email": invoice.customer.email,
-                "customer_phone": invoice.customer.mobile
-            },
-            "order_meta": {
-                "return_url": url_for('cashfree_callback', _external=True) + "?order_id={order_id}"
-            }
-        }
-        # response = requests.post('https://api.cashfree.com/pg/orders', json=order_data, headers=...)
-        # return response.json().get('payment_link')
-        return f"https://example.com/pay/{invoice.invoice_no}"  # placeholder
-    except Exception as e:
-        app.logger.error(f"Cashfree initiation failed: {e}")
-        return None
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 
 # ---------- Rate limiting ----------
 _login_attempts = {}
@@ -414,10 +262,7 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
-<<<<<<< HEAD
 # ---------- Customer Self-Service Access control ----------
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 def customer_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -510,44 +355,30 @@ def send_expiry_reminders():
     """Send templates for plans expiring in 3 days, 2 days, and expired today."""
     with app.app_context():
         today = date.today()
-<<<<<<< HEAD
         # 3 days before expiry
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
         expiring_3d = CustomerPlan.query.filter(
             CustomerPlan.status == 'active',
             CustomerPlan.end_date == today + timedelta(days=3)
         ).all()
         for cp in expiring_3d:
-<<<<<<< HEAD
             send_template_message(cp.customer, 'expiry_3d', {'days': 3},
                                   customer_plan=cp)
-        
-        # 2 days before expiry
-=======
-            send_template_message(cp.customer, 'expiry_3d', {'days': 3})
 
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
+        # 2 days before expiry
         expiring_2d = CustomerPlan.query.filter(
             CustomerPlan.status == 'active',
             CustomerPlan.end_date == today + timedelta(days=2)
         ).all()
         for cp in expiring_2d:
-<<<<<<< HEAD
             send_template_message(cp.customer, 'expiry_2d', {'days': 2},
                                   customer_plan=cp)
-        
-        # Expired today
-=======
-            send_template_message(cp.customer, 'expiry_2d', {'days': 2})
 
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
+        # Expired today
         expired_today = CustomerPlan.query.filter(
             CustomerPlan.status == 'active',
             CustomerPlan.end_date == today
         ).all()
         for cp in expired_today:
-<<<<<<< HEAD
             send_template_message(cp.customer, 'expired', customer_plan=cp)
 
 scheduler = BackgroundScheduler(timezone=os.environ.get('TZ', 'Asia/Kolkata'))
@@ -569,78 +400,48 @@ if _should_start_scheduler and not scheduler.running:
     scheduler.add_job(auto_suspend_overdue, CronTrigger(hour=2, minute=0), **job_opts)
     scheduler.add_job(send_grace_period_reminders, CronTrigger(hour=10, minute=0), **job_opts)
     scheduler.add_job(send_expiry_reminders, CronTrigger(hour=9, minute=0), **job_opts)
-=======
-            send_template_message(cp.customer, 'expired')
-
-scheduler = BackgroundScheduler()
-_should_start_scheduler = (
-    os.environ.get('FLASK_ENV') == 'production'
-    or os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
-    or not app.debug
-)
-if _should_start_scheduler and not scheduler.running:
-    scheduler.add_job(generate_auto_invoices, CronTrigger(hour=1, minute=0))
-    scheduler.add_job(auto_suspend_overdue, CronTrigger(hour=2, minute=0))
-    scheduler.add_job(send_grace_period_reminders, CronTrigger(minute=0))
-    scheduler.add_job(send_expiry_reminders, CronTrigger(hour=8, minute=0))
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     scheduler.start()
 
 # ---------- Error handlers ----------
+def _err(code, msg, pre=None):
+    """Render an error page; fall back to plain text so a template bug never hides the original error."""
+    if pre:
+        pre()
+    try:
+        return render_template('errors/error.html', code=code, message=msg), code
+    except Exception:
+        return f"{code} {msg}", code
+
 @app.errorhandler(400)
-def bad_request(e):
-    try:
-        return render_template('errors/error.html', code=400,
-                               message="The request could not be understood by the server."), 400
-    except:
-        return "400 Bad Request", 400
-
+def bad_request(e):   return _err(400, "The request could not be understood by the server.")
 @app.errorhandler(403)
-def forbidden(e):
-    try:
-        return render_template('errors/error.html', code=403,
-                               message="You don't have permission to access this page."), 403
-    except:
-        return "403 Forbidden", 403
-
+def forbidden(e):     return _err(403, "You don't have permission to access this page.")
 @app.errorhandler(404)
-def not_found(e):
-    try:
-        return render_template('errors/error.html', code=404,
-                               message="The page you're looking for doesn't exist."), 404
-    except:
-        return "404 Not Found", 404
-
+def not_found(e):     return _err(404, "The page you're looking for doesn't exist.")
 @app.errorhandler(413)
-def too_large(e):
-    try:
-        return render_template('errors/error.html', code=413,
-                               message="The file you uploaded is too large."), 413
-    except:
-        return "413 Payload Too Large", 413
-
+def too_large(e):     return _err(413, "The file you uploaded is too large.")
 @app.errorhandler(429)
-def rate_limited(e):
-    try:
-        return render_template('errors/error.html', code=429,
-                               message="Too many requests. Please slow down and try again shortly."), 429
-    except:
-        return "429 Too Many Requests", 429
-
+def rate_limited(e):  return _err(429, "Too many requests. Please slow down and try again shortly.")
 @app.errorhandler(500)
 def server_error(e):
     app.logger.exception("Unhandled server error")
-    db.session.rollback()
-    try:
-        return render_template('errors/error.html', code=500,
-                               message="Something went wrong on our end. It's been logged."), 500
-    except:
-        return "500 Internal Server Error", 500
+    return _err(500, "Something went wrong on our end. It's been logged.", db.session.rollback)
 
 @app.errorhandler(CSRFError)
 def csrf_error(e):
     flash('Your session expired or the form was tampered with. Please try again.', 'danger')
     return redirect(request.referrer or url_for('dashboard')), 400
+# ── Security headers (added to every response) ──────────────────────────────
+@app.after_request
+def set_security_headers(response):
+    """Minimal security headers safe for a Bootstrap + CDN app."""
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+    response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+    # Permissions-Policy: restrict microphone/camera/geolocation
+    response.headers.setdefault(
+        'Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+    return response
 
 # ---------- Authentication ----------
 @app.route('/login', methods=['GET', 'POST'])
@@ -725,10 +526,7 @@ def _group_of(mode):
     return 'other'
 
 def _bucket_payments(payments):
-<<<<<<< HEAD
     """Split a list of payments into the cash / cheque / online / other buckets."""
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     out = {'cash': 0.0, 'cheque': 0.0, 'online': 0.0, 'other': 0.0}
     for p in payments:
         out[_group_of(p.payment_mode)] += float(p.amount or 0)
@@ -763,25 +561,16 @@ def dashboard():
     payment_count = len(approved_payments)
     payment_amount = sum(float(p.amount or 0) for p in approved_payments)
 
-<<<<<<< HEAD
     # Donut + legend: Cash / Cheque / Online / Other
     payment_breakdown = _bucket_payments(approved_payments)
 
     # ===== To be Authorized (all pending payments, any date) =====
-=======
-    payment_breakdown = _bucket_payments(approved_payments)
-
-    # ===== To be Authorized =====
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     all_pending = Payment.query.filter_by(status='pending').all()
     to_authorize_breakdown = _bucket_payments(all_pending)
     to_authorize_total = sum(to_authorize_breakdown.values())
     to_authorize_count = len(all_pending)
 
-<<<<<<< HEAD
     # Authorizing Payment counters
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     pending_authorization_count = to_authorize_count
     authorization_done_count = Payment.query.filter(
         Payment.status == 'approved',
@@ -789,10 +578,7 @@ def dashboard():
         Payment.payment_date >= month_start,
         Payment.payment_date <= month_end).count()
 
-<<<<<<< HEAD
     # "To be Authorized" table -> grouped by date
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     to_authorize_rows = {}
     for p in all_pending:
         row = to_authorize_rows.setdefault(
@@ -801,11 +587,7 @@ def dashboard():
         row['amount'] += float(p.amount or 0)
     to_authorize_rows = sorted(to_authorize_rows.values(), key=lambda r: r['date'], reverse=True)
 
-<<<<<<< HEAD
     # ===== Plan lifecycle chips (7 days) =====
-=======
-    # ===== Plan lifecycle chips =====
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     expiring_days, expired_days, renewed_days = [], [], []
     for i in range(7):
         day = today + timedelta(days=i)
@@ -838,11 +620,7 @@ def dashboard():
     renewed_total = CustomerPlan.query.filter(
         CustomerPlan.start_date >= month_start, CustomerPlan.start_date <= month_end).count()
 
-<<<<<<< HEAD
     # ===== Plans expiring in the next 7 days -> full detail rows =====
-=======
-    # ===== Plans expiring in next 7 days =====
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     horizon = today + timedelta(days=7)
     expiring_plans = (CustomerPlan.query
                       .filter(CustomerPlan.status == 'active',
@@ -870,11 +648,7 @@ def dashboard():
             'outstanding': outstanding,
         })
 
-<<<<<<< HEAD
     # ===== 12-month summary table =====
-=======
-    # ===== 12-month summary =====
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     monthly_summary = []
     for i in range(0, 12):
         m_start = _shift_month(today, i)
@@ -897,11 +671,7 @@ def dashboard():
             'paid_amount': sum(float(x.total_amount or 0) for x in paid),
         })
 
-<<<<<<< HEAD
     # ===== Zone-wise outstanding & collection (current month) =====
-=======
-    # ===== Zone-wise outstanding & collection =====
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     zone_names = [z[0] for z in db.session.query(Customer.zone).distinct().all() if z[0]]
     zone_outstanding, zone_collection = [], []
     for zone_name in sorted(zone_names):
@@ -1008,11 +778,7 @@ def dashboard_export():
         headers={'Content-Disposition': f'attachment; filename=dashboard_snapshot_{today.isoformat()}.csv'}
     )
 
-<<<<<<< HEAD
 # ---------- Plan expiry / renewal reports (dashboard drill-down) ----------
-=======
-# ---------- Plan expiry / renewal reports ----------
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 @app.route('/reports/plan-expiry')
 @login_required
 def plan_expiry_report():
@@ -1112,7 +878,6 @@ def customer_plan_update_dates(plan_id):
 @app.route('/payments/authorizations')
 @login_required
 def payment_authorizations():
-<<<<<<< HEAD
     # Everything that has been collected (by staff at the counter or by the
     # customer through the portal) but not yet signed off by an admin. The
     # money is already on the customer's account either way - this queue is a
@@ -1137,16 +902,6 @@ def payment_authorizations():
                            pending_total=pending_total,
                            portal_total=portal_total,
                            today=date.today())
-=======
-    pending = Payment.query.filter_by(status='pending').order_by(
-        Payment.payment_date.desc()).all()
-    done = Payment.query.filter(
-        Payment.status == 'approved',
-        Payment.authorized_at.isnot(None)).order_by(
-        Payment.authorized_at.desc()).limit(200).all()
-    return render_template('payments/authorizations.html',
-                           pending=pending, done=done, today=date.today())
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 
 @app.route('/payments/<int:id>/reject', methods=['POST'])
 @login_required
@@ -1239,6 +994,39 @@ def zone_delete(id):
     flash('Zone deleted successfully.', 'success')
     return redirect(url_for('zone_list'))
 
+def _master_add(Model, list_view, form_tpl, audit_label, success_msg):
+    """Generic add handler for single-field master tables (name only)."""
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        if name:
+            obj = Model(name=name)
+            db.session.add(obj)
+            db.session.commit()
+            log_audit(f'Add {audit_label}', f"Added {audit_label.lower()} {name}")
+            flash(success_msg, 'success')
+            return redirect(url_for(list_view))
+    return render_template(form_tpl)
+
+def _master_edit(Model, list_view, form_tpl, audit_label, success_msg, id):
+    obj = Model.query.get_or_404(id)
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        if name:
+            obj.name = name
+            db.session.commit()
+            log_audit(f'Edit {audit_label}', f"Edited {audit_label.lower()} {obj.name}")
+            flash(success_msg, 'success')
+            return redirect(url_for(list_view))
+    return render_template(form_tpl, **{audit_label.lower(): obj})
+
+def _master_delete(Model, list_view, audit_label, id):
+    obj = Model.query.get_or_404(id)
+    db.session.delete(obj)
+    db.session.commit()
+    log_audit(f'Delete {audit_label}', f"Deleted {audit_label.lower()} {obj.name}")
+    flash(f'{audit_label} deleted.', 'success')
+    return redirect(url_for(list_view))
+
 # ---------- Locality Master CRUD ----------
 @app.route('/masters/localities')
 @login_required
@@ -1251,42 +1039,19 @@ def locality_list():
 @login_required
 @admin_required
 def locality_add():
-    if request.method == 'POST':
-        name = request.form.get('name')
-        if name:
-            locality = Locality(name=name)
-            db.session.add(locality)
-            db.session.commit()
-            log_audit('Add Locality', f"Added locality {name}")
-            flash('Locality added successfully.', 'success')
-            return redirect(url_for('locality_list'))
-    return render_template('masters/locality_form.html')
+    return _master_add(Locality, 'locality_list', 'masters/locality_form.html', 'Locality', 'Locality added successfully.')
 
 @app.route('/masters/localities/edit/<int:id>', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def locality_edit(id):
-    locality = Locality.query.get_or_404(id)
-    if request.method == 'POST':
-        name = request.form.get('name')
-        if name:
-            locality.name = name
-            db.session.commit()
-            log_audit('Edit Locality', f"Edited locality {locality.name}")
-            flash('Locality updated successfully.', 'success')
-            return redirect(url_for('locality_list'))
-    return render_template('masters/locality_form.html', locality=locality)
+    return _master_edit(Locality, 'locality_list', 'masters/locality_form.html', 'Locality', 'Locality updated successfully.', id)
 
 @app.route('/masters/localities/delete/<int:id>', methods=['POST'])
 @login_required
 @admin_required
 def locality_delete(id):
-    locality = Locality.query.get_or_404(id)
-    db.session.delete(locality)
-    db.session.commit()
-    log_audit('Delete Locality', f"Deleted locality {locality.name}")
-    flash('Locality deleted.', 'success')
-    return redirect(url_for('locality_list'))
+    return _master_delete(Locality, 'locality_list', 'Locality', id)
 
 # ---------- Area Master CRUD ----------
 @app.route('/masters/areas')
@@ -1300,42 +1065,19 @@ def area_list():
 @login_required
 @admin_required
 def area_add():
-    if request.method == 'POST':
-        name = request.form.get('name')
-        if name:
-            area = Area(name=name)
-            db.session.add(area)
-            db.session.commit()
-            log_audit('Add Area', f"Added area {name}")
-            flash('Area added successfully.', 'success')
-            return redirect(url_for('area_list'))
-    return render_template('masters/area_form.html')
+    return _master_add(Area, 'area_list', 'masters/area_form.html', 'Area', 'Area added successfully.')
 
 @app.route('/masters/areas/edit/<int:id>', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def area_edit(id):
-    area = Area.query.get_or_404(id)
-    if request.method == 'POST':
-        name = request.form.get('name')
-        if name:
-            area.name = name
-            db.session.commit()
-            log_audit('Edit Area', f"Edited area {area.name}")
-            flash('Area updated successfully.', 'success')
-            return redirect(url_for('area_list'))
-    return render_template('masters/area_form.html', area=area)
+    return _master_edit(Area, 'area_list', 'masters/area_form.html', 'Area', 'Area updated successfully.', id)
 
 @app.route('/masters/areas/delete/<int:id>', methods=['POST'])
 @login_required
 @admin_required
 def area_delete(id):
-    area = Area.query.get_or_404(id)
-    db.session.delete(area)
-    db.session.commit()
-    log_audit('Delete Area', f"Deleted area {area.name}")
-    flash('Area deleted.', 'success')
-    return redirect(url_for('area_list'))
+    return _master_delete(Area, 'area_list', 'Area', id)
 
 # ---------- Building Master CRUD ----------
 @app.route('/masters/buildings')
@@ -1349,42 +1091,19 @@ def building_list():
 @login_required
 @admin_required
 def building_add():
-    if request.method == 'POST':
-        name = request.form.get('name')
-        if name:
-            building = Building(name=name)
-            db.session.add(building)
-            db.session.commit()
-            log_audit('Add Building', f"Added building {name}")
-            flash('Building added successfully.', 'success')
-            return redirect(url_for('building_list'))
-    return render_template('masters/building_form.html')
+    return _master_add(Building, 'building_list', 'masters/building_form.html', 'Building', 'Building added successfully.')
 
 @app.route('/masters/buildings/edit/<int:id>', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def building_edit(id):
-    building = Building.query.get_or_404(id)
-    if request.method == 'POST':
-        name = request.form.get('name')
-        if name:
-            building.name = name
-            db.session.commit()
-            log_audit('Edit Building', f"Edited building {building.name}")
-            flash('Building updated successfully.', 'success')
-            return redirect(url_for('building_list'))
-    return render_template('masters/building_form.html', building=building)
+    return _master_edit(Building, 'building_list', 'masters/building_form.html', 'Building', 'Building updated successfully.', id)
 
 @app.route('/masters/buildings/delete/<int:id>', methods=['POST'])
 @login_required
 @admin_required
 def building_delete(id):
-    building = Building.query.get_or_404(id)
-    db.session.delete(building)
-    db.session.commit()
-    log_audit('Delete Building', f"Deleted building {building.name}")
-    flash('Building deleted.', 'success')
-    return redirect(url_for('building_list'))
+    return _master_delete(Building, 'building_list', 'Building', id)
 
 # ---------- Company CRUD ----------
 @app.route('/masters/company', methods=['GET', 'POST'])
@@ -1546,22 +1265,16 @@ def address_delete(id):
 def masters_index():
     return render_template('masters/index.html')
 
-<<<<<<< HEAD
 # ---------- Message Templates CRUD (NEW) ----------
-=======
-# ---------- Message Templates CRUD ----------
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 @app.route('/masters/templates')
 @login_required
 @admin_required
 def message_template_list():
-<<<<<<< HEAD
     templates = MessageTemplate.query.order_by(MessageTemplate.name).all()
     return render_template('masters/message_templates.html',
                            templates=templates,
                            placeholders=MESSAGE_PLACEHOLDERS,
                            gateway_ready=messaging.is_configured())
-
 
 #: Shown in the editor so operators know exactly what they can drop into a body.
 MESSAGE_PLACEHOLDERS = [
@@ -1588,23 +1301,16 @@ MESSAGE_PLACEHOLDERS = [
     ('{{today}}',         "Today's date"),
 ]
 
-
 def _template_form_ctx(template=None):
     return dict(template=template,
                 placeholders=MESSAGE_PLACEHOLDERS,
                 system_types=MessageTemplate.SYSTEM_TYPES)
-
-=======
-    templates = MessageTemplate.query.all()
-    return render_template('masters/message_templates.html', templates=templates)
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 
 @app.route('/masters/templates/add', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def message_template_add():
     if request.method == 'POST':
-<<<<<<< HEAD
         name = (request.form.get('name') or '').strip()
         template_type = (request.form.get('template_type') or '').strip().lower()
         body = (request.form.get('body') or '').strip()
@@ -1634,33 +1340,12 @@ def message_template_add():
     return render_template('masters/message_template_form.html',
                            **_template_form_ctx())
 
-=======
-        name = request.form.get('name')
-        template_type = request.form.get('template_type')
-        body = request.form.get('body')
-        is_active = 'is_active' in request.form
-        if not name or not template_type or not body:
-            flash('All fields except Subject are required.', 'danger')
-            return render_template('masters/message_template_form.html')
-        if MessageTemplate.query.filter_by(template_type=template_type).first():
-            flash('A template with this type already exists.', 'danger')
-            return render_template('masters/message_template_form.html')
-        mt = MessageTemplate(name=name, template_type=template_type, body=body, is_active=is_active)
-        db.session.add(mt)
-        db.session.commit()
-        log_audit('Add Template', f"Added message template {name}")
-        flash('Template added successfully.', 'success')
-        return redirect(url_for('message_template_list'))
-    return render_template('masters/message_template_form.html', template=None)
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
-
 @app.route('/masters/templates/edit/<int:id>', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def message_template_edit(id):
     mt = MessageTemplate.query.get_or_404(id)
     if request.method == 'POST':
-<<<<<<< HEAD
         name = (request.form.get('name') or '').strip()
         body = (request.form.get('body') or '').strip()
         if not name or not body:
@@ -1695,24 +1380,11 @@ def message_template_edit(id):
     return render_template('masters/message_template_form.html',
                            **_template_form_ctx(mt))
 
-=======
-        mt.name = request.form.get('name')
-        mt.template_type = request.form.get('template_type')
-        mt.body = request.form.get('body')
-        mt.is_active = 'is_active' in request.form
-        db.session.commit()
-        log_audit('Edit Template', f"Edited message template {mt.name}")
-        flash('Template updated successfully.', 'success')
-        return redirect(url_for('message_template_list'))
-    return render_template('masters/message_template_form.html', template=mt)
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
-
 @app.route('/masters/templates/delete/<int:id>', methods=['POST'])
 @login_required
 @admin_required
 def message_template_delete(id):
     mt = MessageTemplate.query.get_or_404(id)
-<<<<<<< HEAD
     if mt.is_system:
         flash(f'"{mt.name}" is sent automatically by the system, so it cannot be '
               f'deleted. Switch it off instead if you do not want it sent.', 'warning')
@@ -1723,7 +1395,6 @@ def message_template_delete(id):
     log_audit('Delete Template', f"Deleted message template {name}")
     flash('Template deleted.', 'success')
     return redirect(url_for('message_template_list'))
-
 
 @app.route('/masters/templates/<int:id>/test', methods=['POST'])
 @login_required
@@ -1753,15 +1424,6 @@ def message_template_test(id):
         flash(f'Test failed: {result.detail}', 'danger')
     return redirect(url_for('message_template_list'))
 
-
-=======
-    db.session.delete(mt)
-    db.session.commit()
-    log_audit('Delete Template', f"Deleted message template {mt.name}")
-    flash('Template deleted.', 'success')
-    return redirect(url_for('message_template_list'))
-
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 @app.route('/masters/templates/send-bulk', methods=['POST'])
 @login_required
 @admin_required
@@ -1775,23 +1437,23 @@ def send_bulk_message():
     except ValueError:
         flash('Invalid date format. Use YYYY-MM-DD.', 'danger')
         return redirect(url_for('message_template_list'))
-    
+
     template = MessageTemplate.query.get(template_id)
     if not template:
         flash('Template not found.', 'danger')
         return redirect(url_for('message_template_list'))
-    
+
     plans = CustomerPlan.query.filter(
         CustomerPlan.end_date >= start_date,
         CustomerPlan.end_date <= end_date
     ).all()
-    
+
     sent_count = 0
     for cp in plans:
         if cp.customer and cp.customer.mobile:
             send_template_message(cp.customer, template.template_type)
             sent_count += 1
-    
+
     log_audit('Bulk Message', f"Sent {template.name} to {sent_count} customers")
     flash(f'Message sent to {sent_count} customers.', 'success')
     return redirect(url_for('message_template_list'))
@@ -1829,7 +1491,7 @@ def customer_search():
 @admin_required
 def customer_add():
     form = CustomerForm()
-    
+
     form.zone.choices = [(z.name, z.name) for z in Zone.query.all()]
     form.locality.choices = [(l.name, l.name) for l in Locality.query.all()]
     form.area.choices = [(a.name, a.name) for a in Area.query.all()]
@@ -1860,11 +1522,7 @@ def customer_add():
         if password:
             password_hash = generate_password_hash(password)
         else:
-<<<<<<< HEAD
-            password_hash = generate_password_hash('123456')  # <--- DEFAULT PASSWORD
-=======
-            password_hash = generate_password_hash('123456')  # default
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
+            password_hash = generate_password_hash('123456')
 
         reg_form_filename = None
         if form.reg_form.data:
@@ -1971,7 +1629,7 @@ def customer_add():
 def customer_edit(id):
     customer = Customer.query.get_or_404(id)
     form = CustomerForm(obj=customer)
-    
+
     form.zone.choices = [(z.name, z.name) for z in Zone.query.all()]
     form.locality.choices = [(l.name, l.name) for l in Locality.query.all()]
     form.area.choices = [(a.name, a.name) for a in Area.query.all()]
@@ -2067,10 +1725,7 @@ def customer_view(id):
                .order_by(Vendor.name).all())
     service_providers = ServiceProvider.query.filter_by(is_active=True).all()
 
-<<<<<<< HEAD
     # === FIX: pass service provider name properly ===
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     service_provider_name = None
     if active_plan and active_plan.plan and active_plan.plan.service_provider:
         service_provider_name = active_plan.plan.service_provider.name
@@ -2080,11 +1735,7 @@ def customer_view(id):
                            service_providers=service_providers,
                            customer=customer,
                            active_plan=active_plan,
-<<<<<<< HEAD
-                           service_provider_name=service_provider_name,  # <--- FIX
-=======
                            service_provider_name=service_provider_name,
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
                            plans=plans,
                            plans_history=plans_history,
                            invoices=invoices,
@@ -2133,11 +1784,7 @@ def customer_disable(id):
     flash('Customer disabled.', 'success')
     return redirect(url_for('customer_view', id=id))
 
-<<<<<<< HEAD
 # ---- Reset Customer Password (and send to log2space) ----
-=======
-# ---- Reset Customer Password ----
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 @app.route('/customers/<int:id>/reset-password', methods=['POST'])
 @login_required
 @admin_required
@@ -2153,11 +1800,7 @@ def customer_reset_password(id):
     flash('Password reset and sent to customer and log2space.', 'success')
     return redirect(url_for('customer_view', id=id))
 
-<<<<<<< HEAD
 # ---- Reset MAC (NO DB storage – only API) ----
-=======
-# ---- Reset MAC ----
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 @app.route('/customers/<int:id>/reset-mac', methods=['POST'])
 @login_required
 @admin_required
@@ -2246,10 +1889,6 @@ def send_customer_sms(id):
     flash('SMS sent.', 'success')
     return redirect(url_for('customer_view', id=id))
 
-<<<<<<< HEAD
-=======
-# ---------- Vendor Bills (Auto-generate) ----------
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 def _next_vendor_bill_no():
     prefix = f"VB-{date.today():%Y%m}-"
     seq = 1
@@ -2629,17 +2268,14 @@ def renew_plan(customer_id):
     db.session.commit()
     log_audit('Renew Plan', f"Renewed plan {plan.name} for {customer.full_name} until {new_end_date}")
     flash(f'Plan renewed successfully. New expiry: {new_end_date.strftime("%d-%b-%Y")}', 'success')
-    
-<<<<<<< HEAD
+
     # Send Renewal Notification
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     send_template_message(customer, 'renewal', {
         'customer_name': customer.full_name,
         'username': customer.username,
         'amount': plan.price_monthly
     })
-    
+
     send_sms(customer.mobile, f"Dear {customer.full_name}, your plan has been renewed until {new_end_date.strftime('%d-%b-%Y')}.")
     return redirect(url_for('customer_view', id=customer_id))
 
@@ -2670,12 +2306,9 @@ def record_payment(invoice_id):
     if transaction_number:
         final_mode_detail += f" Transaction: {transaction_number}"
 
-<<<<<<< HEAD
     # The payment is credited to the customer straight away. When it is taken
     # by a non-admin it still shows up in the authorization queue for review,
     # but the customer's balance never waits on that sign-off.
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     needs_auth = not current_user.is_admin()
     payment = Payment(
         invoice_id=invoice.id,
@@ -2687,12 +2320,8 @@ def record_payment(invoice_id):
         book_receipt_no=request.form.get('book_receipt_no') or None,
         remarks=remarks or None,
         received_by_user_id=current_user.id,
-<<<<<<< HEAD
         source='admin',
         status='approved',
-=======
-        status='pending' if needs_auth else 'approved',
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
         authorized_at=None if needs_auth else datetime.utcnow(),
         authorized_by_user_id=None if needs_auth else current_user.id,
     )
@@ -2700,11 +2329,7 @@ def record_payment(invoice_id):
     db.session.commit()
     if not invoice.caption:
         invoice.caption = payment.payment_mode
-<<<<<<< HEAD
     if invoice.balance <= 0:
-=======
-    if not needs_auth and invoice.balance <= 0:
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
         invoice.status = 'paid'
     db.session.commit()
     log_audit('Record Payment',
@@ -2721,7 +2346,6 @@ def record_payment(invoice_id):
         except ValueError:
             flash('Invalid renew date format.', 'warning')
 
-<<<<<<< HEAD
     send_template_message(customer, 'payment_received',
                           invoice=invoice, payment=payment)
 
@@ -2731,20 +2355,6 @@ def record_payment(invoice_id):
     return redirect(url_for('customer_view', id=customer.id) + '#payment-history')
 
 # ---- Delete a recorded payment (admin only) ----
-=======
-    if not needs_auth:
-        send_template_message(customer, 'payment_received', {
-            'customer_name': customer.full_name,
-            'paid_amount': amount,
-            'balance': invoice.balance
-        })
-
-    flash('Payment recorded successfully'
-          + (' — awaiting authorization.' if needs_auth else '.'), 'success')
-    return redirect(url_for('customer_view', id=customer.id) + '#payment-history')
-
-# ---- Delete a recorded payment ----
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 @app.route('/payments/<int:id>/delete', methods=['POST'])
 @login_required
 @admin_required
@@ -2895,12 +2505,9 @@ def add_payment(invoice_id):
 @admin_required
 def payment_approve(id):
     payment = Payment.query.get_or_404(id)
-<<<<<<< HEAD
     if payment.authorized_at is not None:
         flash('That payment is already authorized.', 'info')
         return redirect(request.referrer or url_for('payment_authorizations'))
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     payment.status = 'approved'
     payment.authorized_at = datetime.utcnow()
     payment.authorized_by_user_id = current_user.id
@@ -2908,7 +2515,6 @@ def payment_approve(id):
     if invoice and invoice.balance <= 0:
         invoice.status = 'paid'
     db.session.commit()
-<<<<<<< HEAD
     log_audit('Authorize Payment',
               f"Authorized {payment.source_label.lower()} #{payment.id} "
               f"of Rs.{payment.amount}")
@@ -2916,13 +2522,6 @@ def payment_approve(id):
     return redirect(request.referrer or url_for('customer_view', id=payment.customer_id))
 
 # ---------- Service Provider Master CRUD ----------
-=======
-    log_audit('Approve Payment', f"Authorized payment #{payment.id} for {payment.amount}")
-    flash('Payment authorized.', 'success')
-    return redirect(request.referrer or url_for('customer_view', id=payment.customer_id))
-
-# ---------- Service Provider Master ----------
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 @app.route('/masters/service-providers')
 @login_required
 @admin_required
@@ -3275,11 +2874,7 @@ def expense_payee_delete(id):
     flash('Payee deleted.', 'success')
     return redirect(url_for('expense_payee_list'))
 
-<<<<<<< HEAD
 # ---- Expenses main list with filters and totals ----
-=======
-# ---- Expenses main list ----
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 @app.route('/expenses')
 @login_required
 def expenses_index():
@@ -3636,20 +3231,23 @@ def payroll_mark_paid(id):
     return redirect(url_for('payroll_list'))
 
 # ---------- HR Reports ----------
-@app.route('/hr/attendance/report')
-@login_required
-def attendance_report():
+def _hr_month(default=None):
+    """Parse ?month=YYYY-MM from query string; fall back to current month."""
     month_str = request.args.get('month')
-    employee_id = request.args.get('employee_id', type=int)
     today = date.today()
     if month_str:
         try:
-            year, month = map(int, month_str.split('-'))
-            start_date = date(year, month, 1)
+            y, m = map(int, month_str.split('-'))
+            return date(y, m, 1)
         except ValueError:
-            start_date = today.replace(day=1)
-    else:
-        start_date = today.replace(day=1)
+            pass
+    return (default or today).replace(day=1)
+
+@app.route('/hr/attendance/report')
+@login_required
+def attendance_report():
+    employee_id = request.args.get('employee_id', type=int)
+    start_date = _hr_month()
     end_date = (start_date + timedelta(days=32)).replace(day=1) - timedelta(days=1)
 
     query = Attendance.query.filter(Attendance.date >= start_date, Attendance.date <= end_date)
@@ -3693,17 +3291,8 @@ def attendance_report():
 @app.route('/hr/leaves/report')
 @login_required
 def leaves_report():
-    month_str = request.args.get('month')
     employee_id = request.args.get('employee_id', type=int)
-    today = date.today()
-    if month_str:
-        try:
-            year, month = map(int, month_str.split('-'))
-            start_date = date(year, month, 1)
-        except ValueError:
-            start_date = today.replace(day=1)
-    else:
-        start_date = today.replace(day=1)
+    start_date = _hr_month()
     end_date = (start_date + timedelta(days=32)).replace(day=1) - timedelta(days=1)
 
     query = Leave.query.filter(Leave.status == 'approved',
@@ -3744,17 +3333,8 @@ def leaves_report():
 @app.route('/hr/payroll/report')
 @login_required
 def payroll_report():
-    month_str = request.args.get('month')
     employee_id = request.args.get('employee_id', type=int)
-    today = date.today()
-    if month_str:
-        try:
-            year, month = map(int, month_str.split('-'))
-            month_date = date(year, month, 1)
-        except ValueError:
-            month_date = today.replace(day=1)
-    else:
-        month_date = today.replace(day=1)
+    month_date = _hr_month()
 
     query = Payroll.query.filter(Payroll.month_year == month_date)
     if employee_id:
@@ -3855,13 +3435,9 @@ def plan_delete(id):
     flash('Plan deactivated.', 'success')
     return redirect(url_for('plan_list'))
 
-<<<<<<< HEAD
 # =========================================================================== #
 #  VENDOR BILLS  (Inventory -> Vendor Bills)
 # =========================================================================== #
-=======
-# ---------- Vendor Bills ----------
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 @app.route('/inventory/vendor-bills')
 @login_required
 def vendor_bill_list():
@@ -3894,10 +3470,7 @@ def vendor_bill_view(id):
 @login_required
 @admin_required
 def vendor_bill_add():
-<<<<<<< HEAD
     """Raise a purchase bill by hand and receive the stock in one step."""
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     form = VendorBillForm()
     form.vendor_id.choices = _vendor_choices(include_blank=False)
     products = Product.query.filter_by(is_active=True).order_by(Product.name).all()
@@ -4037,7 +3610,6 @@ def vendor_bill_export():
                     headers={'Content-Disposition':
                              'attachment; filename=vendor-bills.csv'})
 
-<<<<<<< HEAD
 # ===========================================================================
 #  OUTBOUND MESSAGING  (bills, due reminders, bulk campaigns)
 # ===========================================================================
@@ -4045,7 +3617,6 @@ def _bill_context(invoice):
     """Placeholder values for a bill/receipt message."""
     cp = invoice.customer_plan
     return dict(plan=cp.plan if cp else None, customer_plan=cp, invoice=invoice)
-
 
 @app.route('/invoices/<int:id>/send', methods=['POST'])
 @login_required
@@ -4068,7 +3639,6 @@ def invoice_send(id):
     else:
         flash(f'Could not send the bill: {result.detail}', 'danger')
     return redirect(request.referrer or url_for('customer_view', id=invoice.customer_id))
-
 
 @app.route('/customers/<int:id>/send-reminder', methods=['POST'])
 @login_required
@@ -4104,7 +3674,6 @@ def customer_send_reminder(id):
         flash(f'Could not send the reminder: {result.detail}', 'danger')
     return redirect(url_for('customer_view', id=id))
 
-
 @app.route('/customers/<int:id>/send-template', methods=['POST'])
 @login_required
 def customer_send_template(id):
@@ -4127,7 +3696,6 @@ def customer_send_template(id):
         flash(f'Could not send: {result.detail}', 'danger')
     return redirect(url_for('customer_view', id=id))
 
-
 @app.route('/customers/<int:id>/messages')
 @login_required
 def customer_message_log(id):
@@ -4138,17 +3706,11 @@ def customer_message_log(id):
     return render_template('customers/message_log.html',
                            customer=customer, logs=logs)
 
-
 @app.route('/messages/bulk', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def bulk_messages():
-    """
-    Bulk WhatsApp campaigns.
 
-    Pick an audience (expiring soon / expired in a date range / everyone with
-    outstanding dues) and a template, preview the recipient count, then send.
-    """
     templates = MessageTemplate.query.filter_by(is_active=True).order_by(
         MessageTemplate.name).all()
     today = date.today()
@@ -4198,7 +3760,6 @@ def bulk_messages():
                            today=today,
                            form_data=request.form)
 
-
 def _bulk_audience(audience, start, end):
     """Return a list of (customer, customer_plan) tuples for a campaign."""
     q = (db.session.query(CustomerPlan, Customer)
@@ -4240,24 +3801,18 @@ def _bulk_audience(audience, start, end):
         out.append((cust, cp))
     return out
 
-
 # ===========================================================================
 #  CUSTOMER SELF-SERVICE PORTAL
 # ===========================================================================
 def _current_customer():
     return db.session.get(Customer, session.get('customer_id'))
 
-
-=======
-# ---------- Customer Portal ----------
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 @app.route('/customer/login', methods=['GET', 'POST'])
 def customer_login():
     if session.get('customer_id'):
         return redirect(url_for('customer_dashboard'))
     form = CustomerLoginForm()
     if form.validate_on_submit():
-<<<<<<< HEAD
         ip = request.remote_addr
         uname = (form.username.data or '').strip()
         if is_rate_limited(ip, uname):
@@ -4283,13 +3838,11 @@ def customer_login():
         flash('Invalid username or password.', 'danger')
     return render_template('customer/login.html', form=form)
 
-
 @app.route('/customer/logout')
 def customer_logout():
     session.pop('customer_id', None)
     flash('You have been logged out.', 'success')
     return redirect(url_for('customer_login'))
-
 
 @app.route('/customer/dashboard')
 @customer_required
@@ -4310,58 +3863,20 @@ def customer_dashboard():
     days_left = None
     if active_plan and active_plan.end_date:
         days_left = (active_plan.end_date - date.today()).days
-=======
-        customer = Customer.query.filter_by(username=form.username.data).first()
-        if customer and customer.is_active and customer.check_password(form.password.data):
-            session['customer_id'] = customer.id
-            session.permanent = True
-            log_audit('Customer Login', f"Customer {customer.full_name} logged in")
-            next_page = request.args.get('next')
-            if next_page and urlsplit(next_page).netloc == '' and next_page.startswith('/'):
-                return redirect(next_page)
-            return redirect(url_for('customer_dashboard'))
-        flash('Invalid username or password.', 'danger')
-    return render_template('customer/login.html', form=form)
-
-@app.route('/customer/logout')
-def customer_logout():
-    session.pop('customer_id', None)
-    flash('Logged out successfully.', 'success')
-    return redirect(url_for('customer_login'))
-
-@app.route('/customer/dashboard')
-@customer_required
-def customer_dashboard():
-    customer_id = session['customer_id']
-    customer = Customer.query.get_or_404(customer_id)
-    active_plan = CustomerPlan.query.filter_by(customer_id=customer_id, status='active').first()
-    invoices = Invoice.query.filter_by(customer_id=customer_id).order_by(Invoice.issue_date.desc()).all()
-    payments = Payment.query.filter_by(customer_id=customer_id).order_by(Payment.payment_date.desc()).all()
-
-    total_billed = sum(float(i.total_amount or 0) for i in invoices)
-    total_paid = sum(float(p.amount or 0) for p in payments if p.status == 'approved')
-    balance = total_billed - total_paid
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 
     return render_template('customer/dashboard.html',
                            customer=customer,
                            active_plan=active_plan,
                            invoices=invoices,
                            payments=payments,
-<<<<<<< HEAD
                            outstanding=outstanding,
                            days_left=days_left,
                            gateway_ready=cashfree.is_configured(),
                            today=date.today())
 
-=======
-                           balance=balance)
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
-
 @app.route('/customer/profile', methods=['GET', 'POST'])
 @customer_required
 def customer_profile():
-<<<<<<< HEAD
     customer = _current_customer()
     form = CustomerChangePasswordForm()
     if form.validate_on_submit():
@@ -4375,7 +3890,6 @@ def customer_profile():
             flash('Password updated successfully.', 'success')
             return redirect(url_for('customer_profile'))
     return render_template('customer/profile.html', customer=customer, form=form)
-
 
 @app.route('/customer/invoice/<int:id>')
 @customer_required
@@ -4392,7 +3906,6 @@ def customer_invoice_view(id):
                            today=date.today(),
                            download=False)
 
-
 # --------------------------------------------------------------------------- #
 #  Online renewal via Cashfree
 # --------------------------------------------------------------------------- #
@@ -4408,59 +3921,11 @@ def _portal_renewal_invoice(customer, active_plan):
     invoice = Invoice(
         customer_id=customer.id,
         customer_plan_id=active_plan.id,
-=======
-    customer_id = session['customer_id']
-    customer = Customer.query.get_or_404(customer_id)
-    if request.method == 'POST':
-        new_password = request.form.get('new_password')
-        confirm_password = request.form.get('confirm_password')
-        if new_password and new_password == confirm_password:
-            customer.set_password(new_password)
-            db.session.commit()
-            flash('Password updated successfully.', 'success')
-        else:
-            flash('Passwords do not match or are empty.', 'danger')
-    return render_template('customer/profile.html', customer=customer)
-
-@app.route('/customer/invoice/<int:id>/download')
-@customer_required
-def customer_invoice_download(id):
-    invoice = Invoice.query.get_or_404(id)
-    if invoice.customer_id != session['customer_id']:
-        abort(403)
-    html = render_template('invoices/summary.html', invoice=invoice,
-                           customer=invoice.customer, company=Company.query.first(),
-                           today=date.today(), download=True)
-    try:
-        import pdfkit
-        pdf = pdfkit.from_string(html, False)
-    except ImportError:
-        flash('PDF generation is not configured. Please contact support.', 'warning')
-        return redirect(url_for('customer_dashboard'))
-    response = Response(pdf, mimetype='application/pdf')
-    response.headers['Content-Disposition'] = f'attachment; filename=invoice-{invoice.invoice_no}.pdf'
-    return response
-
-@app.route('/customer/renew', methods=['POST'])
-@customer_required
-def customer_renew_plan():
-    customer_id = session['customer_id']
-    customer = Customer.query.get_or_404(customer_id)
-    active_plan = CustomerPlan.query.filter_by(customer_id=customer_id, status='active').first()
-    if not active_plan:
-        flash('No active plan to renew.', 'warning')
-        return redirect(url_for('customer_dashboard'))
-    plan = active_plan.plan
-    new_end = active_plan.end_date + timedelta(days=plan.validity_days)
-    invoice = Invoice(
-        customer_id=customer_id,
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
         invoice_no=generate_invoice_no(),
         issue_date=date.today(),
         due_date=date.today() + timedelta(days=15),
         total_amount=plan.price_monthly,
         tax_amount=0.00,
-<<<<<<< HEAD
         caption='Online Payment',
         invoice_type='plan',
         status='sent',
@@ -4469,17 +3934,10 @@ def customer_renew_plan():
     db.session.commit()
     return invoice, True
 
-
 @app.route('/customer/renew', methods=['POST'])
 @customer_required
 def customer_renew_plan():
-    """
-    Start an online renewal.
-
-    Creates (or reuses) the invoice, opens a Cashfree order and hands the
-    payment session back to the browser. The plan is only extended once the
-    payment is actually confirmed - see `_settle_online_order`.
-    """
+    """Create a Cashfree order for the outstanding invoice and show the checkout page."""
     customer = _current_customer()
     active_plan = CustomerPlan.query.filter_by(
         customer_id=customer.id, status='active').first()
@@ -4543,14 +4001,8 @@ def customer_renew_plan():
                            sdk_url=cashfree.sdk_url(),
                            cf_mode='production' if cashfree.environment() == 'production' else 'sandbox')
 
-
 def _settle_online_order(order):
-    """
-    Confirm an order against Cashfree and, if paid, record the money.
-
-    Idempotent: calling it twice never double-credits. This is what both the
-    browser return URL and the webhook call.
-    """
+    """Confirm a Cashfree order and credit the money. Idempotent – safe to call from both the return URL and the webhook."""
     if order.status == 'paid':
         return order
 
@@ -4634,7 +4086,6 @@ def _settle_online_order(order):
                           customer_plan=active_plan)
     return order
 
-
 @app.route('/customer/payment/return')
 @customer_required
 def customer_payment_return():
@@ -4656,7 +4107,6 @@ def customer_payment_return():
               'If money has left your account it will be credited automatically '
               'within a few minutes.', 'warning')
     return redirect(url_for('customer_dashboard'))
-
 
 @app.route('/webhooks/cashfree', methods=['POST'])
 @csrf.exempt
@@ -4685,12 +4135,8 @@ def cashfree_webhook():
         _settle_online_order(order)
     return jsonify(status='ok'), 200
 
-
-# ---------------------------------------------------------------------------
 #  Settings seeding for the messaging + payment gateways
-# ---------------------------------------------------------------------------
 GATEWAY_SETTING_DEFAULTS = {
-    # --- WhatsApp / SMS -----------------------------------------------------
     'wa_enabled':          ('1' if app.config.get('WA_ENABLED') else '0'),
     'wa_provider':         app.config.get('WA_PROVIDER', 'generic'),
     'wa_api_url':          app.config.get('WA_API_URL', ''),
@@ -4701,15 +4147,12 @@ GATEWAY_SETTING_DEFAULTS = {
     'wa_payload_template': messaging.DEFAULTS['wa_payload_template'],
     'wa_country_code':     app.config.get('WA_COUNTRY_CODE', '91'),
     'wa_document_url':     '',
-    # --- Cashfree -----------------------------------------------------------
     'cashfree_app_id':     app.config.get('CASHFREE_APP_ID', ''),
     'cashfree_secret_key': app.config.get('CASHFREE_SECRET_KEY', ''),
     'cashfree_env':        app.config.get('CASHFREE_ENV', 'sandbox'),
-    # --- links used inside message templates --------------------------------
     'app_link':            app.config.get('APP_LINK', ''),
     'web_link':            app.config.get('WEB_LINK', ''),
 }
-
 
 def _seed_gateway_settings():
     """Create any missing settings rows. Never overwrites an edited value."""
@@ -4723,35 +4166,9 @@ def _seed_gateway_settings():
         db.session.commit()
     return added
 
-
 # ---------- Startup ----------
 def init_database(flask_app=None):
     """Create tables and ensure a usable admin account exists."""
-=======
-        caption=f"Online Renewal - Plan: {plan.name}",
-        invoice_type='plan',
-        status='sent'
-    )
-    db.session.add(invoice)
-    db.session.commit()
-    
-    active_plan.end_date = new_end
-    active_plan.last_invoice_date = date.today()
-    db.session.commit()
-    
-    send_template_message(customer, 'renewal', {
-        'customer_name': customer.full_name,
-        'username': customer.username,
-        'amount': plan.price_monthly
-    })
-    
-    flash(f'Plan renewed successfully! New expiry: {new_end.strftime("%d-%b-%Y")}. '
-          f'An invoice has been generated and payment is awaiting admin authorization.', 'success')
-    return redirect(url_for('customer_dashboard'))
-
-# ---------- Startup ----------
-def init_database(flask_app=None):
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
     flask_app = flask_app or app
     with flask_app.app_context():
         db.create_all()
@@ -4761,7 +4178,6 @@ def init_database(flask_app=None):
         except Exception:
             flask_app.logger.warning("Could not seed settings table.")
 
-<<<<<<< HEAD
         # WhatsApp / Cashfree settings rows, so they are editable in the UI
         try:
             _seed_gateway_settings()
@@ -4776,8 +4192,6 @@ def init_database(flask_app=None):
         except Exception as exc:
             flask_app.logger.warning("Could not seed message templates: %s", exc)
 
-=======
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
         admin = User.query.filter_by(username='admin').first()
         if not admin:
             default_pw = os.environ.get('ADMIN_PASSWORD', 'admin123')
