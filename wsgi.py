@@ -1,17 +1,18 @@
 """
-WSGI entry point for production servers.
+WSGI entry point — used by gunicorn and Render.
 
     gunicorn -c gunicorn.conf.py wsgi:application
-
-The scheduler is started here (not in app.py's __main__ block) so it runs
-under gunicorn too, and only in the first worker to avoid duplicate jobs.
 """
 import os
 
 from app import app as application, init_database
 
-# Create tables and seed the admin account on first boot.
+# Create all tables and seed the default admin account on first boot.
+# This is safe to call on every startup: create_all() is a no-op when
+# the schema already matches.
 init_database(application)
 
 if __name__ == '__main__':
-    application.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_ENV', 'production') != 'production'
+    application.run(host='0.0.0.0', port=port, debug=debug)
