@@ -20,13 +20,9 @@ email-validator==2.1.1  # WTForms Email() validator
 # ---- Scheduled jobs (auto-invoice, grace reminders, auto-suspend) ----
 APScheduler==3.10.4
 
-<<<<<<< HEAD
-# ---- Payment gateway (Cashfree) + WhatsApp gateway: plain HTTP calls ----
+# ---- HTTP / Payment ----
 requests==2.32.3
-=======
-# ---- Payment gateway ----
 razorpay==1.4.2
->>>>>>> dc70a1ede676b9cb650b3df45c549cd06fe7535e
 
 # ---- Production WSGI server ----
 gunicorn==22.0.0
