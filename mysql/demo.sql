@@ -1,2 +1,1 @@
-ALTER TABLE payments
-ADD COLUMN source VARCHAR(50) NULL;
+ALTER TABLE payments ADD COLUMN source VARCHAR(20) DEFAULT 'admin';
