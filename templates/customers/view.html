@@ -34,42 +34,13 @@
   .info-card p { font-size:19px; font-weight:700; color:#1e293b; margin:0; }
   .info-card span { font-size:11.5px; color:#94a3b8; }
 
-  /* Addon Invoice form (white panel) */
-  .addon-panel { background:#fff; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:22px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.05); }
-  .addon-panel-head { background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:12px 16px; display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
-  .addon-panel-head span { font-size:13.5px; font-weight:700; color:#0f172a; letter-spacing:.2px; }
-  .addon-panel-head span i { color:#1a76b8; margin-right:6px; }
-  .addon-panel-head small { color:#64748b; font-size:11.5px; }
-  .addon-form { padding:16px; }
-
-  .addon-grid { display:flex; flex-wrap:wrap; gap:12px; }
-  .addon-grid .fld, .addon-foot .fld { flex:1 1 150px; min-width:0; }
-  .addon-grid .fld-wide { flex:2 1 230px; }
-  .addon-grid .fld-md, .addon-foot .fld-md { flex:0 1 160px; }
-  .addon-grid .fld-sm { flex:0 1 120px; }
-  .addon-form label { display:block; font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
-  .addon-form input, .addon-form select { width:100%; border:1px solid #cbd5e1; border-radius:6px; padding:7px 10px; font-size:13px; color:#0f172a; background:#fff; }
-  .addon-form input:focus, .addon-form select:focus { outline:none; border-color:#1a76b8; box-shadow:0 0 0 3px rgba(26,118,184,.12); }
-  .addon-form input[readonly] { background:#f1f5f9; color:#64748b; }
-
-  .vendor-block { margin-top:16px; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; }
-  .vendor-toggle { width:100%; text-align:left; background:#f8fafc; border:none; padding:10px 14px; font-size:12.5px; font-weight:600; color:#334155; display:flex; align-items:center; gap:8px; cursor:pointer; }
-  .vendor-toggle:hover { background:#f1f5f9; }
-  .vendor-toggle small { color:#94a3b8; font-weight:400; font-size:11.5px; margin-left:4px; }
-  .vendor-toggle .chev { transition:transform .18s ease; font-size:10px; color:#94a3b8; }
-  .vendor-toggle[aria-expanded="true"] .chev { transform:rotate(90deg); }
-  .vendor-body { padding:14px; border-top:1px solid #e2e8f0; background:#fff; }
-
-  .vendor-pick { display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
-  .vendor-pick select { min-width:220px; }
-  .addon-items input, .addon-items select { width:100%; border:1px solid #cbd5e1; border-radius:5px; padding:5px 7px; font-size:12.5px; }
-  .addon-items th { background:#f8fafc; }
-
-  .addon-foot { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-top:16px; padding-top:14px; border-top:1px solid #e2e8f0; }
-  .addon-total { margin-left:auto; text-align:right; padding:0 4px; }
-  .addon-total .at-label { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:#64748b; font-weight:700; }
-  .addon-total .at-value { font-size:19px; font-weight:700; color:#0f172a; }
-  .addon-submit { min-width:130px; padding:8px 18px; font-weight:600; }
+  /* Addon Invoice Modal styling */
+  .addon-modal-header { border-bottom: none; padding-bottom: 0; }
+  .addon-modal-title { width: 100%; text-align: center; font-weight: 700; font-size: 1.5rem; color: #1e293b; }
+  .addon-modal-body { padding: 20px 30px; }
+  .addon-modal-body label { font-weight: 600; font-size: 14px; color: #243447; margin-bottom: 4px; }
+  .addon-modal-body .form-control, .addon-modal-body .form-select { border-radius: 6px; border: 1px solid #cbd5e1; padding: 8px 12px; }
+  .addon-modal-body .form-control:focus, .addon-modal-body .form-select:focus { border-color: #1a76b8; box-shadow: 0 0 0 3px rgba(26,118,184,.12); }
 
   .mode-badge { background:#e8f2fa; color:#1a76b8; border-radius:4px; padding:2px 8px; font-size:11px; font-weight:600; display:inline-block; }
   .btn-mini { font-size:11px; padding:4px 9px; }
@@ -77,11 +48,7 @@
   .link-blue:hover { text-decoration:underline; }
 
   @media (max-width: 767.98px) {
-    .addon-form { padding:12px; }
-    .addon-grid .fld, .addon-grid .fld-wide, .addon-grid .fld-md, .addon-grid .fld-sm { flex:1 1 100%; }
-    .addon-foot .fld { flex:1 1 100%; }
-    .addon-total { margin-left:0; text-align:left; width:100%; }
-    .addon-submit { width:100%; }
+    .addon-modal-body { padding: 15px; }
   }
 </style>
 
@@ -128,8 +95,8 @@
           <button class="btn btn-primary btn-sm px-3 dropdown-toggle" data-bs-toggle="dropdown">Options</button>
           <ul class="dropdown-menu dropdown-menu-end">
             <li><a class="dropdown-item" href="{{ url_for('customer_edit', id=customer.id) }}"><i class="fas fa-edit me-2"></i>Edit</a></li>
-            <!-- FIXED: Opens the Pending Invoice tab where the form actually lives -->
-            <li><a class="dropdown-item" href="#pending-invoice" onclick="document.querySelector('[data-bs-target=\'#pending-invoice\']').click();"><i class="fas fa-file-invoice me-2"></i>Addon Invoice</a></li>
+            <!-- UPDATED: Opens the new Addon Invoice Modal -->
+            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#addonInvoiceModal"><i class="fas fa-file-invoice me-2"></i>Addon Invoice</a></li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#addDiscountModal"><i class="fas fa-percent me-2"></i>Add Discount</a></li>
             <li><a class="dropdown-item" href="#" onclick="document.getElementById('removeDiscountForm').submit();return false;"><i class="fas fa-times-circle me-2"></i>Cancel Discount</a></li>
@@ -238,67 +205,7 @@
 
         <!-- ===== PENDING INVOICE ===== -->
         <div class="tab-pane fade" id="pending-invoice">
-          <!-- Addon Invoice Form -->
-          <div class="addon-panel">
-            <div class="addon-panel-head">
-              <span><i class="fas fa-file-invoice-dollar"></i> Addon Invoice</span>
-              <small>Bill anything that is not the monthly plan.</small>
-            </div>
-            <form method="POST" action="{{ url_for('add_customer_invoice', id=customer.id) }}" class="addon-form">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              
-              <div class="addon-grid">
-                <div class="fld fld-md">
-                  <label>Preset Caption</label>
-                  <select name="preset_caption" id="presetCaption">
-                    <option value="">-- Select Preset --</option>
-                    <option value="Installation Charges">Installation Charges</option>
-                    <option value="Shifting Charges">Shifting Charges</option>
-                    <option value="Extra Device">Extra Device</option>
-                    <option value="Router">Router</option>
-                    <option value="Repair / Service Visit">Repair / Service Visit</option>
-                    <option value="Cable / Wiring">Cable / Wiring</option>
-                  </select>
-                </div>
-                <div class="fld"><label>Reference</label><input type="text" value="{{ customer.reference_id or customer.mobile }}" readonly></div>
-                <div class="fld fld-wide"><label>Caption <span class="req">*</span></label><input type="text" name="caption" id="addonCaption" placeholder="e.g. Installation Charges" required></div>
-                <div class="fld fld-wide"><label>Detailed Invoice</label><input type="text" name="detailed_invoice" placeholder="Longer description for the printed bill"></div>
-                <div class="fld fld-sm"><label>Amount</label><input type="number" step="0.01" min="0" name="invoice_amount" id="addonAmount" value="0"></div>
-                <div class="fld fld-sm"><label>Discount</label><input type="number" step="0.01" min="0" name="discount_amount" id="addonDiscount" value="0"></div>
-                <div class="fld fld-md"><label>Invoice Date</label><input type="date" name="invoice_date" value="{{ today.isoformat() }}"></div>
-                <div class="fld fld-md"><label>Mode</label><select name="payment_mode">{% for value, label in payment_modes %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
-              </div>
-
-              <!-- Vendor Products (Optional, Collapsed) -->
-              <div class="vendor-block">
-                <button type="button" class="vendor-toggle" id="vendorToggle" aria-expanded="false" aria-controls="vendorBody">
-                  <i class="fas fa-chevron-right chev"></i><i class="fas fa-boxes-stacked"></i> Bill from Vendor
-                  <small>Add devices from stock (optional)</small>
-                </button>
-                <div class="vendor-body" id="vendorBody" hidden>
-                  <div class="vendor-pick">
-                    <label>Vendor</label>
-                    <select name="vendor_id" id="addonVendor"><option value="">-- No vendor --</option>{% for v in vendors %}<option value="{{ v.id }}">{{ v.name }}</option>{% endfor %}</select>
-                    <button type="button" class="btn btn-outline-primary btn-mini" id="addItemRow"><i class="fas fa-plus"></i> Add Product</button>
-                  </div>
-                  <div class="tbl-wrap">
-                    <table class="tbl addon-items" id="itemsTable">
-                      <thead><tr><th style="width:34%">Product</th><th style="width:20%">Serial No.</th><th style="width:11%">Qty</th><th style="width:15%">Rate</th><th style="width:15%" class="text-end">Line Total</th><th style="width:46px"></th></tr></thead>
-                      <tbody id="itemsBody"><tr class="no-items"><td colspan="6" class="empty">No products added.</td></tr></tbody>
-                      <tfoot><tr><th colspan="4" class="text-end">Products Total</th><th class="text-end" id="itemsTotal">&#8377; 0.00</th><th></th></tr></tfoot>
-                    </table>
-                  </div>
-                </div>
-              </div>
-
-              <div class="addon-foot">
-                <div class="fld fld-md"><label>Book Receipt No.</label><input type="text" name="book_receipt_no" placeholder="Book Receipt No."></div>
-                <div class="fld fld-wide"><label>Remark</label><input type="text" name="remark" placeholder="Remark"></div>
-                <div class="addon-total"><span class="at-label">Invoice Total</span><span class="at-value" id="invoiceTotal">&#8377; 0.00</span></div>
-                <button type="submit" class="btn btn-primary addon-submit"><i class="fas fa-check"></i> Submit</button>
-              </div>
-            </form>
-          </div>
+          <!-- REMOVED: The inline Addon Invoice form is now a Modal -->
 
           <!-- Pending Invoices List -->
           <div class="tbl-wrap">
@@ -337,7 +244,6 @@
           <div class="tbl-wrap">
             <table class="tbl">
               <thead>
-                <!-- MODIFIED: Replaced "Send" header with "Delete" -->
                 <tr><th>#</th><th>Invoice No</th><th>Caption</th><th>Invoice Date</th><th>Due Date</th><th>Amount</th><th>Discount</th><th>Paid</th><th>Pending</th><th>Status</th><th>Summary Invoice</th><th>Detailed Invoice</th><th>Delete</th></tr>
               </thead>
               <tbody>
@@ -354,7 +260,6 @@
                   <td>&#8377; {{ '%.2f'|format(inv.balance) }}</td>
                   <td>{% if inv.status == 'paid' %}<span class="badge bg-success">Paid</span>{% elif inv.status == 'overdue' %}<span class="badge bg-danger">Overdue</span>{% else %}<span class="badge bg-warning text-dark">{{ inv.status|capitalize }}</span>{% endif %}</td>
                   
-                  <!-- MODIFIED: Summary Column now has Print + Summary WhatsApp button -->
                   <td class="text-nowrap">
                     <a class="btn btn-outline-primary btn-mini" target="_blank" href="{{ url_for('invoice_summary', id=inv.id) }}"><i class="fas fa-print"></i> Print</a>
                     {% if customer.mobile %}
@@ -366,7 +271,6 @@
                     {% endif %}
                   </td>
 
-                  <!-- MODIFIED: Detailed Column now has Print + Detailed WhatsApp button -->
                   <td class="text-nowrap">
                     <a class="btn btn-outline-primary btn-mini" target="_blank" href="{{ url_for('invoice_detailed', id=inv.id) }}"><i class="fas fa-print"></i> Print</a>
                     {% if customer.mobile %}
@@ -378,7 +282,6 @@
                     {% endif %}
                   </td>
 
-                  <!-- MODIFIED: Delete column now only has the Trash button -->
                   <td class="text-nowrap">
                     {% if current_user.is_admin() %}
                     <button class="btn btn-outline-danger btn-mini" onclick="if(confirm('Delete invoice {{ inv.invoice_no }}?'))document.getElementById('delInv{{ inv.id }}').submit();"><i class="fas fa-trash-alt"></i></button>
@@ -397,7 +300,6 @@
           <div class="tbl-wrap">
             <table class="tbl">
               <thead>
-                <!-- MODIFIED: Shortened Action header to match 2 buttons -->
                 <tr><th>#</th><th>Date</th><th>Receipt</th><th>Book Receipt No.</th><th>Received Amount</th><th>Against Invoice</th><th>Mode</th><th>Transaction ID</th><th>Type</th><th>Received By</th><th>Status</th><th style="width: 150px;">Action</th></tr>
               </thead>
               <tbody>
@@ -418,7 +320,6 @@
                     {% elif pay.needs_authorization %}<span class="badge bg-warning text-dark">Pending authorization</span>
                     {% else %}<span class="badge bg-success">Authorized</span>{% endif %}
                   </td>
-                  <!-- MODIFIED: Kept exactly 2 buttons: Print Summary & WhatsApp Send Summary -->
                   <td class="text-nowrap">
                     {% if pay.invoice %}
                       <a class="btn btn-outline-primary btn-mini" target="_blank" href="{{ url_for('invoice_summary', id=pay.invoice_id) }}"><i class="fas fa-print"></i></a>
@@ -452,12 +353,8 @@
                   <td>{{ cp.plan.name if cp.plan else '-' }}</td>
                   <td>{{ cp.plan.speed_mbps if cp.plan else '-' }} Mbps</td>
                   <td>&#8377; {{ '%.2f'|format(cp.plan.price_monthly) if cp.plan else '0.00' }}</td>
-                  
-                  <!-- MODIFIED: Dates are now plain text, not editable inputs -->
                   <td>{{ cp.start_date.strftime('%d-%m-%Y') }}</td>
                   <td>{{ cp.end_date.strftime('%d-%m-%Y') }}</td>
-                  
-                  <!-- MODIFIED: Only status is editable -->
                   <td>
                     <select form="hist{{ cp.id }}" name="status" class="form-select form-select-sm" style="width:125px;">
                       {% for st in ['active','expired','cancelled','terminated'] %}
@@ -484,6 +381,77 @@
 </div>
 
 <!-- ================= MODALS & HIDDEN FORMS ================= -->
+
+<!-- NEW ADDON INVOICE MODAL (Matches your screenshot) -->
+<div class="modal fade" id="addonInvoiceModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header addon-modal-header">
+        <h5 class="modal-title addon-modal-title">ADDON INVOICE</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body addon-modal-body">
+        <form method="POST" action="{{ url_for('add_customer_invoice', id=customer.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          
+          <div class="row g-3 mb-3">
+            <div class="col-md-12">
+              <label for="addonCaption" class="form-label">Heading <span class="text-danger">*</span></label>
+              <select name="caption" id="addonCaption" class="form-select" required>
+                <option value="">-Select-</option>
+                <!-- Dynamically loads categories from Addon Category Master -->
+                {% for cat in addon_categories %}
+                <option value="{{ cat.name }}">{{ cat.name }}</option>
+                {% endfor %}
+              </select>
+              <small class="text-muted">Manage these categories under Masters > Addon Categories.</small>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Start Date</label>
+              <input type="date" class="form-control" name="start_date" value="{{ today.isoformat() }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Expiry Date</label>
+              <input type="date" class="form-control" name="end_date">
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Amount</label>
+              <input type="number" step="0.01" min="0" class="form-control" name="invoice_amount" value="0">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Discount</label>
+              <input type="number" step="0.01" min="0" class="form-control" name="discount_amount" value="0">
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-12">
+              <label class="form-label">Mode</label>
+              <select name="payment_mode" class="form-select">
+                <option value="">-Select Mode-</option>
+                {% for value, label in payment_modes %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-end gap-2 mt-4">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary">Submit</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Renew plan -->
 {% if active_plan %}
 <div class="modal fade" id="renewPlanModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
@@ -543,11 +511,6 @@
 </div></div></div>
 {% endfor %}
 
-<!-- Payment View/Approve/Delete Forms -->
-{% for pay in payments %}
-<!-- Removed viewPaymentModal, approvePay, and deletePaymentForm modals as they are no longer needed for payment history -->
-{% endfor %}
-
 <!-- Hidden Actions -->
 <form id="removeDiscountForm" action="{{ url_for('remove_discount', id=customer.id) }}" method="POST" style="display:none;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"></form>
 <form id="resetPasswordForm" action="{{ url_for('customer_reset_password', id=customer.id) }}" method="POST" style="display:none;"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"></form>
@@ -582,11 +545,6 @@
     setTimeout(function () { w.print(); }, 300);
   }
 
-  // Preset dropdown populates Caption field
-  document.getElementById('presetCaption').addEventListener('change', function() {
-      document.getElementById('addonCaption').value = this.value;
-  });
-
   // Vendor section toggle
   (function () {
     var toggle = document.getElementById('vendorToggle');
@@ -600,7 +558,7 @@
     }
   })();
 
-  // Vendor product rows logic
+  // Vendor product rows logic (only if vendor block exists)
   (function () {
     var vendorSel = document.getElementById('addonVendor');
     var body      = document.getElementById('itemsBody');

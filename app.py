@@ -2076,13 +2076,20 @@ def add_customer_invoice(id):
     book_receipt_no = (request.form.get('book_receipt_no') or '').strip()
     remark = (request.form.get('remark') or request.form.get('remarks') or '').strip()
     vendor_id = request.form.get('vendor_id', type=int)
-    date_raw = request.form.get('invoice_date')
+    
+    # NEW: Handle Start Date and End Date from the modal
+    start_date_raw = request.form.get('start_date')
+    end_date_raw = request.form.get('end_date')
 
     try:
-        issue_date = (datetime.strptime(date_raw, '%Y-%m-%d').date()
-                      if date_raw else date.today())
+        # If Start Date is provided, use it. Otherwise use today.
+        issue_date = (datetime.strptime(start_date_raw, '%Y-%m-%d').date() if start_date_raw else date.today())
+        # If End Date is provided, use it. Otherwise default to 15 days from now.
+        due_date = (datetime.strptime(end_date_raw, '%Y-%m-%d').date() if end_date_raw else issue_date + timedelta(days=15))
     except ValueError:
+        # Fallback if date formatting fails
         issue_date = date.today()
+        due_date = issue_date + timedelta(days=15)
 
     try:
         discount = Decimal(str(request.form.get('discount_amount', type=float) or 0))
@@ -2167,8 +2174,9 @@ def add_customer_invoice(id):
             customer_id=customer.id,
             customer_plan_id=active_plan.id if active_plan else None,
             invoice_no=generate_invoice_no(),
+            # UPDATED: Use issue_date and due_date parsed above
             issue_date=issue_date,
-            due_date=issue_date + timedelta(days=due_days),
+            due_date=due_date,
             total_amount=total,
             tax_amount=Decimal('0.00'),
             discount_amount=discount,
