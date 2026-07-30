@@ -7,6 +7,7 @@ from functools import wraps
 from threading import Lock
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
+from api import api
 
 from flask import (
     Flask, render_template, redirect, url_for, flash, request, jsonify,
@@ -87,15 +88,15 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 db.init_app(app)
-# pool_pre_ping / pool_recycle (in config.py) handles stale connections.
 
 csrf = CSRFProtect(app)
+csrf.exempt(api)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'login'
-login_manager.login_message_category = 'warning'
-login_manager.session_protection = 'strong'
+...
+# Register REST API blueprint
+app.register_blueprint(api)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -432,6 +433,11 @@ def server_error(e):
 
 @app.errorhandler(CSRFError)
 def csrf_error(e):
+    if request.path.startswith('/api/'):
+        return jsonify({
+            'success': False,
+            'message': 'CSRF validation failed'
+        }), 400
     flash('Your session expired or the form was tampered with. Please try again.', 'danger')
     return redirect(request.referrer or url_for('dashboard')), 400
 # ── Security headers (added to every response) ──────────────────────────────
