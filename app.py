@@ -87,9 +87,7 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 db.init_app(app)
-# NOTE: no db.engine.dispose() here. Disposing the pool on every worker boot
-# throws away the pooling configured in config.py. Stale connections are
-# handled by pool_pre_ping / pool_recycle instead.
+# pool_pre_ping / pool_recycle (in config.py) handles stale connections.
 
 csrf = CSRFProtect(app)
 
@@ -448,26 +446,20 @@ def set_security_headers(response):
         'Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
     return response
 
-# ---------------------------------------------------------------------------
-#  Request timing  --  set SLOW_REQUEST_MS=0 to log every request.
-#  Only logs requests slower than the threshold, so the logs stay readable.
-#  Set SLOW_REQUEST_MS to a negative number (or remove this block) to disable.
-# ---------------------------------------------------------------------------
-SLOW_REQUEST_MS = int(os.environ.get('SLOW_REQUEST_MS', 500))
-
+# ---------- Request timing (set SLOW_REQUEST_MS env var to control threshold) ----------
+_SLOW_MS = int(os.environ.get('SLOW_REQUEST_MS', 500))
 
 @app.before_request
 def _timing_start():
     request._t0 = time.perf_counter()
 
-
 @app.after_request
 def _timing_end(response):
     t0 = getattr(request, '_t0', None)
-    if t0 is not None and SLOW_REQUEST_MS >= 0:
+    if t0 is not None and _SLOW_MS >= 0:
         elapsed = (time.perf_counter() - t0) * 1000
-        if elapsed >= SLOW_REQUEST_MS:
-            app.logger.warning("TIMING %s %s -> %.0f ms",
+        if elapsed >= _SLOW_MS:
+            app.logger.warning('TIMING %s %s -> %.0f ms',
                                request.method, request.path, elapsed)
     return response
 
@@ -619,30 +611,32 @@ def dashboard():
     to_authorize_rows = sorted(to_authorize_rows.values(), key=lambda r: r['date'], reverse=True)
 
     # ===== Plan lifecycle chips (7 days) =====
+    # BATCHED: 2 GROUP BY queries replace 21 individual .count() calls.
+    _chip_start = today - timedelta(days=6)
+    _chip_end   = today + timedelta(days=6)
+    from sqlalchemy import func as _func
+    _end_counts = {r[0]: r[1] for r in
+                   db.session.query(CustomerPlan.end_date, _func.count())
+                   .filter(CustomerPlan.end_date >= _chip_start,
+                           CustomerPlan.end_date <= _chip_end)
+                   .group_by(CustomerPlan.end_date).all()}
+    _start_counts = {r[0]: r[1] for r in
+                     db.session.query(CustomerPlan.start_date, _func.count())
+                     .filter(CustomerPlan.start_date >= _chip_start,
+                             CustomerPlan.start_date <= _chip_end)
+                     .group_by(CustomerPlan.start_date).all()}
+
     expiring_days, expired_days, renewed_days = [], [], []
     for i in range(7):
         day = today + timedelta(days=i)
-        expiring_days.append({
-            'date': day,
-            'label': day.strftime('%d-%b'),
-            'count': CustomerPlan.query.filter(
-                CustomerPlan.end_date == day,
-                CustomerPlan.status == 'active').count()
-        })
+        expiring_days.append({'date': day, 'label': day.strftime('%d-%b'),
+                              'count': _end_counts.get(day, 0)})
     for i in range(7):
         day = today - timedelta(days=i)
-        expired_days.append({
-            'date': day,
-            'label': day.strftime('%d-%b'),
-            'count': CustomerPlan.query.filter(
-                CustomerPlan.end_date == day,
-                CustomerPlan.end_date < today).count()
-        })
-        renewed_days.append({
-            'date': day,
-            'label': day.strftime('%d-%b'),
-            'count': CustomerPlan.query.filter(CustomerPlan.start_date == day).count()
-        })
+        expired_days.append({'date': day, 'label': day.strftime('%d-%b'),
+                             'count': _end_counts.get(day, 0) if day < today else 0})
+        renewed_days.append({'date': day, 'label': day.strftime('%d-%b'),
+                             'count': _start_counts.get(day, 0)})
 
     expiring_total = CustomerPlan.query.filter(
         CustomerPlan.status == 'active', CustomerPlan.end_date >= today).count()
@@ -652,6 +646,7 @@ def dashboard():
         CustomerPlan.start_date >= month_start, CustomerPlan.start_date <= month_end).count()
 
     # ===== Plans expiring in the next 7 days -> full detail rows =====
+    # BATCHED: 1 invoice fetch replaces N per-customer queries.
     horizon = today + timedelta(days=7)
     expiring_plans = (CustomerPlan.query
                       .filter(CustomerPlan.status == 'active',
@@ -659,15 +654,20 @@ def dashboard():
                               CustomerPlan.end_date <= horizon)
                       .order_by(CustomerPlan.end_date.asc())
                       .all())
+    _exp_cust_ids = [cp.customer.id for cp in expiring_plans if cp.customer]
+    _exp_invs = (Invoice.query
+                 .filter(Invoice.customer_id.in_(_exp_cust_ids),
+                         Invoice.status.in_(['draft', 'sent', 'overdue']))
+                 .all()) if _exp_cust_ids else []
+    _outstanding_map = {}
+    for _inv in _exp_invs:
+        _outstanding_map[_inv.customer_id] = (
+            _outstanding_map.get(_inv.customer_id, 0.0) + float(_inv.balance))
     expiring_rows = []
     for cp in expiring_plans:
         cust = cp.customer
         if not cust:
             continue
-        outstanding = sum(
-            inv.balance for inv in Invoice.query.filter(
-                Invoice.customer_id == cust.id,
-                Invoice.status.in_(['draft', 'sent', 'overdue'])).all())
         expiring_rows.append({
             'plan': cp,
             'customer': cust,
@@ -676,24 +676,31 @@ def dashboard():
             'renew_date': cp.start_date,
             'expiry_date': cp.end_date,
             'days_left': (cp.end_date - today).days,
-            'outstanding': outstanding,
+            'outstanding': _outstanding_map.get(cust.id, 0.0),
         })
 
     # ===== 12-month summary table =====
+    # BATCHED: 2 bulk fetches replace 24 individual queries (12 invoices + 12 counts).
+    _oldest_month = _shift_month(today, 11)
+    _cur_month_end = (today.replace(day=1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    _all12_invs = Invoice.query.filter(
+        Invoice.issue_date >= _oldest_month,
+        Invoice.issue_date <= _cur_month_end).all()
+    _all12_custs = Customer.query.filter(
+        Customer.registration_date >= _oldest_month,
+        Customer.registration_date <= _cur_month_end).all()
     monthly_summary = []
     for i in range(0, 12):
         m_start = _shift_month(today, i)
         m_end = (m_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
-        invs = Invoice.query.filter(Invoice.issue_date >= m_start,
-                                    Invoice.issue_date <= m_end).all()
-        paid = [x for x in invs if x.status == 'paid']
+        invs    = [x for x in _all12_invs if m_start <= x.issue_date <= m_end]
+        paid    = [x for x in invs if x.status == 'paid']
         pending = [x for x in invs if x.status in ('draft', 'sent', 'overdue')]
+        nc      = sum(1 for c in _all12_custs if m_start <= c.registration_date <= m_end)
         monthly_summary.append({
             'month': m_start.strftime('%b,%y'),
             'month_key': m_start.isoformat(),
-            'new_clients': Customer.query.filter(
-                Customer.registration_date >= m_start,
-                Customer.registration_date <= m_end).count(),
+            'new_clients': nc,
             'total_bills': len(invs),
             'total_amount': sum(float(x.total_amount or 0) for x in invs),
             'pending_bills': len(pending),
@@ -703,30 +710,38 @@ def dashboard():
         })
 
     # ===== Zone-wise outstanding & collection (current month) =====
-    zone_names = [z[0] for z in db.session.query(Customer.zone).distinct().all() if z[0]]
-    zone_outstanding, zone_collection = [], []
-    for zone_name in sorted(zone_names):
-        cust_ids = [c.id for c in Customer.query.filter_by(zone=zone_name).all()]
-        if not cust_ids:
-            continue
-        unpaid = Invoice.query.filter(
-            Invoice.customer_id.in_(cust_ids),
-            Invoice.status.in_(['draft', 'sent', 'overdue'])).all()
-        out_amount = sum(inv.balance for inv in unpaid)
-        if unpaid:
-            zone_outstanding.append({'zone': zone_name, 'count': len(unpaid), 'amount': out_amount})
+    # BATCHED: 2 queries replace 2*N (one pair per zone).
+    _zone_cust_map = {}
+    for _c in Customer.query.filter(Customer.zone.isnot(None)).all():
+        _zone_cust_map.setdefault(_c.zone, []).append(_c.id)
+    _all_zcids = [cid for ids in _zone_cust_map.values() for cid in ids]
+    _cust_zone  = {cid: z for z, ids in _zone_cust_map.items() for cid in ids}
 
-        pays = Payment.query.filter(
-            Payment.customer_id.in_(cust_ids),
-            Payment.status == 'approved',
-            Payment.payment_date >= month_start,
-            Payment.payment_date <= month_end).all()
-        if pays:
-            zone_collection.append({
-                'zone': zone_name,
-                'count': len(pays),
-                'amount': sum(float(p.amount or 0) for p in pays)
-            })
+    _z_invs = (Invoice.query
+               .filter(Invoice.customer_id.in_(_all_zcids),
+                       Invoice.status.in_(['draft', 'sent', 'overdue']))
+               .all()) if _all_zcids else []
+    _z_pays = (Payment.query
+               .filter(Payment.customer_id.in_(_all_zcids),
+                       Payment.status == 'approved',
+                       Payment.payment_date >= month_start,
+                       Payment.payment_date <= month_end)
+               .all()) if _all_zcids else []
+
+    _zi, _zp = {}, {}
+    for _inv in _z_invs: _zi.setdefault(_cust_zone[_inv.customer_id], []).append(_inv)
+    for _pay in _z_pays: _zp.setdefault(_cust_zone[_pay.customer_id], []).append(_pay)
+
+    zone_outstanding, zone_collection = [], []
+    for zone_name in sorted(_zone_cust_map.keys()):
+        _unpaid = _zi.get(zone_name, [])
+        if _unpaid:
+            zone_outstanding.append({'zone': zone_name, 'count': len(_unpaid),
+                                     'amount': sum(inv.balance for inv in _unpaid)})
+        _pays = _zp.get(zone_name, [])
+        if _pays:
+            zone_collection.append({'zone': zone_name, 'count': len(_pays),
+                                    'amount': sum(float(p.amount or 0) for p in _pays)})
 
     return render_template(
         'dashboard.html',
