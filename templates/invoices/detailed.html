@@ -80,7 +80,7 @@
 
 {% if not download %}
 <div class="toolbar">
-  <a class="btn ghost" href="javascript:history.back()">&larr; Back</a>
+  <button type="button" class="btn ghost" onclick="goBack()">&larr; Back</button>
   <button class="btn" onclick="window.print()">Print</button>
 </div>
 {% endif %}
@@ -297,5 +297,23 @@
   </table>
 
 </div>
+
+{% if not download %}
+<script>
+  // The invoice usually opens in a new tab (target="_blank"), where there is no
+  // history to go back to. Close that tab; if the browser blocks window.close(),
+  // fall back to this customer's page.
+  function goBack() {
+    if (window.history.length > 1 && document.referrer) {
+      window.history.back();
+      return;
+    }
+    window.close();
+    setTimeout(function () {
+      window.location.href = '{{ url_for("customer_view", id=invoice.customer_id) }}#pending-invoice';
+    }, 150);
+  }
+</script>
+{% endif %}
 </body>
 </html>
