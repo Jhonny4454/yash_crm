@@ -2064,9 +2064,99 @@ def api_vendor_products(vendor_id):
         'on_hand': p.on_hand,
     } for p in products])
 
+# ---------------------------------------------------------------------------
+#  ADDON INVOICE helpers: preset headings + Include / Exclude / No Tax switch
+# ---------------------------------------------------------------------------
+
+#: The headings that appear in the "Heading" dropdown of the Addon Invoice
+#: pop-up. They are only created once; edit them later under
+#: Masters > Addon Categories without this list overwriting your changes.
+ADDON_DEFAULT_CATEGORIES = [
+    ('16 Port Switch',        0),
+    ('Adaptor',               0),
+    ('Cheque Bounce Charges', 0),
+    ('Installation Charges',  0),
+    ('OLT Charges',           0),
+    ('ONU Charges',           0),
+    ('Opening Balance',       0),
+    ('Previous Dues',         0),
+    ('Reconnection Charges',  0),
+    ('Router charges',        0),
+    ('Shifting Charges',      0),
+    ('Static IP',             0),
+    ('Wrong Billing',         0),
+]
+
+
+def seed_addon_categories():
+    """Create the standard addon headings if they are not there yet."""
+    from models import AddonCategory
+    added = 0
+    for name, price in ADDON_DEFAULT_CATEGORIES:
+        if not AddonCategory.query.filter_by(name=name).first():
+            db.session.add(AddonCategory(name=name, default_price=price,
+                                         description=''))
+            added += 1
+    if added:
+        db.session.commit()
+    return added
+
+
+def _gst_percent():
+    """GST rate used by the Addon Invoice tax switch.
+
+    Stored in the settings table under `gst_percent` so it can be changed
+    without touching the code. Falls back to 18%.
+    """
+    try:
+        return Decimal(str(Setting.get('gst_percent', 18) or 18))
+    except Exception:
+        return Decimal('18')
+
+
+def _apply_tax(amount, mode):
+    """Turn the amount typed on the form into (grand_total, tax_amount).
+
+    include  -> the amount already has GST inside it; the total does not move,
+                the tax is only broken out for the invoice.
+    exclude  -> GST is added on top of the amount typed in.
+    notax    -> nothing is added and no tax is shown.
+    """
+    try:
+        amount = Decimal(str(amount or 0))
+    except (InvalidOperation, TypeError):
+        amount = Decimal('0')
+
+    rate = _gst_percent()
+    mode = (mode or 'notax').strip().lower()
+    cents = Decimal('0.01')
+
+    if amount <= 0 or rate <= 0 or mode == 'notax':
+        return amount.quantize(cents), Decimal('0.00')
+
+    if mode == 'exclude':
+        tax = amount * rate / Decimal('100')
+        total = amount + tax
+    else:  # 'include'
+        base = amount / (Decimal('1') + rate / Decimal('100'))
+        tax = amount - base
+        total = amount
+
+    return total.quantize(cents), tax.quantize(cents)
+
+
 @app.route('/customers/<int:id>/add_invoice', methods=['POST'])
 @login_required
 def add_customer_invoice(id):
+    """Raise an addon invoice.
+
+    Fed by two places on the Pending Invoice tab:
+      * the inline quick-entry strip  -> receipt_no, discount_amount,
+        invoice_amount, start_date, payment_mode, book_receipt_no, remark
+      * the ADDON INVOICE pop-up      -> caption (Heading), start_date,
+        end_date, invoice_amount, tax_applicable
+    Both post to this one endpoint, so either can be used.
+    """
     customer = Customer.query.get_or_404(id)
     back = redirect(url_for('customer_view', id=id) + '#pending-invoice')
 
@@ -2074,22 +2164,32 @@ def add_customer_invoice(id):
     detailed = (request.form.get('detailed_invoice') or '').strip()
     payment_mode = (request.form.get('payment_mode') or '').strip()
     book_receipt_no = (request.form.get('book_receipt_no') or '').strip()
+    receipt_no = (request.form.get('receipt_no') or '').strip()
     remark = (request.form.get('remark') or request.form.get('remarks') or '').strip()
     vendor_id = request.form.get('vendor_id', type=int)
-    
-    # NEW: Handle Start Date and End Date from the modal
+    tax_mode = (request.form.get('tax_applicable') or 'notax').strip().lower()
+
+    # How many days an invoice stays open when no End Date is given
+    try:
+        due_days = int(Setting.get('invoice_due_days', 15) or 15)
+    except Exception:
+        due_days = 15
+
+    # Start Date / End Date come from the pop-up; the strip only sends a date
     start_date_raw = request.form.get('start_date')
     end_date_raw = request.form.get('end_date')
-
     try:
-        # If Start Date is provided, use it. Otherwise use today.
-        issue_date = (datetime.strptime(start_date_raw, '%Y-%m-%d').date() if start_date_raw else date.today())
-        # If End Date is provided, use it. Otherwise default to 15 days from now.
-        due_date = (datetime.strptime(end_date_raw, '%Y-%m-%d').date() if end_date_raw else issue_date + timedelta(days=15))
+        issue_date = (datetime.strptime(start_date_raw, '%Y-%m-%d').date()
+                      if start_date_raw else date.today())
+        due_date = (datetime.strptime(end_date_raw, '%Y-%m-%d').date()
+                    if end_date_raw else issue_date + timedelta(days=due_days))
     except ValueError:
-        # Fallback if date formatting fails
         issue_date = date.today()
-        due_date = issue_date + timedelta(days=15)
+        due_date = issue_date + timedelta(days=due_days)
+
+    if due_date < issue_date:
+        flash('The end date cannot be before the start date.', 'danger')
+        return back
 
     try:
         discount = Decimal(str(request.form.get('discount_amount', type=float) or 0))
@@ -2098,10 +2198,11 @@ def add_customer_invoice(id):
         flash('Amount and discount must be valid numbers.', 'danger')
         return back
 
+    # ---- optional vendor product rows -------------------------------------
     prod_ids = request.form.getlist('item_product_id[]')
-    serials  = request.form.getlist('item_serial[]')
-    qtys     = request.form.getlist('item_qty[]')
-    prices   = request.form.getlist('item_price[]')
+    serials = request.form.getlist('item_serial[]')
+    qtys = request.form.getlist('item_qty[]')
+    prices = request.form.getlist('item_price[]')
 
     lines, items_total = [], Decimal('0')
     for idx, pid in enumerate(prod_ids):
@@ -2141,7 +2242,9 @@ def add_customer_invoice(id):
         ))
         items_total += price * qty
 
-    total = items_total + flat_amount
+    # ---- Include / Exclude / No Tax ---------------------------------------
+    net_total = items_total + flat_amount
+    total, tax_amount = _apply_tax(net_total, tax_mode)
 
     if total < 0:
         flash('Invoice amount cannot be negative.', 'danger')
@@ -2161,12 +2264,6 @@ def add_customer_invoice(id):
                    .filter_by(customer_id=id, status='active')
                    .order_by(CustomerPlan.end_date.desc()).first())
 
-    due_days = 15
-    try:
-        due_days = int(Setting.get('invoice_due_days', 15) or 15)
-    except Exception:
-        pass
-
     payment = None
     vendor_bills = []
     try:
@@ -2174,13 +2271,12 @@ def add_customer_invoice(id):
             customer_id=customer.id,
             customer_plan_id=active_plan.id if active_plan else None,
             invoice_no=generate_invoice_no(),
-            # UPDATED: Use issue_date and due_date parsed above
             issue_date=issue_date,
             due_date=due_date,
             total_amount=total,
-            tax_amount=Decimal('0.00'),
+            tax_amount=tax_amount,
             discount_amount=discount,
-            receipt_number=book_receipt_no or None,
+            receipt_number=(book_receipt_no or receipt_no or None),
             remarks=remark or None,
             caption=caption or (detailed or ('Equipment' if lines else None)),
             invoice_type='discount' if (discount and not total) else 'addon',
@@ -2198,6 +2294,7 @@ def add_customer_invoice(id):
                 item_type='service',
                 quantity=1,
                 unit_price=flat_amount,
+                tax_percent=float(_gst_percent()) if tax_mode in ('include', 'exclude') else 0,
             ))
 
         for ln in lines:
@@ -2226,6 +2323,7 @@ def add_customer_invoice(id):
         if lines:
             vendor_bills = _build_vendor_bills(invoice, customer, lines, issue_date)
 
+        # A mode was picked on the quick-entry strip -> money collected now.
         if payment_mode and total > 0:
             needs_auth = not current_user.is_admin()
             payment = Payment(
@@ -2235,10 +2333,13 @@ def add_customer_invoice(id):
                 payment_date=issue_date,
                 payment_mode=payment_mode,
                 mode_detail=remark or None,
-                book_receipt_no=book_receipt_no or None,
+                book_receipt_no=book_receipt_no or receipt_no or None,
                 remarks=remark or None,
                 received_by_user_id=current_user.id,
-                status='pending' if needs_auth else 'approved',
+                source='admin',
+                # The money is credited straight away; a non-admin entry still
+                # shows up in the authorization queue for review.
+                status='approved',
                 authorized_at=None if needs_auth else datetime.utcnow(),
                 authorized_by_user_id=None if needs_auth else current_user.id,
             )
@@ -2258,14 +2359,16 @@ def add_customer_invoice(id):
 
     log_audit('Addon Invoice',
               f"{invoice.invoice_no} for {customer.full_name}: {len(lines)} item(s), "
-              f"Rs.{total - discount}"
+              f"Rs.{total - discount} (tax {tax_mode}: Rs.{tax_amount})"
               + (f", {len(vendor_bills)} vendor bill(s)" if vendor_bills else ""))
 
     msg = f'Invoice {invoice.invoice_no} created for Rs.{(total - discount):,.2f}.'
+    if tax_amount > 0:
+        msg += f' (GST {_gst_percent()}%: Rs.{tax_amount:,.2f} {tax_mode}d.)'
     if vendor_bills:
         msg += (' Vendor bill' + ('s ' if len(vendor_bills) > 1 else ' ')
                 + ', '.join(b.bill_no for b in vendor_bills) + ' raised.')
-    if payment is not None and payment.status == 'pending':
+    if payment is not None and payment.authorized_at is None:
         msg += ' The payment is waiting for admin authorization.'
     flash(msg, 'success')
     return back
@@ -4285,6 +4388,12 @@ def init_database(flask_app=None):
             _seed_gateway_settings()
         except Exception as exc:
             flask_app.logger.warning("Could not seed gateway settings: %s", exc)
+
+        # Standard Addon Invoice headings for the pop-up dropdown
+        try:
+            seed_addon_categories()
+        except Exception as exc:
+            flask_app.logger.warning("Could not seed addon categories: %s", exc)
 
         # The seven standard customer message templates
         try:
