@@ -92,8 +92,12 @@
 {% set co_email   = (company.email if company and company.email else '') %}
 {% set co_pan     = (company.pan_no if company and company.pan_no else '') %}
 {% set co_gstin   = (company.gstin if company and company.gstin else '') %}
-{% set co_state   = (company.place_of_supply if company and company.place_of_supply else '') %}
-{% set co_code    = (company.state_code if company and company.state_code else '') %}
+{#- State / State Code: read whichever Company field is filled in, then fall
+    back to Maharashtra (GST state code 27). `attribute` with a default keeps
+    this safe even if the Company model has no `state` column at all. -#}
+{% set co_state   = (company.place_of_supply if company and company.place_of_supply else '')
+                    or (company|attr('state') if company else '') or 'Maharashtra' %}
+{% set co_code    = (company.state_code if company and company.state_code else '') or '27' %}
 {% set cust_addr  = customer.billing_address or customer.primary_address or '' %}
 {% set addr_bits  = [customer.flat_no, customer.building, customer.area, customer.locality]|select|list %}
 {% set cp         = invoice.customer_plan %}
