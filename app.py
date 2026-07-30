@@ -4425,6 +4425,17 @@ def init_database(flask_app=None):
             db.session.commit()
             flask_app.logger.info("Admin account re-enabled.")
 
+            @app.before_request
+def _t0():
+    request._t0 = time.perf_counter()
+
+@app.after_request
+def _t1(response):
+    if hasattr(request, '_t0'):
+        app.logger.warning("%s %s took %.0f ms", request.method, request.path,
+                           (time.perf_counter() - request._t0) * 1000)
+    return response
+
 if __name__ == '__main__':
     init_database(app)
     debug_mode = os.environ.get('FLASK_ENV') != 'production'
