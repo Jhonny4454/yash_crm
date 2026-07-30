@@ -1,5 +1,6 @@
 import os
 import csv
+import time
 import io
 import secrets
 from functools import wraps
@@ -86,9 +87,9 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 db.init_app(app)
-# ---- FIX: Force SQLAlchemy to refresh its metadata on next query ----
-with app.app_context():
-    db.engine.dispose()
+# NOTE: no db.engine.dispose() here. Disposing the pool on every worker boot
+# throws away the pooling configured in config.py. Stale connections are
+# handled by pool_pre_ping / pool_recycle instead.
 
 csrf = CSRFProtect(app)
 
@@ -447,6 +448,29 @@ def set_security_headers(response):
         'Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
     return response
 
+# ---------------------------------------------------------------------------
+#  Request timing  --  set SLOW_REQUEST_MS=0 to log every request.
+#  Only logs requests slower than the threshold, so the logs stay readable.
+#  Set SLOW_REQUEST_MS to a negative number (or remove this block) to disable.
+# ---------------------------------------------------------------------------
+SLOW_REQUEST_MS = int(os.environ.get('SLOW_REQUEST_MS', 500))
+
+
+@app.before_request
+def _timing_start():
+    request._t0 = time.perf_counter()
+
+
+@app.after_request
+def _timing_end(response):
+    t0 = getattr(request, '_t0', None)
+    if t0 is not None and SLOW_REQUEST_MS >= 0:
+        elapsed = (time.perf_counter() - t0) * 1000
+        if elapsed >= SLOW_REQUEST_MS:
+            app.logger.warning("TIMING %s %s -> %.0f ms",
+                               request.method, request.path, elapsed)
+    return response
+
 # ---------- Authentication ----------
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -461,8 +485,6 @@ def login():
         return render_template('login.html', form=form), 429
 
     if form.validate_on_submit():
-        # Ensure a fresh database session to avoid stale connection issues
-        db.session.remove()
         user = User.query.filter_by(username=form.username.data).first()
         if user and user.is_active and user.check_password(form.password.data):
             session.permanent = True
@@ -543,9 +565,6 @@ def _bucket_payments(payments):
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    # ---- Force a fresh session for this request ----
-    db.session.remove()
-
     today = date.today()
     month_start, month_end = _month_bounds(today)
 
@@ -4424,18 +4443,7 @@ def init_database(flask_app=None):
             admin.is_active = True
             db.session.commit()
             flask_app.logger.info("Admin account re-enabled.")
-
-            @app.before_request
-def _t0():
-    request._t0 = time.perf_counter()
-
-@app.after_request
-def _t1(response):
-    if hasattr(request, '_t0'):
-        app.logger.warning("%s %s took %.0f ms", request.method, request.path,
-                           (time.perf_counter() - request._t0) * 1000)
-    return response
-
+            
 if __name__ == '__main__':
     init_database(app)
     debug_mode = os.environ.get('FLASK_ENV') != 'production'
