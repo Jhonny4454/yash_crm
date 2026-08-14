@@ -547,6 +547,19 @@ table.data tr.is-selected { background: rgba(0, 115, 183, 0.06); }
 
 .quick-renew .input { width: auto; min-width: 150px; }
 
+/* ---- Switching between Expiring / Expired / Renewed --------------------- */
+/* These are three separate pages, so this is navigation rather than a filter.
+   It sits in the page heading, away from the toolbar's filter chips, so the
+   two are not mistaken for each other. */
+
+.view-switch {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.view-switch .chip { text-decoration: none; }
+
 @media (max-width: 640px) {
   .bulk-bar { flex-direction: column; align-items: stretch; }
   .bulk-actions .btn { flex: 1; }

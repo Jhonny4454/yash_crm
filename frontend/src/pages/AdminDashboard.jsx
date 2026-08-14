@@ -70,7 +70,7 @@ export default function AdminDashboard() {
         <Link className="btn sm" to="/masters/bulk-messages">
           <i className="fab fa-whatsapp" aria-hidden="true" /> Bulk Messages
         </Link>
-        <Link className="btn sm" to="/reports/plan-expiry">
+        <Link className="btn sm" to="/reports/expiring">
           <i className="fas fa-calendar-times" aria-hidden="true" /> Plan Expiry
         </Link>
       </div>
@@ -325,25 +325,25 @@ function PlanLifecycle({ plans }) {
             read as a total and was not one: a customer who lapsed three weeks
             ago appeared in neither the chips nor the count, so the row could
             say (0) with a hundred dead connections behind it. */}
-        <LifecycleRow name="Expired" days={expired} tone="danger" range="expired"
+        <LifecycleRow name="Expired" days={expired} tone="danger" page="expired"
                       unit="lapsed connection" cumulative
                       total={plans?.expired_total ?? plans?.expired_all ?? 0}
-                      allTotal={plans?.expired_all} allRange="expired"
+                      allTotal={plans?.expired_all} allRange=""
                       allLabel="every expired plan" {...shared} />
         {/* Between the two: without it the panel only ever reports trouble,
             and the operator has no read on whether the chasing is working.
             Green on purpose. */}
-        <LifecycleRow name="Customer renewed" days={renewed} tone="ok" range="renewed"
+        <LifecycleRow name="Customer renewed" days={renewed} tone="ok" page="renewed"
                       unit="customer"
                       total={plans?.renewed_total
                         ?? renewed.reduce((s, d) => s + d.count, 0)}
-                      allTotal={plans?.renewed_all} allRange="renewedall"
+                      allTotal={plans?.renewed_all} allRange="?range=all"
                       allLabel="every renewal on record" {...shared} />
-        <LifecycleRow name="Expiring" days={expiring} tone="warn" range="7"
+        <LifecycleRow name="Expiring" days={expiring} tone="warn" page="expiring"
                       unit="plan"
                       total={plans?.expiring_total
                         ?? expiring.reduce((s, d) => s + d.count, 0)}
-                      allTotal={plans?.expiring_all} allRange="all"
+                      allTotal={plans?.expiring_all} allRange="?range=all"
                       allLabel="every plan still to expire" {...shared} />
       </div>
     </div>
@@ -351,12 +351,12 @@ function PlanLifecycle({ plans }) {
 }
 
 function LifecycleRow({ name, days, total, allTotal, allRange, allLabel, tone,
-                       range, unit = "plan", cumulative = false,
+                       page, unit = "plan", cumulative = false,
                        todayIso, columns }) {
   return (
     <div className="life-row">
       <span className="name">{name}</span>
-      <Link className={`pill-total ${tone}`} to={`/reports/plan-expiry?range=${range}`}
+      <Link className={`pill-total ${tone}`} to={`/reports/${page}`}
             title={cumulative
               ? `${total} already lapsed as of today`
               : `${total} across the week shown here`}>
@@ -364,7 +364,7 @@ function LifecycleRow({ name, days, total, allTotal, allRange, allLabel, tone,
       </Link>
       {Number.isFinite(allTotal) && (
         <Link className={`life-all ${tone}`}
-              to={`/reports/plan-expiry?range=${allRange}`}
+              to={`/reports/${page}${allRange}`}
               title={`Open ${allLabel} — ${allTotal} in total`}>
           View all <strong>{allTotal}</strong>
         </Link>
@@ -379,7 +379,7 @@ function LifecycleRow({ name, days, total, allTotal, allRange, allLabel, tone,
           return (
             <Link key={day.date}
                   className={`chip-day${isToday ? " is-today" : ""}`}
-                  to={`/reports/plan-expiry?range=${range}`}
+                  to={`/reports/${page}`}
                   title={`${day.count} ${unit}${day.count === 1 ? "" : "s"} `
                     + `${cumulative ? "lapsed by" : "on"} ${day.label}`
                     + (isToday ? " (today)" : "")}>

@@ -32,6 +32,7 @@ const LeavesPage = lazy(() => import("./pages/LeavesPage"));
 const IspIntegrations = lazy(() => import("./pages/IspIntegrations"));
 const BulkMessages = lazy(() => import("./pages/BulkMessages"));
 const PlanExpiryBoard = lazy(() => import("./pages/PlanExpiryBoard"));
+const PlanExpiryRedirect = lazy(() => import("./pages/PlanExpiryBoard").then((m) => ({ default: m.PlanExpiryRedirect })));
 const PaymentsPage = lazy(() => import("./pages/PaymentsPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const BackupsPage = lazy(() => import("./pages/AdminToolsPages").then((m) => ({ default: m.BackupsPage })));
@@ -167,7 +168,15 @@ export default function App() {
       <Route path="hr/attendance" element={resource("hr/attendance")} />
       <Route path="hr/leaves" element={<Page><LeavesPage /></Page>} />
       <Route path="hr/payroll" element={resource("hr/payroll")} />
-      <Route path="reports/plan-expiry" element={<Page><PlanExpiryBoard /></Page>} />
+      {/* Three questions, three pages. They shared one board with a row of
+          filter chips, and all three "View all" buttons on the dashboard led
+          to it - so pressing "Expired" landed you somewhere headed "Next 7
+          days" until you noticed which chip was lit. The old path still
+          works and forwards to whichever one the ?range= asked for. */}
+      <Route path="reports/expiring" element={<Page><PlanExpiryBoard view="expiring" /></Page>} />
+      <Route path="reports/expired" element={<Page><PlanExpiryBoard view="expired" /></Page>} />
+      <Route path="reports/renewed" element={<Page><PlanExpiryBoard view="renewed" /></Page>} />
+      <Route path="reports/plan-expiry" element={<Page><PlanExpiryRedirect /></Page>} />
       <Route path="reports/attendance" element={report("/reports/attendance", "Attendance report")} />
       <Route path="reports/leaves" element={report("/reports/leaves", "Leave report")} />
       <Route path="reports/payroll" element={report("/reports/payroll", "Payroll report")} />

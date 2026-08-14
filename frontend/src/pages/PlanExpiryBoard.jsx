@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { get, post, put } from "../api/client";
 import { useLookup } from "../api/useLookup";
 import { useAuth } from "../context/AuthContext";
@@ -10,58 +10,126 @@ import {
 import "../styles/Forms.css";
 
 /**
- * Plan expiry board - who is expiring, who has expired, and renew them in place.
+ * Three screens, not one: Expiring soon, Expired, and Recently renewed.
  *
- * Replaces reports/plan_expiry.html plus the inline-editable expiry table that
- * sat on the Jinja dashboard. That table posted to customer_plan_update_dates;
- * the REST equivalent (PUT /customer-plans/<id>/dates) existed but nothing in
- * the SPA called it, so renewing a plan meant leaving the report.
+ * They used to be a single board with a row of filter chips, and all three
+ * "View all" buttons on the dashboard led to it. Landing on the same page from
+ * three different questions is disorienting - you press "Expired" and arrive
+ * somewhere that says "Next 7 days" until you notice which chip is lit - and
+ * it forced one set of controls onto three jobs that need different ones.
  *
- * Dates are edited per row and saved individually: the endpoint takes one plan
- * at a time, and a partial failure should not roll back rows that saved fine.
+ * They now have their own routes, their own titles, and their own controls:
  *
- * There is deliberately NO "+30d" / "+20d" quick-extend button. It filled the
- * two date boxes immediately but only staged the change in local state, so the
- * dates on screen said the plan had been extended while the database still
- * said it had not - and pressing it, seeing the dates move and navigating away
- * lost the lot. That is exactly the shape of "I edited it and it reverted",
- * which is what it kept getting reported as. Type the end date, press Save.
+ *   /reports/expiring   who runs out soon. Editable dates, so you can renew
+ *                       before the connection drops. No messaging: telling
+ *                       somebody their plan HAS expired when it has not is
+ *                       worse than not writing at all.
+ *
+ *   /reports/expired    who has already lapsed. The only screen that can
+ *                       select rows, because it is the only one where a bulk
+ *                       action makes sense: Quick Renew pushes every ticked
+ *                       customer to one date, and the WhatsApp button sends
+ *                       them the approved "plan expired" template.
+ *
+ *   /reports/renewed    a record of work already done. Deliberately READ ONLY
+ *                       - no date boxes, no Save, nothing to press. A renewal
+ *                       log you can accidentally edit is not a log.
+ *
+ * The table itself is shared, because it is the same rows and the same
+ * columns; what differs is which controls each view is allowed.
+ *
+ * There is deliberately NO "+30d" / "+20d" quick-extend button anywhere. It
+ * filled the date boxes immediately but only staged the change in local state,
+ * so the screen said the plan had been extended while the database said it had
+ * not - and navigating away lost the lot. That is exactly the shape of "I
+ * edited it and it reverted". Type the date and press Save, or tick the rows
+ * and use Quick Renew.
  *
  * Paged at 100 rows. The endpoint used to return EVERY matching row - 96 KB at
- * 604 customers, roughly 1.5 MB at ten thousand - serialised again on every
- * filter change, which is most of what made this screen feel slow.
- *
- * The expired view, and only the expired view, can select rows and send them a
- * WhatsApp expiry notice. Expiring and Renewed are deliberately read-only:
- * telling somebody whose plan runs out next Tuesday that it has already
- * expired is worse than not messaging them, and Renewed is a record of work
- * already done.
+ * 604 customers, roughly 1.5 MB at ten thousand - re-serialised on every filter
+ * change, which is most of what made this screen feel slow.
  */
-
-const RANGES = [
-  { key: "7", days: 7, label: "Next 7 days" },
-  { key: "15", days: 15, label: "Next 15 days" },
-  { key: "30", days: 30, label: "Next 30 days" },
-  // No far edge: every plan still to run out, however far off. The dashboard's
-  // "View all" lands here, because the next question after "who expires this
-  // week" is always "and after that?" - and a 30-day cap silently answered it
-  // wrong for anyone on a quarterly or yearly plan.
-  { key: "all", days: "all", label: "All upcoming" },
-  { key: "expired", days: -1, label: "Already expired", notify: true },
-  // Not an expiry window at all - the API switches which date it filters on.
-  // It lives in the same list because it is the same rows and the same
-  // columns, and the operator arriving from the dashboard's Renewed chip
-  // expects to land on this board, not a separate screen.
-  { key: "renewed", days: 7, label: "Renewed (last 7 days)", mode: "renewed" },
-  { key: "renewed30", days: 30, label: "Renewed (last 30 days)", mode: "renewed" },
-  { key: "renewedall", days: "all", label: "Renewed (all)", mode: "renewed" },
-];
 
 const PER_PAGE = 100;
 
 const today = () => new Date().toLocaleDateString("en-CA");
 
-export default function PlanExpiryBoard() {
+const VIEWS = {
+  expiring: {
+    key: "expiring",
+    title: "Expiring soon",
+    blurb: "Connections about to run out. Edit a date and press Save to renew "
+      + "one before it drops.",
+    ranges: [
+      { key: "7", days: 7, label: "Next 7 days" },
+      { key: "15", days: 15, label: "Next 15 days" },
+      { key: "30", days: 30, label: "Next 30 days" },
+      // No far edge: every plan still to run out, however far off. A 30-day
+      // cap silently answered "and after that?" wrong for anyone on a
+      // quarterly or yearly plan.
+      { key: "all", days: "all", label: "All upcoming" },
+    ],
+    editableDates: true,
+    daysLabel: "Days left",
+    emptyTitle: "Nothing expiring in this window",
+  },
+  expired: {
+    key: "expired",
+    title: "Expired customers",
+    blurb: "Connections that have already lapsed. Tick the ones you want, then "
+      + "renew them to a date or send the expiry notice on WhatsApp.",
+    // One set, so no chips - the window is "everything already past".
+    ranges: [],
+    days: -1,
+    editableDates: true,
+    selectable: true,
+    daysLabel: "Overdue",
+    emptyTitle: "No expired plans",
+    emptyHint: "Every connection on the books is still inside its period.",
+  },
+  renewed: {
+    key: "renewed",
+    title: "Recently renewed",
+    blurb: "A record of renewals already done. Read only.",
+    ranges: [
+      { key: "7", days: 7, label: "Last 7 days" },
+      { key: "30", days: 30, label: "Last 30 days" },
+      { key: "all", days: "all", label: "Everything on record" },
+    ],
+    mode: "renewed",
+    // The point of this view is that it is a LOG. Date boxes and a Save button
+    // on a record of what already happened invite somebody to change history
+    // by accident, and there is no undo.
+    editableDates: false,
+    showRenewedOn: true,
+    daysLabel: "Days left",
+    emptyTitle: "No renewals in this window",
+  },
+};
+
+/** Old links (/reports/plan-expiry?range=…) land on the right new page. */
+export function PlanExpiryRedirect() {
+  const [params] = useSearchParams();
+  const range = params.get("range") || "7";
+  const zone = params.get("zone");
+
+  const view = range.startsWith("renewed") ? "renewed"
+    : range === "expired" ? "expired" : "expiring";
+
+  // The renewed and expiring windows carry over; "expired" has none.
+  const next = new URLSearchParams();
+  if (zone) next.set("zone", zone);
+  if (view === "renewed") next.set("range", range === "renewed30" ? "30"
+    : range === "renewedall" ? "all" : "7");
+  if (view === "expiring" && ["7", "15", "30", "all"].includes(range)) {
+    next.set("range", range);
+  }
+  const query = next.toString();
+  return <Navigate to={`/reports/${view}${query ? `?${query}` : ""}`} replace />;
+}
+
+export default function PlanExpiryBoard({ view = "expiring" }) {
+  const config = VIEWS[view] || VIEWS.expiring;
   const { toast, confirm } = useToast();
   const { can } = useAuth();
   const [params, setParams] = useSearchParams();
@@ -69,18 +137,20 @@ export default function PlanExpiryBoard() {
   const canRenew = can("plans.renew");
   const canMessage = can("messages.send");
 
-  const range = params.get("range") || "7";
   const zone = params.get("zone") || "";
   const page = Math.max(1, Number(params.get("page") || 1));
-  const selectedRange = RANGES.find((r) => r.key === range) || RANGES[0];
-  const days = selectedRange.days;
-  const mode = selectedRange.mode;
-  // Selection only exists on the expired view, and only for somebody who can
-  // actually DO something with a selection. Showing a column of checkboxes to
-  // a user whose permissions cover neither renewing nor messaging gives them a
-  // control that does nothing, which reads as broken rather than as forbidden.
-  const isExpiredView = Boolean(selectedRange.notify);
-  const canSelect = isExpiredView && (canRenew || canMessage);
+
+  const ranges = config.ranges;
+  const rangeKey = params.get("range") || (ranges.length ? ranges[0].key : "");
+  const selectedRange = ranges.find((r) => r.key === rangeKey) || ranges[0];
+  const days = config.days ?? selectedRange?.days ?? 7;
+  const mode = config.mode;
+
+  // Selection exists only where a bulk action does, and only for somebody who
+  // can actually perform one. A column of checkboxes that leads to no button
+  // reads as broken rather than as forbidden.
+  const canSelect = Boolean(config.selectable) && (canRenew || canMessage);
+  const canEdit = Boolean(config.editableDates) && canRenew;
 
   const [rows, setRows] = useState([]);
   const [meta, setMeta] = useState(null);
@@ -93,17 +163,14 @@ export default function PlanExpiryBoard() {
   const [edits, setEdits] = useState({});
   const [savingId, setSavingId] = useState(null);
 
-  // Ticked rows, and the separate "everything the filter matches" mode.
-  // They are different things: 100 ticks on this page is not the same
-  // instruction as "all 3,412 expired customers", and conflating them is how
-  // a bulk send goes to the wrong list.
+  // Ticked rows, and the separate "everything the filter matches" mode. They
+  // are different instructions: 100 ticks on this page is not the same thing
+  // as "all 3,412 expired customers", and conflating them is how a bulk action
+  // goes to the wrong list.
   const [picked, setPicked] = useState(() => new Set());
   const [allMatching, setAllMatching] = useState(false);
   const [sending, setSending] = useState(false);
   const [renewing, setRenewing] = useState(false);
-  // Defaults to today, which is the shortest sensible renewal and makes the
-  // control obviously a date rather than an empty box the operator has to
-  // guess the format of.
   const [renewTo, setRenewTo] = useState(today);
   const [job, setJob] = useState(null);
   const jobId = useRef(null);
@@ -131,14 +198,14 @@ export default function PlanExpiryBoard() {
     return () => { cancelled = true; };
   }, [days, mode, zone, page, reloadKey]);
 
-  // A change of filter is a change of list, so the selection cannot survive
-  // it. Paging deliberately does NOT clear it - ticking rows on page 1, going
-  // to page 2 and losing them is the classic way a bulk action gets sent to
-  // half the people it should have.
+  // A change of filter is a change of list, so the selection cannot survive it.
+  // Paging deliberately does NOT clear it - ticking rows on page 1, going to
+  // page 2 and losing them is the classic way a bulk action reaches half the
+  // people it should have.
   useEffect(() => {
     setPicked(new Set());
     setAllMatching(false);
-  }, [range, zone]);
+  }, [view, rangeKey, zone]);
 
   /* Follow a running send. Polling stops the moment the job reports a finish
    * time, so a completed send does not keep asking about itself forever. */
@@ -259,17 +326,29 @@ export default function PlanExpiryBoard() {
     }
   }
 
+  /** The filter, exactly as the GET sends it, so the server re-runs the same
+   *  query rather than trusting a list of ids from the browser. */
+  function filterQuery() {
+    const query = new URLSearchParams({ days: String(days) });
+    if (mode) query.set("mode", mode);
+    if (zone) query.set("zone", zone);
+    return query.toString();
+  }
+
+  function selection() {
+    return allMatching ? { all: true } : { customer_plan_ids: [...picked] };
+  }
+
   async function sendExpiryNotice() {
     if (!canSelect || !canMessage || sending || !selectedCount) return;
 
     const confirmed = await confirm({
       title: `Send the expiry notice to ${selectedCount} customer${selectedCount === 1 ? "" : "s"}?`,
-      message: allMatching
+      message: (allMatching
         ? `Every expired customer the current filter matches${zone ? ` in ${zone}` : ""} `
-          + "will get a WhatsApp message saying their plan has expired. "
-          + "WhatsApp messages cannot be recalled once sent."
-        : "They will each get a WhatsApp message saying their plan has expired. "
-          + "WhatsApp messages cannot be recalled once sent.",
+        : "They ")
+        + "will get the approved “plan expired” WhatsApp template. "
+        + "WhatsApp messages cannot be recalled once sent.",
       confirmLabel: "Send now",
       tone: "danger",
     });
@@ -277,17 +356,8 @@ export default function PlanExpiryBoard() {
 
     setSending(true);
     try {
-      // The filter travels in the query string, exactly as it does on the GET.
-      // The server re-runs the same query rather than trusting a list of ids
-      // from the browser - so "all matching" means all matching on the server,
-      // and a tampered id cannot pull in somebody outside the current view.
-      const query = new URLSearchParams({ days: String(days) });
-      if (zone) query.set("zone", zone);
-
       const response = await post(
-        `/reports/plan-expiry/notify?${query.toString()}`,
-        allMatching ? { all: true } : { customer_plan_ids: [...picked] },
-      );
+        `/reports/plan-expiry/notify?${filterQuery()}`, selection());
       const data = response?.data || response;
 
       if (!data?.recipients) {
@@ -312,13 +382,9 @@ export default function PlanExpiryBoard() {
 
   /* Push every selected plan out to one date, in one call.
    *
-   * Working through two hundred lapsed connections a row at a time is two
-   * hundred round trips and two hundred chances to mistype a date. The whole
-   * point of ticking them is to give them all the same answer.
-   *
-   * Deliberately does NOT raise invoices - extending service and billing for
-   * it are separate decisions, and a button that quietly issued two hundred
-   * bills would be an expensive surprise. The confirmation says so. */
+   * Deliberately raises NO invoices - extending service and billing for it are
+   * separate decisions, and a button that quietly issued two hundred bills
+   * would be an expensive surprise. The confirmation says so. */
   async function quickRenew() {
     if (!canSelect || !canRenew || renewing || !selectedCount) return;
 
@@ -340,16 +406,8 @@ export default function PlanExpiryBoard() {
 
     setRenewing(true);
     try {
-      const query = new URLSearchParams({ days: String(days) });
-      if (zone) query.set("zone", zone);
-
-      const response = await post(
-        `/reports/plan-expiry/renew?${query.toString()}`,
-        {
-          end_date: renewTo,
-          ...(allMatching ? { all: true } : { customer_plan_ids: [...picked] }),
-        },
-      );
+      const response = await post(`/reports/plan-expiry/renew?${filterQuery()}`,
+        { end_date: renewTo, ...selection() });
       const data = response?.data || response;
       toast.success(data?.detail || `${data?.renewed || 0} plan(s) renewed.`);
       clearSelection();
@@ -363,29 +421,41 @@ export default function PlanExpiryBoard() {
   }
 
   const dirtyCount = Object.keys(edits).length;
+  const showSave = canEdit;
+  const showRenewedOn = Boolean(config.showRenewedOn);
 
   return (
     <section className="page">
       <div className="page-heading">
         <div>
-          <h1>Plan expiry</h1>
-          <p>
-            Renew a plan by editing its dates here — no need to open each customer.
-            {canSelect && " Tick the customers you want to remind, then send the expiry notice."}
-          </p>
+          <h1>{config.title}</h1>
+          <p>{config.blurb}</p>
         </div>
+        {/* The other two views are one click away, so arriving on the wrong
+            one costs nothing. They are separate pages, not chips, because they
+            answer separate questions. */}
+        <nav className="view-switch" aria-label="Other expiry views">
+          {Object.values(VIEWS).map((v) => (
+            <Link key={v.key} to={`/reports/${v.key}`}
+                  className={v.key === config.key ? "chip is-active" : "chip"}>
+              {v.title}
+            </Link>
+          ))}
+        </nav>
       </div>
 
       <div className="toolbar">
-        <div className="filter-chips" role="group" aria-label="Expiry window">
-          {RANGES.map((r) => (
-            <button key={r.key} type="button"
-                    className={range === r.key ? "chip is-active" : "chip"}
-                    onClick={() => patch({ range: r.key, page: "" })}>
-              {r.label}
-            </button>
-          ))}
-        </div>
+        {ranges.length > 0 && (
+          <div className="filter-chips" role="group" aria-label="Window">
+            {ranges.map((r) => (
+              <button key={r.key} type="button"
+                      className={rangeKey === r.key ? "chip is-active" : "chip"}
+                      onClick={() => patch({ range: r.key, page: "" })}>
+                {r.label}
+              </button>
+            ))}
+          </div>
+        )}
         <select className="input" style={{ maxWidth: 200 }} value={zone}
                 onChange={(e) => patch({ zone: e.target.value, page: "" })}
                 aria-label="Filter by zone">
@@ -412,10 +482,9 @@ export default function PlanExpiryBoard() {
           <div className="bulk-actions">
             <button type="button" className="btn sm" onClick={clearSelection}>Clear</button>
 
-            {/* Both actions are hidden - not merely disabled - for a staff
-                member whose permissions do not cover them. A greyed-out
-                button that never becomes usable is an invitation to ask why,
-                every day, forever. */}
+            {/* Hidden, not disabled, for a user whose permissions do not cover
+                them. A greyed-out button that never becomes usable is an
+                invitation to ask why, every day, forever. */}
             {canRenew && (
               <div className="quick-renew">
                 <label htmlFor="renew-to">Renew to</label>
@@ -452,14 +521,12 @@ export default function PlanExpiryBoard() {
       <div className="card">
         <div className="table-wrap">
           {loading ? (
-            <Loading label="Loading plans" />
+            <Loading label={`Loading ${config.title.toLowerCase()}`} />
           ) : !rows.length ? (
             <Empty
-              title={mode === "renewed" ? "No renewals in this window"
-                : days === -1 ? "No expired plans"
-                  : days === "all" ? "Nothing is due to expire"
-                    : "Nothing expiring in this window"}
-              hint={zone ? `Try clearing the ${zone} zone filter.` : "Try a wider date range."}
+              title={config.emptyTitle}
+              hint={zone ? `Try clearing the ${zone} zone filter.`
+                : config.emptyHint || "Try a wider date range."}
             />
           ) : (
             <table className="data">
@@ -477,10 +544,10 @@ export default function PlanExpiryBoard() {
                   <th>Start date</th><th>End date</th>
                   {/* On the Renewed view, "days left" is not what the operator
                       came to see - they want to know WHEN it was renewed. */}
-                  {mode === "renewed" && <th>Renewed on</th>}
-                  <th className="right">Days left</th>
+                  {showRenewedOn && <th>Renewed on</th>}
+                  <th className="right">{config.daysLabel}</th>
                   <th className="right">Outstanding</th>
-                  <th className="right">Save</th>
+                  {showSave && <th className="right">Save</th>}
                 </tr>
               </thead>
               <tbody>
@@ -492,7 +559,6 @@ export default function PlanExpiryBoard() {
                   const invalid = endValue && startValue && endValue < startValue;
                   const overdue = row.days_left < 0;
                   const ticked = allMatching || picked.has(id);
-
                   const rail = overdue ? "rail rail-danger"
                     : row.days_left <= 3 ? "rail rail-warn" : "rail rail-idle";
 
@@ -512,19 +578,30 @@ export default function PlanExpiryBoard() {
                       <td>{row.zone || "—"}</td>
                       <td>{row.plan_name || "—"}</td>
                       <td className="right num">{inr(row.price)}</td>
-                      <td>
-                        <input type="date" className="input mini-date" value={startValue}
-                               onChange={(e) => editRow(id, "start_date", e.target.value)}
-                               aria-label={`Start date for ${row.customer_name}`} />
-                      </td>
-                      <td>
-                        <input type="date" className={`input mini-date${invalid ? " is-invalid" : ""}`}
-                               value={endValue} min={startValue || undefined}
-                               onChange={(e) => editRow(id, "end_date", e.target.value)}
-                               aria-invalid={Boolean(invalid)}
-                               aria-label={`End date for ${row.customer_name}`} />
-                      </td>
-                      {mode === "renewed" && (
+
+                      {canEdit ? (
+                        <>
+                          <td>
+                            <input type="date" className="input mini-date" value={startValue}
+                                   onChange={(e) => editRow(id, "start_date", e.target.value)}
+                                   aria-label={`Start date for ${row.customer_name}`} />
+                          </td>
+                          <td>
+                            <input type="date" className={`input mini-date${invalid ? " is-invalid" : ""}`}
+                                   value={endValue} min={startValue || undefined}
+                                   onChange={(e) => editRow(id, "end_date", e.target.value)}
+                                   aria-invalid={Boolean(invalid)}
+                                   aria-label={`End date for ${row.customer_name}`} />
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td>{fmtDate(row.start_date)}</td>
+                          <td>{fmtDate(row.end_date)}</td>
+                        </>
+                      )}
+
+                      {showRenewedOn && (
                         <td>{row.renewed_on ? fmtDate(row.renewed_on) : "—"}</td>
                       )}
                       <td className="right num">
@@ -537,31 +614,35 @@ export default function PlanExpiryBoard() {
                           ? <strong style={{ color: "#b91c1c" }}>{inr(row.outstanding)}</strong>
                           : "—"}
                       </td>
-                      <td className="right">
-                        <div className="row-actions">
-                          <button type="button" className="btn sm primary"
-                                  disabled={!pending || savingId === id || invalid}
-                                  onClick={() => saveRow(row)}>
-                            {savingId === id ? "…" : "Save"}
-                          </button>
-                        </div>
-                      </td>
+                      {showSave && (
+                        <td className="right">
+                          <div className="row-actions">
+                            <button type="button" className="btn sm primary"
+                                    disabled={!pending || savingId === id || invalid}
+                                    onClick={() => saveRow(row)}>
+                              {savingId === id ? "…" : "Save"}
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={canSelect ? 5 : 4}>
+                  {/* Checkbox + Customer/Mobile/Zone/Plan */}
+                  <td colSpan={(canSelect ? 1 : 0) + 4}>
                     <strong>{totals.count} plan{totals.count === 1 ? "" : "s"}</strong>
                     {meta?.pages > 1 && (
                       <span className="muted"> · showing {rows.length} on page {meta.page} of {meta.pages}</span>
                     )}
                   </td>
                   <td className="right num"><strong>{inr(totals.value)}</strong></td>
-                  <td colSpan={mode === "renewed" ? 4 : 3} />
+                  {/* Start + End + optional Renewed on + the days column */}
+                  <td colSpan={2 + (showRenewedOn ? 1 : 0) + 1} />
                   <td className="right num"><strong>{inr(totals.outstanding)}</strong></td>
-                  <td />
+                  {showSave && <td />}
                 </tr>
               </tfoot>
             </table>

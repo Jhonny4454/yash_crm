@@ -91,7 +91,9 @@ export const MENU = [
   {
     name: "Reports", icon: "fa-chart-bar",
     children: [
-      { name: "Customer Expiry", path: "/reports/plan-expiry" },
+      { name: "Expiring Soon", path: "/reports/expiring" },
+      { name: "Expired Customers", path: "/reports/expired" },
+      { name: "Recently Renewed", path: "/reports/renewed" },
       { name: "Attendance Report", path: "/reports/attendance" },
       { name: "Leaves Report", path: "/reports/leaves" },
       { name: "Salary Report", path: "/reports/payroll" },
@@ -150,6 +152,8 @@ export const TITLES = {
   "/reports/expenses": "Expense Report",
   "/reports/leaves": "Leaves Report",
   "/reports/payroll": "Salary Report",
-  "/reports/plan-expiry": "Customer Expiry Report",
+  "/reports/expiring": "Expiring Soon",
+  "/reports/expired": "Expired Customers",
+  "/reports/renewed": "Recently Renewed",
   "/staff/types": "Staff Types",
 };
