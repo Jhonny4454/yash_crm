@@ -4823,7 +4823,73 @@ def init_database(flask_app=None):
             admin.is_active = True
             db.session.commit()
             flask_app.logger.info("Admin account re-enabled.")
-            
+
+
+# --------------------------------------------------------------------------- #
+#  Schema check on import
+# --------------------------------------------------------------------------- #
+def ensure_schema(flask_app=None):
+    """Add any column the models have and the live database does not.
+
+    Why this runs at IMPORT and not only inside ``init_database()``
+    --------------------------------------------------------------
+    ``init_database()`` is called from ``wsgi.py`` and from ``python app.py``.
+    It is NOT called by ``flask run``, by an IDE run configuration, by a
+    WSGI server pointed straight at ``app:app``, or by any of the helper
+    scripts - and in every one of those cases the application starts happily
+    with a model that has a column the database has never heard of. The first
+    query then dies with
+
+        (1054, "Unknown column 'users.permissions' in 'field list'")
+
+    which is not a code error anybody can find by reading the code: the code is
+    right, the database is behind. It happened on the deploy that added
+    ``users.permissions``, and it would happen again on the next column.
+
+    So the check moves to where it cannot be skipped. ``app.py`` is imported by
+    every entry point there is, so importing it is now enough to guarantee the
+    schema matches the models.
+
+    It only ever ADDS columns and tables - never drops, never rewrites - and it
+    can never stop the process starting: a database that is unreachable at
+    import time is a problem for the first request to report, not a reason to
+    refuse to boot. Set AUTO_MIGRATE=0 to skip it (for instance while running a
+    migration by hand).
+    """
+    flask_app = flask_app or app
+    if os.environ.get('AUTO_MIGRATE', '1') == '0':
+        return None
+    if getattr(flask_app, '_schema_checked', False):
+        return None
+    flask_app._schema_checked = True
+
+    try:
+        with flask_app.app_context():
+            from services.schema_sync import sync_schema
+            changes = sync_schema(db)
+    except Exception as exc:                            # noqa: BLE001
+        # Deliberately swallowed. The database being unreachable while the
+        # process starts is common (a Railway instance waking up, a container
+        # ordered before its database) and must not turn into a boot loop.
+        flask_app.logger.warning('Schema check could not run: %s', exc)
+        return None
+
+    for table, column in changes['added_columns']:
+        flask_app.logger.warning('Schema: added missing column %s.%s',
+                                 table, column)
+    for table, column, message in changes['failed']:
+        # Loud, because this is the state that produces "Unknown column" on
+        # every request afterwards, and a warning nobody reads is how it
+        # reaches a customer.
+        flask_app.logger.error(
+            'Schema: could NOT add %s.%s - %s. Run "python upgrade_schema.py" '
+            'against this database.', table, column, message)
+    return changes
+
+
+ensure_schema(app)
+
+
 if __name__ == '__main__':
     init_database(app)
     debug_mode = os.environ.get('FLASK_ENV') != 'production'
