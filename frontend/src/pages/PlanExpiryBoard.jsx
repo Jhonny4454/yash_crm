@@ -19,6 +19,13 @@ import "../styles/Forms.css";
  * Dates are edited per row and saved individually: the endpoint takes one plan
  * at a time, and a partial failure should not roll back rows that saved fine.
  *
+ * There is deliberately NO "+30d" / "+20d" quick-extend button. It filled the
+ * two date boxes immediately but only staged the change in local state, so the
+ * dates on screen said the plan had been extended while the database still
+ * said it had not - and pressing it, seeing the dates move and navigating away
+ * lost the lot. That is exactly the shape of "I edited it and it reverted",
+ * which is what it kept getting reported as. Type the end date, press Save.
+ *
  * Paged at 100 rows. The endpoint used to return EVERY matching row - 96 KB at
  * 604 customers, roughly 1.5 MB at ten thousand - serialised again on every
  * filter change, which is most of what made this screen feel slow.
@@ -52,13 +59,6 @@ const RANGES = [
 const PER_PAGE = 100;
 
 const today = () => new Date().toLocaleDateString("en-CA");
-
-function addDays(iso, days) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  d.setDate(d.getDate() + days);
-  return d.toLocaleDateString("en-CA");
-}
 
 export default function PlanExpiryBoard() {
   const { toast, confirm } = useToast();
@@ -192,15 +192,6 @@ export default function PlanExpiryBoard() {
 
   function editRow(id, field, value) {
     setEdits((prev) => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
-  }
-
-  /** Extend by this plan's own validity period from the current end date. */
-  function quickRenew(row) {
-    const current = edits[row.customer_plan_id]?.end_date || row.end_date;
-    const start = addDays(current, 1);
-    const validityDays = Math.max(1, Number(row.validity_days || 30));
-    editRow(row.customer_plan_id, "start_date", start);
-    editRow(row.customer_plan_id, "end_date", addDays(start, validityDays - 1));
   }
 
   async function saveRow(row) {
@@ -462,11 +453,6 @@ export default function PlanExpiryBoard() {
                       </td>
                       <td className="right">
                         <div className="row-actions">
-                          <button type="button" className="btn sm"
-                                  title={`Extend by ${row.validity_days || 30} days`}
-                                  onClick={() => quickRenew(row)}>
-                            +{row.validity_days || 30}d
-                          </button>
                           <button type="button" className="btn sm primary"
                                   disabled={!pending || savingId === id || invalid}
                                   onClick={() => saveRow(row)}>
