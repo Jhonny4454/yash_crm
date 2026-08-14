@@ -35,6 +35,11 @@ NEW_COLUMNS = {
         ('meta_language', "VARCHAR(10) NULL DEFAULT 'en'"),
         ('meta_variables', 'VARCHAR(255) NULL'),
     ],
+    'users': [
+        # Per-user capability list. NULL means unrestricted, which is what
+        # every existing row has to keep meaning - see permissions.py.
+        ('permissions', 'TEXT NULL'),
+    ],
     'customers': [
         ('ip_address', 'VARCHAR(45) NULL'),
         ('ipacct_id', 'VARCHAR(50) NULL'),

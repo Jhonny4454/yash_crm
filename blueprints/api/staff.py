@@ -17,6 +17,7 @@ from sqlalchemy import func, or_
 from models import (Attendance, Customer, CustomerPlan, Expense, Invoice,
                     Leave, Payment, Payroll, Plan, StaffType, User, db)
 
+from . import permissions
 from .serializers import customer_plan_dict, user_dict
 from .utils import (admin_required, body, check_enums, current_staff_id, fail,
                     invalid_values, iso, money, ok, paginate, staff_required,
@@ -26,6 +27,33 @@ bp = Blueprint('api_staff', __name__)
 
 STAFF_WRITABLE = ('username', 'full_name', 'email', 'mobile', 'role',
                   'staff_type_id', 'is_active')
+
+
+def _apply_permissions(user, data, actor=None):
+    """Write the capability list, if the request carried one.
+
+    Only an administrator reaches these endpoints, so there is no question of
+    somebody granting themselves more than they have. The one guard that IS
+    needed is below in staff_update: an admin must not be able to strip their
+    own staff.manage box and lock the last door behind them.
+    """
+    if 'permissions' not in data:
+        return
+    user.permissions = permissions.serialise(data.get('permissions'))
+
+
+@bp.get('/staff/capabilities')
+@staff_required
+def staff_capabilities():
+    """Everything an administrator can grant, for the tick-box grid.
+
+    Sent from the server rather than hard-coded in the React bundle so a
+    capability added to permissions.py appears on the Staff screen without a
+    front-end release, and so the labels cannot drift out of step with the
+    rules that actually enforce them.
+    """
+    return ok({'capabilities': permissions.CAPABILITIES,
+               'implies': {k: list(v) for k, v in permissions.IMPLIES.items()}})
 
 
 # --------------------------------------------------------------------------- #
@@ -84,6 +112,7 @@ def staff_create():
     for field in STAFF_WRITABLE:
         if field in data and field != 'username':
             setattr(user, field, data[field])
+    _apply_permissions(user, data)
     user.set_password(password)
 
     db.session.add(user)
@@ -109,9 +138,24 @@ def staff_update(uid):
     if bad:
         return invalid_values(bad)
 
+    # An administrator must not be able to lock themselves out. Demoting your
+    # own account, or handing yourself a capability list that omits
+    # staff.manage, leaves nobody who can undo it - and the only way back is
+    # editing the database by hand.
+    if uid == current_staff_id():
+        demoting = 'role' in data and data['role'] != 'admin'
+        losing_staff = ('permissions' in data
+                        and 'staff.manage' not in permissions.parse(data['permissions'])
+                        and permissions.parse(data['permissions']))
+        if demoting or losing_staff:
+            return fail('cannot_restrict_yourself', 400,
+                        detail='Ask another administrator to change your own '
+                               'role or permissions.')
+
     for field in STAFF_WRITABLE:
         if field in data:
             setattr(user, field, data[field])
+    _apply_permissions(user, data)
 
     password = data.get('password')
     if password:
@@ -311,6 +355,103 @@ def _expiry_summary(query, mode):
     }
 
 
+def _selected_plans(query, data):
+    """The rows a bulk action applies to: the ticked ids, or the whole filter.
+
+    The filter is re-run on the SERVER from the query string rather than
+    trusting a list of ids from the browser, so "all matching" means all
+    matching here - and a tampered id cannot reach a customer outside the view
+    the operator was looking at.
+    """
+    if data.get('all'):
+        return query, None
+    try:
+        ids = [int(i) for i in (data.get('customer_plan_ids') or [])]
+    except (TypeError, ValueError):
+        return None, fail('invalid_selection', 400)
+    if not ids:
+        return None, fail('nothing_selected', 400,
+                          detail='Tick at least one customer first.')
+    return query.filter(CustomerPlan.id.in_(ids)), None
+
+
+@bp.post('/reports/plan-expiry/renew')
+@staff_required
+def report_plan_expiry_renew():
+    """Push every selected plan out to one new end date, in one action.
+
+    This is the bulk counterpart of editing a row's dates and pressing Save.
+    Working through two hundred lapsed connections one row at a time is two
+    hundred round trips and two hundred chances to mistype a date; the whole
+    point of ticking them is to give them all the same answer.
+
+    Body::
+
+        {"end_date": "2026-09-14", "customer_plan_ids": [12, 44]}
+        {"end_date": "2026-09-14", "all": true}
+
+    What it changes, and what it deliberately does not:
+      * ``end_date`` moves to the date given.
+      * ``start_date`` moves to the day after the OLD end date, so the new
+        period reads as continuous rather than overlapping the one it follows.
+        A plan whose old end date is already in the future keeps its start.
+      * ``status`` returns to 'active' if the new end date has not passed.
+      * ``last_invoice_date`` is stamped with today, because that is the field
+        every other renewal path writes and it is what the dashboard's
+        "Customer renewed" row counts. A renewal that did not appear there
+        would make the operator think their afternoon's work vanished.
+      * NO invoice is raised and no money is recorded. Extending service and
+        billing for it are different decisions, and a bulk button that quietly
+        issued two hundred invoices would be a very expensive surprise. Use
+        Generate Invoice for that.
+    """
+    data = body()
+    mode, days, unbounded, zone, today = _expiry_args()
+
+    end_date = data.get('end_date') or data.get('date')
+    try:
+        new_end = datetime.strptime(str(end_date)[:10], '%Y-%m-%d').date()
+    except (TypeError, ValueError):
+        return fail('invalid_end_date', 400,
+                    detail='Pick the date the plans should run to.')
+
+    query = _expiry_query(mode, days, unbounded, zone, today)
+    query, err = _selected_plans(query, data)
+    if err:
+        return err
+
+    plans = query.all()
+    if not plans:
+        return ok({'renewed': 0, 'detail': 'Nothing matched that selection.'})
+
+    renewed = 0
+    for cp in plans:
+        if cp.end_date and cp.end_date < new_end:
+            # Continuous, not overlapping: the new period starts the day the
+            # old one finished. A plan that has not run out yet keeps its
+            # start date, because that period is still being served.
+            if cp.end_date < today:
+                cp.start_date = cp.end_date + timedelta(days=1)
+        cp.end_date = new_end
+        if new_end >= today:
+            cp.status = 'active'
+        cp.last_invoice_date = today
+        renewed += 1
+
+    db.session.commit()
+
+    try:
+        from app import log_audit
+        log_audit('Quick Renew',
+                  f'{renewed} plan(s) extended to {new_end.isoformat()}')
+    except Exception:                                    # pragma: no cover
+        pass
+
+    return ok({'renewed': renewed, 'end_date': iso(new_end),
+               'detail': f'{renewed} plan(s) now run to {new_end.strftime("%d %b %Y")}. '
+                         f'No invoice was raised.'})
+
+
 #: Only the expired view may message people. Chasing somebody whose plan runs
 #: out next Tuesday with "your plan has expired" is worse than not messaging
 #: them at all, and the Renewed view is a record of work already done.
@@ -344,17 +485,9 @@ def report_plan_expiry_notify():
                     detail='Expiry notices can only be sent from the expired list.')
 
     query = _expiry_query(mode, days, unbounded, zone, today)
-
-    ids = data.get('customer_plan_ids')
-    if not data.get('all'):
-        try:
-            ids = [int(i) for i in (ids or [])]
-        except (TypeError, ValueError):
-            return fail('invalid_selection', 400)
-        if not ids:
-            return fail('nothing_selected', 400,
-                        detail='Tick at least one customer first.')
-        query = query.filter(CustomerPlan.id.in_(ids))
+    query, err = _selected_plans(query, data)
+    if err:
+        return err
 
     from sqlalchemy.orm import selectinload
     plans = query.options(selectinload(CustomerPlan.customer),

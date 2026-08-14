@@ -68,7 +68,12 @@ export const RESOURCES = {
       { key: "password", label: "Password", type: "password", hideInTable: true }, { key: "email", label: "Email", type: "email" },
       { key: "mobile", label: "Mobile", type: "tel" }, { key: "role", label: "Role", options: STAFF_ROLES },
       { key: "staff_type_id", label: "Staff type", type: "lookup", lookup: "/staff/types" }, { key: "monthly_salary", label: "Monthly salary", type: "money" }, yesNo,
+      // What this account is allowed to do. Hidden from the table because it
+      // is a list, and a column of fifteen comma-separated keys tells nobody
+      // anything; the Edit dialog is where it is read and set.
+      { key: "permissions", label: "What this account can do", type: "permissions", hideInTable: true },
     ],
+    hint: "Add staff, set their role, and choose exactly which parts of the system each one can use.",
   },
   "service-providers": {
     title: "Service providers", singular: "Service provider", endpoint: "/service-providers",

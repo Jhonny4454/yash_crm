@@ -145,6 +145,29 @@ export function AuthProvider({ children }) {
     });
   }, []);
 
+  /* What this user is allowed to do.
+   *
+   * Reads `granted` off the signed-in user, which the API computes as the
+   * ticked capabilities PLUS everything those imply. Testing against the raw
+   * `permissions` list instead would make this stricter than the server: a
+   * user given "record payments" would have the invoice list hidden by the UI
+   * while the API was perfectly willing to serve it.
+   *
+   * Anyone unrestricted - and every administrator - answers true to
+   * everything, so screens written with `can()` behave exactly as they did
+   * before permissions existed.
+   *
+   * This hides controls; it does not secure anything. Every endpoint behind
+   * these screens re-checks the capability on the token, so a hand-edited
+   * localStorage buys a visible button and a 403 behind it.
+   */
+  const can = useCallback((capability) => {
+    const user = session?.user;
+    if (!user) return false;
+    if (!user.restricted) return true;
+    return Array.isArray(user.granted) && user.granted.includes(capability);
+  }, [session]);
+
   const value = useMemo(() => ({
     ...session,
     user: session?.user || null,
@@ -156,6 +179,8 @@ export function AuthProvider({ children }) {
     isAdmin: session?.audience === "staff" && session?.user?.role === "admin",
     isStaff: session?.audience === "staff",
     isCustomer: session?.audience === "customer",
+    restricted: Boolean(session?.user?.restricted),
+    can,
     offline,
     idleIn,
     staySignedIn,
@@ -164,7 +189,7 @@ export function AuthProvider({ children }) {
     signOut,
     refreshProfile,
   }), [session, signedIn, offline, idleIn, staySignedIn, setCompany,
-    signIn, signOut, refreshProfile]);
+    signIn, signOut, refreshProfile, can]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

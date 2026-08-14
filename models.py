@@ -16,6 +16,14 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120))
     mobile = db.Column(db.String(20))
     role = db.Column(db.Enum('admin', 'support', 'field', 'accounts'), default='support')
+    #: Comma-separated capability keys - see blueprints/api/permissions.py.
+    #:
+    #: NULL or empty means unrestricted, NOT "no access". Every user that
+    #: existed before this column did is empty, and reading empty as "denied"
+    #: would have locked the whole company out on the deploy that added it. A
+    #: user becomes restricted the moment an administrator ticks their first
+    #: box. Ignored entirely for role='admin', who always has everything.
+    permissions = db.Column(db.Text, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     staff_type_id = db.Column(db.Integer, db.ForeignKey('staff_types.id'))
     monthly_salary = db.Column(db.Numeric(10, 2), default=0.00)

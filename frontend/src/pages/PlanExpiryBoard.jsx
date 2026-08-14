@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { get, post, put } from "../api/client";
 import { useLookup } from "../api/useLookup";
+import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import {
   Empty, ErrorNote, Loading, Pager, fmtDate, inr, readableError,
@@ -62,7 +63,11 @@ const today = () => new Date().toLocaleDateString("en-CA");
 
 export default function PlanExpiryBoard() {
   const { toast, confirm } = useToast();
+  const { can } = useAuth();
   const [params, setParams] = useSearchParams();
+
+  const canRenew = can("plans.renew");
+  const canMessage = can("messages.send");
 
   const range = params.get("range") || "7";
   const zone = params.get("zone") || "";
@@ -70,7 +75,12 @@ export default function PlanExpiryBoard() {
   const selectedRange = RANGES.find((r) => r.key === range) || RANGES[0];
   const days = selectedRange.days;
   const mode = selectedRange.mode;
-  const canNotify = Boolean(selectedRange.notify);
+  // Selection only exists on the expired view, and only for somebody who can
+  // actually DO something with a selection. Showing a column of checkboxes to
+  // a user whose permissions cover neither renewing nor messaging gives them a
+  // control that does nothing, which reads as broken rather than as forbidden.
+  const isExpiredView = Boolean(selectedRange.notify);
+  const canSelect = isExpiredView && (canRenew || canMessage);
 
   const [rows, setRows] = useState([]);
   const [meta, setMeta] = useState(null);
@@ -90,6 +100,11 @@ export default function PlanExpiryBoard() {
   const [picked, setPicked] = useState(() => new Set());
   const [allMatching, setAllMatching] = useState(false);
   const [sending, setSending] = useState(false);
+  const [renewing, setRenewing] = useState(false);
+  // Defaults to today, which is the shortest sensible renewal and makes the
+  // control obviously a date rather than an empty box the operator has to
+  // guess the format of.
+  const [renewTo, setRenewTo] = useState(today);
   const [job, setJob] = useState(null);
   const jobId = useRef(null);
 
@@ -245,7 +260,7 @@ export default function PlanExpiryBoard() {
   }
 
   async function sendExpiryNotice() {
-    if (!canNotify || sending || !selectedCount) return;
+    if (!canSelect || !canMessage || sending || !selectedCount) return;
 
     const confirmed = await confirm({
       title: `Send the expiry notice to ${selectedCount} customer${selectedCount === 1 ? "" : "s"}?`,
@@ -295,6 +310,58 @@ export default function PlanExpiryBoard() {
     }
   }
 
+  /* Push every selected plan out to one date, in one call.
+   *
+   * Working through two hundred lapsed connections a row at a time is two
+   * hundred round trips and two hundred chances to mistype a date. The whole
+   * point of ticking them is to give them all the same answer.
+   *
+   * Deliberately does NOT raise invoices - extending service and billing for
+   * it are separate decisions, and a button that quietly issued two hundred
+   * bills would be an expensive surprise. The confirmation says so. */
+  async function quickRenew() {
+    if (!canSelect || !canRenew || renewing || !selectedCount) return;
+
+    if (!renewTo) {
+      toast.error("Pick the date these plans should run to.");
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: `Renew ${selectedCount} plan${selectedCount === 1 ? "" : "s"} to ${fmtDate(renewTo)}?`,
+      message: (allMatching
+        ? `Every expired customer the current filter matches${zone ? ` in ${zone}` : ""} `
+        : "The selected plans ")
+        + `will run to ${fmtDate(renewTo)} and go back to active. `
+        + "No invoice is raised — bill them from Generate Invoice.",
+      confirmLabel: "Renew now",
+    });
+    if (!confirmed) return;
+
+    setRenewing(true);
+    try {
+      const query = new URLSearchParams({ days: String(days) });
+      if (zone) query.set("zone", zone);
+
+      const response = await post(
+        `/reports/plan-expiry/renew?${query.toString()}`,
+        {
+          end_date: renewTo,
+          ...(allMatching ? { all: true } : { customer_plan_ids: [...picked] }),
+        },
+      );
+      const data = response?.data || response;
+      toast.success(data?.detail || `${data?.renewed || 0} plan(s) renewed.`);
+      clearSelection();
+      // Those rows have left this list - they are not expired any more.
+      setReloadKey((k) => k + 1);
+    } catch (err) {
+      toast.error(readableError(err));
+    } finally {
+      setRenewing(false);
+    }
+  }
+
   const dirtyCount = Object.keys(edits).length;
 
   return (
@@ -304,7 +371,7 @@ export default function PlanExpiryBoard() {
           <h1>Plan expiry</h1>
           <p>
             Renew a plan by editing its dates here — no need to open each customer.
-            {canNotify && " Tick the customers you want to remind, then send the expiry notice."}
+            {canSelect && " Tick the customers you want to remind, then send the expiry notice."}
           </p>
         </div>
       </div>
@@ -329,7 +396,7 @@ export default function PlanExpiryBoard() {
 
       {job && <JobProgress job={job} />}
 
-      {canNotify && selectedCount > 0 && (
+      {canSelect && selectedCount > 0 && (
         <div className="bulk-bar" role="status">
           <span>
             <strong>{selectedCount}</strong> customer{selectedCount === 1 ? "" : "s"} selected
@@ -344,10 +411,29 @@ export default function PlanExpiryBoard() {
           </span>
           <div className="bulk-actions">
             <button type="button" className="btn sm" onClick={clearSelection}>Clear</button>
-            <button type="button" className="btn sm primary"
-                    disabled={sending} onClick={sendExpiryNotice}>
-              {sending ? "Sending…" : "Send expiry notice on WhatsApp"}
-            </button>
+
+            {/* Both actions are hidden - not merely disabled - for a staff
+                member whose permissions do not cover them. A greyed-out
+                button that never becomes usable is an invitation to ask why,
+                every day, forever. */}
+            {canRenew && (
+              <div className="quick-renew">
+                <label htmlFor="renew-to">Renew to</label>
+                <input id="renew-to" type="date" className="input" value={renewTo}
+                       min={today()} onChange={(e) => setRenewTo(e.target.value)} />
+                <button type="button" className="btn sm primary"
+                        disabled={renewing || !renewTo} onClick={quickRenew}>
+                  {renewing ? "Renewing…" : "Quick Renew"}
+                </button>
+              </div>
+            )}
+
+            {canMessage && (
+              <button type="button" className="btn sm"
+                      disabled={sending} onClick={sendExpiryNotice}>
+                {sending ? "Sending…" : "Send expiry notice on WhatsApp"}
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -379,7 +465,7 @@ export default function PlanExpiryBoard() {
             <table className="data">
               <thead>
                 <tr>
-                  {canNotify && (
+                  {canSelect && (
                     <th className="select-col">
                       <input type="checkbox" checked={allOnPagePicked}
                              onChange={togglePage}
@@ -412,7 +498,7 @@ export default function PlanExpiryBoard() {
 
                   return (
                     <tr key={id} className={ticked ? `${rail} is-selected` : rail}>
-                      {canNotify && (
+                      {canSelect && (
                         <td className="select-col">
                           <input type="checkbox" checked={ticked}
                                  onChange={() => togglePick(id)}
@@ -466,7 +552,7 @@ export default function PlanExpiryBoard() {
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={canNotify ? 5 : 4}>
+                  <td colSpan={canSelect ? 5 : 4}>
                     <strong>{totals.count} plan{totals.count === 1 ? "" : "s"}</strong>
                     {meta?.pages > 1 && (
                       <span className="muted"> · showing {rows.length} on page {meta.page} of {meta.pages}</span>

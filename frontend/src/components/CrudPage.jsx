@@ -53,9 +53,14 @@ export default function CrudPage({
   const { data, meta, loading, refreshing, error, refetch } = useFetch(endpoint, { q, page });
 
   const tableCols = columns.filter((c) => !c.hideInTable);
-  const blank = Object.fromEntries(
-    columns.map((c) => [c.key, c.type === "checkbox" ? true : ""]),
-  );
+  const blank = Object.fromEntries(columns.map((c) => [
+    c.key,
+    // A permission field holds a LIST. Seeded as "" it would post an empty
+    // string, which the server parses as "no capabilities" rather than as
+    // "this field was not touched" - so a new staff member would be created
+    // already restricted out of everything.
+    c.type === "permissions" ? [] : c.type === "checkbox" ? true : "",
+  ]));
 
   // Sort the current page client-side. Server-side ordering would need an
   // API change; this at least makes each page scannable.
@@ -471,6 +476,19 @@ function CrudDialog({ endpoint, singular, columns, value, onClose, onSaved }) {
                 );
               }
 
+              if (c.type === "permissions") {
+                return (
+                  <PermissionsField
+                    key={c.key}
+                    label={c.label}
+                    value={form[c.key]}
+                    role={form.role}
+                    onChange={(next) => setForm((f) => ({ ...f, [c.key]: next }))}
+                    wide={wide}
+                  />
+                );
+              }
+
               if (c.type === "lookup") {
                 return (
                   <LookupField
@@ -546,6 +564,106 @@ function CrudDialog({ endpoint, singular, columns, value, onClose, onSaved }) {
           </div>
         </div>
       </form>
+    </div>
+  );
+}
+
+/**
+ * The tick-box grid that decides what one staff member is allowed to do.
+ *
+ * The catalogue comes from the SERVER (`GET /staff/capabilities`), not from a
+ * constant in this bundle. The same list is what actually enforces access in
+ * blueprints/api/permissions.py, so fetching it means a capability added there
+ * appears here without a front-end release - and, more importantly, that the
+ * labels an administrator reads can never describe something different from
+ * what the API enforces.
+ *
+ * Two behaviours that stop this being a footgun:
+ *
+ *  - No boxes ticked means UNRESTRICTED, which is the opposite of what a grid
+ *    of empty checkboxes looks like. So it says so, in the box, in words.
+ *  - Ticking "record payments" silently grants "view invoices" on the server,
+ *    because you cannot record a payment against a bill you are not allowed to
+ *    open. The implied boxes are shown ticked and disabled rather than being
+ *    left blank, or the screen would be describing a stricter rule than the
+ *    one in force.
+ */
+function PermissionsField({ label, value, role, onChange, wide }) {
+  const { data } = useFetch("/staff/capabilities");
+  const catalogue = data?.capabilities || [];
+  const implies = data?.implies || {};
+
+  const picked = useMemo(
+    () => new Set(Array.isArray(value) ? value : []),
+    [value],
+  );
+
+  // What the server will add on top of what was ticked.
+  const impliedByPicks = useMemo(() => {
+    const out = new Set();
+    picked.forEach((key) => (implies[key] || []).forEach((k) => out.add(k)));
+    return out;
+  }, [picked, implies]);
+
+  const groups = useMemo(() => {
+    const map = new Map();
+    catalogue.forEach((c) => {
+      if (!map.has(c.group)) map.set(c.group, []);
+      map.get(c.group).push(c);
+    });
+    return [...map.entries()];
+  }, [catalogue]);
+
+  const isAdmin = role === "admin";
+
+  function toggle(key) {
+    const next = new Set(picked);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    onChange([...next]);
+  }
+
+  return (
+    <div className="field" style={wide ? { gridColumn: "1 / -1" } : {}}>
+      <label>{label}</label>
+
+      {isAdmin ? (
+        <div className="hint perm-note">
+          Administrators can do everything. Choose another role to limit this
+          account to specific tasks.
+        </div>
+      ) : (
+        <div className="hint perm-note">
+          {picked.size === 0
+            ? "Nothing ticked — this account can use the whole system, as before. "
+              + "Tick a box to restrict it to only those tasks."
+            : `Restricted to ${picked.size} area${picked.size === 1 ? "" : "s"}. `
+              + "Everything else is hidden and refused."}
+        </div>
+      )}
+
+      <div className={`perm-grid${isAdmin ? " is-disabled" : ""}`}>
+        {groups.map(([group, items]) => (
+          <fieldset key={group} className="perm-group">
+            <legend>{group}</legend>
+            {items.map((c) => {
+              const inherited = !picked.has(c.key) && impliedByPicks.has(c.key);
+              return (
+                <label key={c.key} className="check-row" title={inherited
+                  ? "Granted automatically by another permission above."
+                  : undefined}>
+                  <input type="checkbox"
+                         checked={isAdmin || picked.has(c.key) || inherited}
+                         disabled={isAdmin || inherited}
+                         onChange={() => toggle(c.key)} />
+                  {c.label}
+                  {inherited && <span className="perm-implied">auto</span>}
+                </label>
+              );
+            })}
+          </fieldset>
+        ))}
+      </div>
     </div>
   );
 }

@@ -119,6 +119,30 @@ def _active_account(claims):
     return account, None
 
 
+def _capability_check(account):
+    """403 if this user's capability list does not cover this request.
+
+    Applied here rather than as a decorator on each endpoint. Every staff
+    endpoint already goes through staff_required, so one check here covers all
+    of them - and the alternative, 209 decorators, fails silently on the one
+    somebody forgets to add.
+
+    A user with no capability list is unrestricted and this returns None
+    immediately, so nothing changes for anybody until an administrator ticks a
+    box. See blueprints/api/permissions.py.
+    """
+    try:
+        from .permissions import check
+    except Exception:                                    # pragma: no cover
+        return None
+    missing = check(account)
+    if missing is None:
+        return None
+    return fail('not_permitted', 403, capability=missing,
+                detail='Your account does not have permission for this. Ask '
+                       'an administrator to enable it under Staff.')
+
+
 def staff_required(fn):
     """Any logged-in staff user (admin/support/field/accounts)."""
     @wraps(fn)
@@ -127,6 +151,9 @@ def staff_required(fn):
         if err:
             return err
         account, err = _active_account(claims)
+        if err:
+            return err
+        err = _capability_check(account)
         if err:
             return err
         request.jwt = claims

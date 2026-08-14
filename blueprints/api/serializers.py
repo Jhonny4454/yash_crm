@@ -18,6 +18,7 @@ from flask import url_for
 
 from models import Company, Customer, CustomerPlan, Invoice, Payment, Plan, User
 
+from . import permissions as _permissions
 from .utils import iso, money
 
 
@@ -106,6 +107,14 @@ def user_dict(u):
         'staff_type': u.staff_type.name if u.staff_type else '',
         'monthly_salary': money(u.monthly_salary),
         'created_at': iso(u.created_at),
+        # What this user is allowed to do. `permissions` is what the admin
+        # actually ticked; `granted` is that plus everything it implies, and is
+        # what the browser should test against - otherwise a user given
+        # "record payments" has the invoice list hidden from them by a UI that
+        # is stricter than the API it is talking to.
+        'permissions': _permissions.parse(getattr(u, 'permissions', None)),
+        'restricted': _permissions.is_restricted(u),
+        'granted': sorted(_permissions.effective(u)),
     }
 
 
