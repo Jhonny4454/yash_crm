@@ -288,21 +288,17 @@ function AuthorisationQueue({ days }) {
  * all seven columns. It answered a question the chips did not look like they
  * were asking.
  *
- * Two of the rows count things that have ALREADY happened, so they look back
- * from today; the third counts what is still coming, so it looks forward:
+ * ONLY THE EXPIRING ROW CARRIES THE DAY-BY-DAY CHIPS - today at the left edge,
+ * then one column per day to the end of the week (14 Aug ... 20 Aug). That is
+ * the row where the date is the actionable part: it says which morning to make
+ * which calls.
  *
- *   Expired   08 Aug .. 14 Aug   plans that ran out that day and have not
- *                                come back. Renewing moves end_date forward,
- *                                so a customer who renewed leaves this window
- *                                on their own.
- *   Renewed   08 Aug .. 14 Aug   renewals recorded that day, as distinct
- *                                customers.
- *   Expiring  14 Aug .. 20 Aug   active plans running out that day.
- *
- * The rows therefore do not share a column, and each one prints its own date
- * span beside its name. A single shared forward axis was tried and put six
- * structural zeros on each of the first two rows: nothing can have expired
- * tomorrow yet.
+ * Expired and Renewed are a headline and a link. Both count what has ALREADY
+ * happened, so spreading them across seven dated columns spent most of the
+ * panel restating a week that is over - and, sitting under a dated row, read
+ * as a third axis to compare against when it was nothing of the kind. They
+ * keep their own date span in words beside the name, their count for that
+ * span, and "View all" for the whole book.
  */
 function PlanLifecycle({ plans }) {
   const expiring = plans?.expiring || [];
@@ -320,7 +316,7 @@ function PlanLifecycle({ plans }) {
 
   return (
     <div className="panel-card">
-      <div className="panel-head">Plan lifecycle — last &amp; next 7 days</div>
+      <div className="panel-head">Plan lifecycle</div>
       <div className="panel-body">
         {/* Each row carries TWO numbers. The pill is the week on screen; "View
             all" is the whole book. They were the same control before, which
@@ -329,6 +325,7 @@ function PlanLifecycle({ plans }) {
             say (0) with a hundred dead connections behind it. */}
         <LifecycleRow name="Expired" days={expired} tone="danger" page="expired"
                       unit="lapsed connection" span={spans.recently_expired?.label}
+                      chips={false}
                       total={plans?.expired_total ?? plans?.expired_all ?? 0}
                       allTotal={plans?.expired_all} allRange=""
                       allLabel="every expired plan" {...shared} />
@@ -337,6 +334,7 @@ function PlanLifecycle({ plans }) {
             Green on purpose. */}
         <LifecycleRow name="Customer renewed" days={renewed} tone="ok" page="renewed"
                       unit="customer" span={spans.renewed?.label}
+                      chips={false}
                       total={plans?.renewed_total
                         ?? renewed.reduce((s, d) => s + d.count, 0)}
                       allTotal={plans?.renewed_all} allRange="?range=all"
@@ -353,9 +351,10 @@ function PlanLifecycle({ plans }) {
 }
 
 function LifecycleRow({ name, days, total, allTotal, allRange, allLabel, tone,
-                       page, unit = "plan", span, todayIso, columns }) {
+                       page, unit = "plan", span, chips = true,
+                       todayIso, columns }) {
   return (
-    <div className="life-row">
+    <div className={chips ? "life-row" : "life-row is-summary"}>
       <span className="name">
         {name}
         {/* Each row covers a different week - the past two look back, the
@@ -374,10 +373,12 @@ function LifecycleRow({ name, days, total, allTotal, allRange, allLabel, tone,
           View all <strong>{allTotal}</strong>
         </Link>
       )}
-      {/* The chips live in their own grid rather than being flex siblings of
-          the label. As siblings each chip sized itself to its own text, so
-          "05 Aug (0)" and "12 Aug (10)" were different widths and the three
-          rows never lined up as columns. Fixed tracks fix that. */}
+      {/* Only the Expiring row draws these. They live in their own grid rather
+          than being flex siblings of the label: as siblings each chip sized
+          itself to its own text, so "05 Aug (0)" and "12 Aug (10)" were
+          different widths and the columns never lined up. Fixed tracks fix
+          that. */}
+      {chips && (
       <div className="life-days" style={{ "--life-cols": columns }}>
         {days.map((day) => {
           const isToday = day.date === todayIso;
@@ -393,6 +394,7 @@ function LifecycleRow({ name, days, total, allTotal, allRange, allLabel, tone,
           );
         })}
       </div>
+      )}
     </div>
   );
 }
