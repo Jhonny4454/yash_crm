@@ -74,6 +74,38 @@ class Config:
     RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID')
     RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET')
 
+    # ------------------------------------------------------ REST API (JWT) --
+    # Used by blueprints/api - the React admin panel and the React Native app.
+    # Falls back to SECRET_KEY when JWT_SECRET_KEY is not set separately.
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or SECRET_KEY
+    # Access tokens are deliberately short. The browser signs itself out after
+    # two minutes with no activity, but that only clears localStorage on THAT
+    # machine - a token already copied off it keeps working until it expires.
+    # 15 minutes bounds that window without the operator noticing, because the
+    # API client refreshes silently while they are working.
+    #
+    # JWT_ACCESS_HOURS is still honoured so an existing .env keeps working.
+    JWT_ACCESS_MINUTES = int(
+        os.environ.get('JWT_ACCESS_MINUTES')
+        or (int(os.environ['JWT_ACCESS_HOURS']) * 60
+            if os.environ.get('JWT_ACCESS_HOURS') else 15))
+    JWT_ACCESS_HOURS = JWT_ACCESS_MINUTES / 60
+    JWT_REFRESH_DAYS = int(os.environ.get('JWT_REFRESH_DAYS', 30))
+    #: The address a CUSTOMER can reach this server on. Used to build the
+    #: signed bill links that go out in WhatsApp messages - behind a proxy
+    #: request.url_root is often http://localhost:5000, which is useless in a
+    #: message. Set this to the public https:// address once deployed.
+    PUBLIC_BASE_URL = os.environ.get('PUBLIC_BASE_URL', '')
+
+    CORS_ORIGINS = os.environ.get(
+        'CORS_ORIGINS',
+        'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000')
+    # Where Cashfree sends the mobile app back after checkout.
+    CASHFREE_RETURN_URL = os.environ.get('CASHFREE_RETURN_URL', '')
+
+    # ------------------------------------------------------------- billing --
+    INVOICE_DUE_DAYS = int(os.environ.get('INVOICE_DUE_DAYS', 15))
+
     # -------------------------------------------- WhatsApp / SMS gateway ----
     # Seeded into the `settings` table on first boot so they can be edited from
     # the admin UI afterwards without a redeploy.

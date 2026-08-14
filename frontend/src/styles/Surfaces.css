@@ -1,0 +1,217 @@
+/* ====================================================================
+   Surface outlines.
+
+   Borders were spread across three token names (--line, --border-light,
+   --border) plus hardcoded #e2e8f0, all at slate-200. At that weight
+   adjacent panels blend into one another and it is hard to tell where one
+   box ends and the next begins.
+
+   This file is imported LAST so it settles the argument: one strong colour
+   for the OUTER edge of every container, and the old light grey kept for
+   INTERNAL dividers - table rows, field separators - so tables stay readable
+   instead of turning into a grid of heavy lines.
+   ==================================================================== */
+
+:root {
+  /* Outer edge of a box. Slate-400: dark enough to separate two adjacent
+     white panels on a light grey page, without reading as a table grid. */
+  --box-border: #94a3b8;
+  --box-border-strong: #64748b;
+
+  /* Internal dividers stay light on purpose. */
+  --line: #e2e8f0;
+  --border-light: #e2e8f0;
+  --border: #e2e8f0;
+  --line-strong: #cbd5e1;
+}
+
+/* ---- Containers -------------------------------------------------------- */
+
+.panel-card,
+.card,
+.panel,
+.modal-card,
+.form-page fieldset.panel,
+.ref-stat,
+.picker-results,
+.profile-readonly,
+.cd-options-menu {
+  border: 2px solid var(--box-border) !important;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+}
+
+/* The blue metric strip is its own surface - give it a matching weight
+   rather than the light border it inherits. */
+.strip {
+  border: 2px solid var(--box-border-strong);
+}
+
+/* A panel head sits flush inside the new border, so square off its top
+   corners and let the container's radius do the rounding. */
+.panel-card > .panel-head:first-child {
+  border-radius: 8px 8px 0 0;
+}
+
+/* ---- Nested boxes need a lighter edge, or they fight the parent --------- */
+
+.panel-card .panel-card,
+.card .card,
+.cd-rail .panel-card {
+  border-width: 2px;
+}
+
+.chip-day,
+.cd-chip,
+.toast {
+  border: 1px solid var(--line-strong);
+}
+
+/* ---- Tables: strong outer frame, light inner rules --------------------- */
+
+.tbl,
+table.data {
+  border: 1px solid var(--line-strong);
+}
+
+.tbl th,
+table.data th {
+  border-bottom: 2px solid var(--box-border);
+}
+
+.tbl td,
+table.data td {
+  border-bottom: 1px solid var(--line);
+}
+
+/* A table already inside a bordered panel does not need its own frame. */
+.panel-card .table-wrap > .tbl,
+.panel-card .table-wrap > table.data,
+.card .table-wrap > .tbl,
+.card .table-wrap > table.data {
+  border: none;
+}
+
+/* ---- Form controls ----------------------------------------------------- */
+
+.field input,
+.field select,
+.field textarea,
+.cd-form input,
+.cd-form select,
+.cd-form textarea,
+.input,
+.select {
+  border: 1px solid var(--line-strong);
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus,
+.cd-form input:focus,
+.cd-form select:focus,
+.cd-form textarea:focus,
+.input:focus,
+.select:focus {
+  border-color: #1a76b8;
+}
+
+/* ---- Separator between the two dashboard/detail columns ---------------- */
+
+.zone-tabs,
+.cd-body .panel-card + .panel-card {
+  border-color: var(--line-strong);
+}
+
+/* ---- Print: hairlines, since ink weight is not the issue on paper ------ */
+
+@media print {
+  .panel-card, .card, .panel, .strip, .tbl, table.data {
+    border-width: 1px !important;
+    box-shadow: none !important;
+  }
+}
+
+/* ====================================================================
+   Stronger outlines, second pass.
+
+   The first pass covered the container classes that existed then. Since
+   the screens have grown, several newer surfaces - the tab strip, the
+   filter bars, the payment entry, the dialogs - were still relying on
+   the light divider colour and blurred into the page behind them.
+
+   Same principle as before: one strong colour on the OUTER edge of
+   anything that is a box, light rules kept for what is inside it.
+   ==================================================================== */
+
+.cd-panel,
+.panel-card,
+.search-panel,
+.run-panel,
+.filter-bar,
+.reminder-panel,
+.bulk-outcome,
+.run-result,
+.addon-form,
+.renew-block,
+.pay-summary,
+.picker-results,
+.plan-picker,
+.settings-group,
+.metric-card,
+.plan-card,
+.current-plan,
+.list-cards > article,
+.detail-grid,
+.strip,
+.dlg-facts,
+.confirm-card,
+.cd-options-menu,
+.offline-banner {
+  border: 2px solid var(--box-border);
+}
+
+/* The tab strip and its panel are one surface - no seam between them. */
+.cd-tabs {
+  border: 2px solid var(--box-border);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+}
+
+.cd-panel { border-radius: 0 0 10px 10px; }
+
+/* Dialogs sit above everything, so they get the heavier weight. */
+.modal-card,
+.confirm-card {
+  border: 2px solid var(--box-border-strong) !important;
+  box-shadow: 0 24px 60px -20px rgba(15, 23, 42, 0.55);
+}
+
+/* Fieldsets inside a dialog are nested boxes: keep them lighter so they do
+   not compete with the dialog's own edge. */
+.renew-block,
+.form-page fieldset.panel {
+  border-width: 1px;
+  border-color: var(--line-strong);
+}
+
+/* Inputs get a visible edge of their own - at slate-200 they disappeared
+   against a white panel and the form read as floating text. */
+.pay-grid input, .pay-grid select,
+.addon-grid input, .addon-grid select,
+.renew-grid input, .renew-grid select,
+.search-field input, .search-field select,
+.run-field input, .run-field select,
+.filter-right input, .filter-right select,
+.settings-grid input {
+  border: 1px solid var(--line-strong);
+}
+
+/* Tables inside an already-bordered panel keep their header rule only. */
+.panel-card > .table-wrap > .tbl,
+.cd-panel .table-wrap > .tbl { border: none; }
+
+.tbl thead th {
+  background: #f1f5f9;
+  border-bottom: 2px solid var(--box-border);
+}

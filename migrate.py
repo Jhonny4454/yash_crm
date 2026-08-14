@@ -29,31 +29,7 @@ import models_ext                                     # noqa: E402,F401
 DRY_RUN = '--dry-run' in sys.argv
 
 
-def column_ddl(column, dialect):
-    """Render an ADD COLUMN fragment that is safe on a populated table.
-
-    NOT NULL is deliberately dropped: existing rows have no value for a new
-    column, so forcing NOT NULL would fail. A DEFAULT is emitted when the
-    model declares a simple scalar one.
-    """
-    try:
-        type_sql = column.type.compile(dialect=dialect)
-    except Exception:                                  # noqa: BLE001
-        type_sql = 'TEXT'
-
-    ddl = f"{column.name} {type_sql}"
-
-    default = getattr(column, 'default', None)
-    if default is not None and getattr(default, 'is_scalar', False):
-        value = default.arg
-        if isinstance(value, bool):
-            ddl += f" DEFAULT {1 if value else 0}"
-        elif isinstance(value, (int, float)):
-            ddl += f" DEFAULT {value}"
-        elif isinstance(value, str):
-            escaped = value.replace("'", "''")
-            ddl += f" DEFAULT '{escaped}'"
-    return ddl
+from services.schema_sync import column_ddl        # noqa: E402
 
 
 def main():

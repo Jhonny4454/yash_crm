@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#102a43" />
+    <title>UniCRM — Yash Internet Services</title>
+
+    <!--
+      Font Awesome, loaded WITHOUT blocking the page.
+
+      This was a plain <link rel="stylesheet"> to cdnjs, which is the most
+      expensive line in the whole application: a browser will not paint a
+      single pixel until a stylesheet in <head> has been fetched, and this one
+      lives on somebody else's server. Before any of our own code ran, the
+      browser had to resolve cdnjs.cloudflare.com, complete a TLS handshake
+      and download about 100KB of CSS. On a slow connection that is most of a
+      second of blank white screen; if cdnjs is unreachable, the app does not
+      appear at all until the request gives up.
+
+      `media="print"` makes it non-blocking - the browser fetches it at low
+      priority and paints without waiting - and the onload handler switches it
+      to `all` the moment it arrives. The icons appear a fraction of a second
+      after the text instead of holding everything up.
+
+      preconnect gets the DNS lookup and TLS handshake underway immediately,
+      in parallel with our own bundle, so the icons land sooner too.
+    -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com" />
+    <link rel="stylesheet" media="print" onload="this.media='all'"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <noscript>
+      <link rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    </noscript>
+
+    <style>
+      /* Painted before any bundle arrives, so the first thing on screen is the
+         app's own background rather than a white flash. */
+      html, body { margin: 0; background: #f4f6f9; }
+      #root:empty::after {
+        content: "";
+        display: block;
+        height: 3px;
+        background: linear-gradient(90deg, #1a76b8, #64b5f6, #1a76b8);
+        background-size: 200% 100%;
+        animation: boot 1.1s linear infinite;
+      }
+      @keyframes boot { to { background-position: -200% 0; } }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

@@ -1,0 +1,249 @@
+/* ====================================================================
+   Customer portal - invoices and the pay-now flow.
+   ==================================================================== */
+
+.portal-invoices .num { text-align: right; font-variant-numeric: tabular-nums; }
+.portal-invoices .due { color: #b91c1c; }
+
+.portal-invoices .mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+}
+
+.portal-invoices .row-actions {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+/* The amount is part of the button label, so it must not be clipped when the
+   label grows from "Pay ₹799.00" to "Waiting for payment…". */
+.pay-btn { min-width: 9.5rem; justify-content: center; }
+
+/* While a payment is in flight the button is the only thing that matters on
+   the row - make the disabled state read as "working", not "unavailable". */
+.pay-btn:disabled { opacity: 0.9; cursor: progress; }
+
+@media (max-width: 640px) {
+  .portal-invoices .row-actions { flex-direction: column; align-items: stretch; }
+  .pay-btn { min-width: 0; }
+}
+
+/* ---- Renew or change plan ---------------------------------------------- */
+
+.current-plan {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.current-plan h2 { margin: 0 0 0.2rem; font-size: 1.05rem; }
+.current-plan p { margin: 0; font-size: 0.85rem; color: #64748b; }
+
+.section-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+/* The plan they are already on stays visible for comparison, but cannot be
+   "chosen" - switching to your own plan raises an invoice for nothing. */
+.plan-card.is-current { background: #f8fafc; }
+
+.plan-current-tag {
+  display: inline-block;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #15803d;
+  background: #dcfce7;
+  border-radius: 999px;
+}
+
+@media (max-width: 640px) {
+  .current-plan { flex-direction: column; align-items: stretch; }
+  .current-plan .btn { width: 100%; justify-content: center; }
+}
+
+/* ---- Plan chooser (customer portal) -------------------------------------
+ *
+ * Replaces the grid of plan cards with a single dropdown, matching how staff
+ * pick a package in the admin portal. A native <select> is deliberate: on a
+ * phone it opens the OS picker, which is easier to use one-handed than a
+ * column of cards, and it is the control customers already know.
+ */
+.plan-choose-panel { display: grid; gap: 16px; }
+
+.plan-choose-row { display: grid; gap: 7px; }
+
+.plan-choose-row label {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--muted, #4b5563);
+}
+
+.plan-select {
+  width: 100%;
+  max-width: 560px;
+  padding: 11px 12px;
+  font: inherit;
+  font-size: 0.95rem;
+  color: inherit;
+  background: var(--surface, #fff);
+  border: 1px solid var(--line, #1f2937);
+  border-radius: 9px;
+  /* 44px keeps it a comfortable touch target on a phone. */
+  min-height: 44px;
+}
+
+.plan-select:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
+.plan-choose-detail {
+  padding: 14px 16px;
+  border: 1px solid var(--line, #1f2937);
+  border-radius: 10px;
+  background: rgba(37, 99, 235, 0.045);
+}
+
+.plan-choose-detail dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px 20px;
+}
+
+.plan-choose-detail dl > div { display: grid; gap: 3px; }
+
+.plan-choose-detail dt {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted, #6b7280);
+}
+
+.plan-choose-detail dd { margin: 0; font-weight: 600; }
+
+.plan-diff { margin: 12px 0 0; font-size: 0.86rem; font-weight: 600; }
+.plan-diff.up { color: #b45309; }
+.plan-diff.down { color: #15803d; }
+
+.plan-choose-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 560px) {
+  .plan-choose-actions .btn { width: 100%; }
+  .plan-select { max-width: none; }
+}
+
+/* ---- Pay your dues ------------------------------------------------------ */
+/* The account total, made payable. It sits above the invoice table and under
+   the dashboard metrics, so it is styled as a statement rather than a row. */
+.metric-card.is-due strong { color: #b91c1c; }
+
+.pay-dues {
+  display: grid;
+  gap: 12px;
+  border: 2px solid #fca5a5;
+  background: #fff7f7;
+}
+
+.pay-dues-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.pay-dues-head h2 { margin: 0 0 2px; font-size: 1.02rem; }
+.pay-dues-head p { margin: 0; font-size: 0.87rem; color: var(--muted, #6b7280); }
+
+.pay-dues-total {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #b91c1c;
+  white-space: nowrap;
+}
+
+.pay-dues-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pay-dues-row label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted, #6b7280);
+}
+
+/* The rupee sign is part of the field, not the value, so the customer never
+   has to guess whether to type it. */
+.pay-dues-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line, #d1d5db);
+  border-radius: 8px;
+  background: #fff;
+  padding-left: 10px;
+  min-width: 0;
+}
+
+.pay-dues-input span { color: var(--muted, #6b7280); font-weight: 600; }
+
+.pay-dues-input .input {
+  border: 0;
+  background: transparent;
+  width: 8.5rem;
+  min-width: 0;
+  padding-left: 2px;
+}
+
+.pay-dues-input .input:focus { outline: none; }
+.pay-dues-input:focus-within { border-color: #2563eb; }
+
+.pay-dues-note,
+.pay-dues-warn,
+.pay-dues-off { margin: 0; font-size: 0.85rem; }
+
+.pay-dues-note { color: var(--muted, #6b7280); }
+.pay-dues-warn { color: #b91c1c; font-weight: 600; }
+.pay-dues-off { color: #92400e; }
+
+@media (max-width: 560px) {
+  .pay-dues-row { align-items: stretch; }
+  .pay-dues-row .btn,
+  .pay-dues-input { width: 100%; }
+  .pay-dues-input .input { width: 100%; }
+}
+
+/* Offline payment instructions, shown when there is no card gateway. */
+.pay-dues-offline { display: grid; gap: 8px; }
+.pay-dues-offline p { margin: 0; font-size: 0.87rem; }
+.pay-dues-offline .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
+
+.pay-dues-bank {
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid var(--line, #d1d5db);
+  border-radius: 8px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}

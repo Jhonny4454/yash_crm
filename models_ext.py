@@ -158,6 +158,18 @@ SETTING_DEFAULTS = [
      'interruption. - YASH', 'str'),
     ('invoice_due_days',        '15',     'int'),
     ('grace_period_days',       '1',      'int'),
+
+    # Outgoing mail. Off by default: with no SMTP host the mailer reports
+    # 'dry-run' rather than pretending an invoice was delivered.
+    ('mail_enabled',            'False',  'bool'),
+    ('mail_host',               '',       'str'),
+    ('mail_port',               '587',    'int'),
+    ('mail_username',           '',       'str'),
+    ('mail_password',           '',       'str'),
+    ('mail_from',               '',       'str'),
+    ('mail_from_name',          '',       'str'),
+    ('mail_use_tls',            'True',   'bool'),
+    ('mail_use_ssl',            'False',  'bool'),
 ]
 
 
@@ -457,3 +469,85 @@ class ImportJob(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     created_by = db.relationship('User')
+
+# --------------------------------------------------------------------------- #
+#  Portal renewals
+# --------------------------------------------------------------------------- #
+class RenewalRequest(db.Model):
+    """
+    One renewal a customer started from the self-service portal.
+
+    Covers both "renew what I already have" and "renew me onto a different
+    plan" (an upgrade or downgrade), for a chosen number of billing cycles.
+    The row is raised together with its invoice; the plan is only extended
+    once an admin approves the linked payment, so a customer can never move
+    their own expiry date.
+    """
+    __tablename__ = 'renewal_requests'
+
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'),
+                            nullable=False, index=True)
+    customer_plan_id = db.Column(db.Integer, db.ForeignKey('customer_plans.id'))
+
+    current_plan_id = db.Column(db.Integer, db.ForeignKey('plans.id'))
+    requested_plan_id = db.Column(db.Integer, db.ForeignKey('plans.id'),
+                                  nullable=False)
+
+    #: How many billing cycles were bought in one go (1 / 3 / 6 / 12).
+    months = db.Column(db.Integer, default=1, nullable=False)
+    #: Total days the plan will be extended by once approved.
+    days = db.Column(db.Integer, default=30, nullable=False)
+    amount = db.Column(db.Numeric(10, 2), default=0, nullable=False)
+
+    invoice_id = db.Column(db.Integer, db.ForeignKey('invoices.id'))
+    payment_id = db.Column(db.Integer, db.ForeignKey('payments.id'))
+
+    #: renew = same plan, change = upgrade/downgrade
+    kind = db.Column(db.Enum('renew', 'change'), default='renew')
+    #: pending -> approved | rejected | cancelled
+    status = db.Column(db.Enum('pending', 'approved', 'rejected', 'cancelled'),
+                       default='pending', index=True)
+
+    note = db.Column(db.String(255))
+    decision_note = db.Column(db.String(255))
+    decided_at = db.Column(db.DateTime)
+    decided_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    #: Filled in on approval so the history screen can show the new expiry.
+    effective_from = db.Column(db.Date)
+    effective_to = db.Column(db.Date)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    customer = db.relationship('Customer', backref=db.backref(
+        'renewal_requests', lazy='dynamic'))
+    customer_plan = db.relationship('CustomerPlan')
+    current_plan = db.relationship('Plan', foreign_keys=[current_plan_id])
+    requested_plan = db.relationship('Plan', foreign_keys=[requested_plan_id])
+    invoice = db.relationship('Invoice')
+    payment = db.relationship('Payment')
+    decided_by = db.relationship('User')
+
+    @property
+    def is_upgrade(self):
+        if not (self.current_plan and self.requested_plan):
+            return False
+        return (self.requested_plan.speed_mbps or 0) > (self.current_plan.speed_mbps or 0)
+
+    @property
+    def status_badge(self):
+        return {'pending': 'warning', 'approved': 'success',
+                'rejected': 'danger', 'cancelled': 'secondary'}.get(
+                    self.status or '', 'secondary')
+
+    @property
+    def plan_label(self):
+        if self.kind == 'change' and self.current_plan and self.requested_plan:
+            return f"{self.current_plan.name} → {self.requested_plan.name}"
+        return self.requested_plan.name if self.requested_plan else '-'
+
+    @property
+    def duration_label(self):
+        m = self.months or 1
+        return '1 month' if m == 1 else f'{m} months'

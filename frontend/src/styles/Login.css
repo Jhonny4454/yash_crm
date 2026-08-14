@@ -1,0 +1,562 @@
+@keyframes gradientMove {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Fixed and inset rather than `height: 100vh; width: 100vw`.
+ *
+ * Two bugs lived in that older declaration. `width: 100vw` includes the
+ * scrollbar's width, so on any desktop that shows one the page was wider than
+ * the viewport and scrolled sideways. And `body` carries
+ * `padding-top: var(--topbar-h)` + `padding-bottom: var(--footer-h)` for the
+ * admin shell's fixed chrome - 92px of padding on a screen that has neither a
+ * top bar nor a footer, which is exactly the 92px of scroll that was measured
+ * here at every viewport size.
+ *
+ * Taking the page out of flow removes both. The `auth-screen` body class that
+ * Login.jsx sets zeroes the padding as well, so nothing is left to scroll.
+ *
+ * 100dvh, with 100vh as the fallback: on mobile Safari and Chrome, 100vh is
+ * the height with the address bar HIDDEN, so a 100vh layout is taller than
+ * what you can actually see until you scroll. dvh is the visible height.
+ */
+.login-page {
+  position: fixed;
+  inset: 0;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  overflow: hidden;
+}
+
+/* The animated gradient is the STAFF sign-in only. The customer portal is
+   deliberately still - see the note above .login-page.is-customer below. */
+.login-page.is-staff {
+  background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #f5576c);
+  background-size: 400% 400%;
+  animation: gradientMove 15s ease infinite;
+}
+
+/* Cancels the admin shell's fixed-chrome padding while a sign-in screen is
+   on. Set from Login.jsx, because CSS cannot reach up to <body>. */
+body.auth-screen {
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+}
+
+.login-card {
+  /* A neutral slate tint rather than pure black: black over the gradient's
+     pink phase turns the card muddy maroon, while slate stays neutral through
+     the whole animation and still gives white text a solid contrast ratio. */
+  background: rgba(15, 23, 42, 0.55) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 28px !important;
+  padding: 1.8rem 1.5rem !important;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: 0 20px 48px -12px rgba(0, 0, 0, 0.6) !important;
+}
+
+.login-logo {
+  text-align: center;
+  margin-bottom: 1.2rem;
+}
+
+.login-logo img {
+  max-width: 120px;
+  width: 100%;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.25));
+}
+
+.login-logo h1 {
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0.4rem 0 0;
+}
+
+.login-logo .tagline {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.8rem;
+  display: block;
+  margin-top: 0.1rem;
+}
+
+.login-field {
+  margin-bottom: 1rem !important;
+}
+
+.login-field label {
+  display: block;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+  font-size: 0.8rem;
+  margin-bottom: 0.25rem;
+}
+
+.login-field input {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  background: rgba(255, 255, 255, 0.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 14px !important;
+  color: #fff !important;
+  font-size: 0.95rem;
+  transition: 0.2s;
+  box-sizing: border-box;
+  height: 46px;
+}
+
+.login-field input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.25) !important;
+  border-color: #fff !important;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15) !important;
+}
+
+.login-field input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.login-password-wrap {
+  position: relative;
+}
+
+.login-password-wrap input {
+  padding-right: 44px !important;
+}
+
+.login-toggle {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0;
+  height: 46px;
+  width: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-toggle:hover {
+  color: #fff;
+}
+
+.login-check {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  color: #fff !important;
+  margin: 0.2rem 0 0.8rem !important;
+}
+
+.login-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: #764ba2;
+  margin: 0;
+}
+
+.login-flex {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.login-forgot {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.8rem;
+  text-decoration: none;
+}
+
+.login-forgot:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.login-btn {
+  width: 100%;
+  padding: 0.7rem;
+  background: linear-gradient(135deg, #764ba2, #667eea) !important;
+  border: none !important;
+  border-radius: 50px !important;
+  color: #fff !important;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+  box-shadow: 0 6px 20px rgba(118, 75, 162, 0.35) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 46px;
+}
+
+.login-btn:hover:not(:disabled) {
+  transform: scale(1.01);
+  box-shadow: 0 8px 26px rgba(118, 75, 162, 0.5) !important;
+}
+
+.login-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.login-error {
+  background: rgba(255, 0, 0, 0.15) !important;
+  border: 1px solid rgba(255, 0, 0, 0.25) !important;
+  border-radius: 14px !important;
+  color: #fff !important;
+  padding: 0.6rem 1rem !important;
+  margin-bottom: 1rem !important;
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.login-error button {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.1rem;
+  cursor: pointer;
+  opacity: 0.7;
+  padding: 0 0.2rem;
+}
+
+.login-error button:hover {
+  opacity: 1;
+}
+
+.login-footer {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.7rem;
+  margin-top: 1.2rem;
+}
+
+@media (max-width: 576px) {
+  .login-card {
+    padding: 1.2rem 1rem !important;
+    max-width: 320px !important;
+  }
+  .login-logo img {
+    max-width: 100px;
+  }
+  .login-field input {
+    height: 44px;
+    font-size: 0.9rem;
+  }
+  .login-btn {
+    font-size: 0.95rem;
+    padding: 0.6rem;
+    height: 44px;
+  }
+  .login-toggle {
+    height: 44px;
+  }
+}
+
+/* ---- Footer links -------------------------------------------------------
+   These had no rule at all, so they fell back to the default anchor blue -
+   effectively invisible against the dark card. */
+
+.login-footer {
+  display: flex;
+  justify-content: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  margin-top: 1.1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.login-footer a {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.83rem;
+  font-weight: 500;
+  text-decoration: none;
+  padding: 0.2rem 0.35rem;
+  border-radius: 5px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.login-footer a:hover,
+.login-footer a:focus-visible {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  text-decoration: underline;
+}
+
+/* Keep the password reveal legible on the translucent field. */
+.login-toggle { color: rgba(255, 255, 255, 0.8); }
+.login-toggle:hover { color: #fff; }
+
+/* ---- Reset-by-code screen ---------------------------------------------- */
+
+/* Distinct from .login-error: this is information, not a failure. The reset
+   screen has to say "we could not send it, ask an admin" without that
+   reading as though something went wrong with the form. */
+.login-notice {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.8rem;
+  font-size: 0.83rem;
+  line-height: 1.5;
+  color: #0c4a6e;
+  background: rgba(224, 242, 254, 0.95);
+  border: 1px solid #7dd3fc;
+  border-radius: 8px;
+}
+
+.login-link-btn {
+  display: block;
+  width: 100%;
+  margin-top: 0.6rem;
+  padding: 0.4rem;
+  font: inherit;
+  font-size: 0.82rem;
+  color: #bae6fd;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.login-link-btn:hover { color: #fff; }
+
+/* ====================================================================
+   Login animation, and telling the two portals apart at a glance.
+
+   Staff and customers sign in through the same component, and the only
+   difference was one line of tagline text - so an operator who landed on
+   the wrong one had no way to notice. They now differ in colour, and the
+   card announces which door you are at.
+
+   Every animation is wrapped in a reduced-motion guard. A drifting
+   gradient behind a login form is decoration; for someone with vestibular
+   sensitivity it is a reason to shut the tab.
+   ==================================================================== */
+
+/* (Positioning lives in the single .login-page block at the top of this file.
+   A second one here used to re-declare `position: relative`, quietly undoing
+   the `fixed` above it - which is what let the body padding scroll the page.) */
+
+/* Slow-drifting mesh behind the card. Two blurred blobs, no images. */
+.login-page::before,
+.login-page::after {
+  content: "";
+  position: absolute;
+  width: 46vmax;
+  height: 46vmax;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.login-page::before {
+  top: -14vmax;
+  left: -10vmax;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.55), transparent 70%);
+}
+
+.login-page::after {
+  bottom: -16vmax;
+  right: -12vmax;
+  background: radial-gradient(circle, rgba(26, 118, 184, 0.45), transparent 70%);
+}
+
+/* Drift, lift and sheen are staff-side only. */
+.login-page.is-staff::before { animation: login-drift-a 22s ease-in-out infinite; }
+.login-page.is-staff::after { animation: login-drift-b 28s ease-in-out infinite; }
+
+@keyframes login-drift-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(6vmax, 4vmax, 0) scale(1.12); }
+}
+
+@keyframes login-drift-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.05); }
+  50%      { transform: translate3d(-5vmax, -5vmax, 0) scale(0.92); }
+}
+
+/* The card lifts in once, rather than appearing mid-flight. */
+.login-card {
+  position: relative;
+  z-index: 1;
+}
+
+.is-staff .login-card {
+  animation: login-card-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes login-card-in {
+  from { opacity: 0; transform: translateY(18px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Fields arrive in sequence, so the eye is led down the form. */
+.is-staff .login-card .login-field,
+.is-staff .login-card .login-btn,
+.is-staff .login-card .login-footer {
+  animation: login-field-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.is-staff .login-card .login-field:nth-of-type(1) { animation-delay: 120ms; }
+.is-staff .login-card .login-field:nth-of-type(2) { animation-delay: 190ms; }
+.is-staff .login-card .login-btn { animation-delay: 260ms; }
+.is-staff .login-card .login-footer { animation-delay: 330ms; }
+
+@keyframes login-field-in {
+  from { opacity: 0; transform: translateY(9px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.is-staff .login-logo img { animation: login-logo-in 700ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes login-logo-in {
+  from { opacity: 0; transform: scale(0.86) rotate(-6deg); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* The button shows it is working rather than just going grey.
+   Hover/press feedback is kept on both portals - that is the control telling
+   you it received the click, not decoration. */
+.login-btn { transition: transform 140ms ease, box-shadow 140ms ease, filter 140ms ease; }
+.login-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.06); }
+.login-btn:active:not(:disabled) { transform: translateY(0); }
+
+.login-btn:disabled {
+  position: relative;
+  overflow: hidden;
+}
+
+/* A sheen crossing the button while the request is in flight. Staff only. */
+.is-staff .login-btn:disabled::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%,
+              rgba(255, 255, 255, 0.28) 50%, transparent 80%);
+  animation: login-sheen 1.1s linear infinite;
+}
+
+@keyframes login-sheen {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+/* ---- Which portal am I at? -------------------------------------------- */
+
+/* Staff: the product's blue. Customers: a warmer teal. The difference is
+   deliberate and load-bearing - it is the fastest way to notice you have
+   opened the wrong sign-in. */
+.login-page.is-staff {
+  background: linear-gradient(135deg, #0f2942 0%, #1a76b8 55%, #14496e 100%);
+}
+
+/* The customer portal is deliberately still: no drifting gradient, no
+   staggered entrance, no sheen. Customers open this screen to do one thing
+   and leave, and movement on a page that is asking for a password reads as
+   the page still loading. The staff portal keeps its entrance because
+   operators sit in front of it all day and asked for it. */
+.login-page.is-customer {
+  background: linear-gradient(135deg, #06403c 0%, #0e8f83 55%, #0a5f58 100%);
+}
+
+.login-page.is-customer::after {
+  background: radial-gradient(circle, rgba(14, 143, 131, 0.5), transparent 70%);
+}
+
+.portal-badge {
+  display: inline-block;
+  margin-top: 0.4rem;
+  padding: 0.16rem 0.7rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.login-page.is-customer .login-btn {
+  background: linear-gradient(135deg, #0e8f83, #0a6f66);
+}
+
+/* ---- Respect the setting ---------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .login-page::before,
+  .login-page::after,
+  .login-card,
+  .login-card .login-field,
+  .login-card .login-btn,
+  .login-card .login-footer,
+  .login-logo img,
+  .login-btn:disabled::after {
+    animation: none !important;
+  }
+  .login-btn:hover:not(:disabled) { transform: none; }
+}
+
+/* Small screens: the card fills the width and the blobs get out of the way. */
+@media (max-width: 480px) {
+  .login-page::before, .login-page::after { filter: blur(50px); opacity: 0.35; }
+  .login-card { width: calc(100vw - 2rem); padding: 1.4rem 1.2rem; }
+}
+
+
+/* ---- Fitting a short screen -------------------------------------------
+ *
+ * A 1280x600 laptop measured the card running from y=91 to y=625 in a 600px
+ * viewport - the sign-in button was below the fold with no way to scroll to
+ * it, because the page deliberately does not scroll. Rather than allowing a
+ * scrollbar, the card compresses: the logo shrinks first (it is decoration),
+ * then the gaps.
+ */
+@media (max-height: 700px) {
+  .login-card { padding: 1.2rem 1.3rem !important; border-radius: 20px !important; }
+  .login-logo { margin-bottom: 0.7rem; }
+  .login-logo img { width: 54px; height: 54px; }
+  .login-logo h1 { font-size: 1.05rem; margin: 0.35rem 0 0; }
+  .login-field { margin-bottom: 0.65rem; }
+}
+
+@media (max-height: 560px) {
+  .login-card { padding: 0.9rem 1.1rem !important; }
+  .login-logo img { width: 40px; height: 40px; }
+  .login-logo .tagline { display: none; }
+  .login-logo h1 { font-size: 0.95rem; }
+  .login-field { margin-bottom: 0.5rem; }
+  .login-footer { margin-top: 0.6rem; font-size: 0.78rem; }
+}
+
+/* Last resort. If the viewport is shorter than the most compressed card - a
+ * phone in landscape with the keyboard up - let the CARD scroll rather than
+ * the page, so the button is always reachable and the background stays put.
+ */
+.login-card {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+}

@@ -1,0 +1,67 @@
+/* ====================================================================
+   "Cannot reach the server" bar.
+
+   Sits above everything, including the sidebar, because it explains why
+   the rest of the screen is behaving oddly. Amber rather than red: the
+   session is intact and nothing has been lost, so this is a warning
+   about the connection, not a failure the operator caused.
+   ==================================================================== */
+
+.offline-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* Above the sidebar, which otherwise covers the first half of the message. */
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  padding: 0.55rem 1rem;
+  font-size: 0.85rem;
+  color: #78350f;
+  background: #fef3c7;
+  border-bottom: 2px solid #f59e0b;
+}
+
+.offline-banner strong { white-space: nowrap; }
+.offline-banner span { flex: 1 1 260px; line-height: 1.45; }
+
+.offline-banner button {
+  padding: 0.3rem 0.8rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #78350f;
+  background: #fde68a;
+  border: 1px solid #f59e0b;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.offline-banner button:hover:not(:disabled) { background: #fcd34d; }
+.offline-banner button:disabled { opacity: 0.6; cursor: progress; }
+
+/* Recovered: green, and the only useful action is to reload. */
+.offline-banner.is-back {
+  color: #14532d;
+  background: #dcfce7;
+  border-bottom-color: #22c55e;
+}
+
+.offline-banner.is-back button {
+  color: #14532d;
+  background: #bbf7d0;
+  border-color: #22c55e;
+}
+
+/* Headroom while the bar is up, so it never sits on top of the topbar. */
+body.has-offline-banner { padding-top: 44px; }
+
+@media (max-width: 640px) {
+  body.has-offline-banner { padding-top: 78px; }
+  .offline-banner { font-size: 0.8rem; padding: 0.5rem 0.75rem; }
+}
+
+@media print { .offline-banner { display: none !important; } }

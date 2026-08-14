@@ -1,0 +1,96 @@
+/* The idle countdown.
+ *
+ * Anchored bottom-right rather than as a centred modal on purpose: a modal
+ * with a backdrop would block the page the operator is trying to get back to,
+ * and moving the mouse to dismiss it is the very thing that cancels it.
+ */
+.idle-warning {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 9000;
+  animation: idle-warning-in 160ms ease-out;
+}
+
+@keyframes idle-warning-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.idle-warning-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 400px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #1f2937;
+  border-left: 5px solid #d97706;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.26);
+}
+
+.idle-warning-card strong {
+  display: block;
+  font-size: 0.95rem;
+  color: #111827;
+}
+
+.idle-warning-card p {
+  margin: 2px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: #4b5563;
+}
+
+.idle-warning-card .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.idle-warning-ring {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px solid #d97706;
+  color: #b45309;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: #fffbeb;
+}
+
+/* Full width on a phone: 400px of card beside a 360px viewport would push the
+   Stay signed in button off screen, which is the one control that matters. */
+@media (max-width: 520px) {
+  .idle-warning {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .idle-warning-card {
+    max-width: none;
+    flex-wrap: wrap;
+  }
+
+  .idle-warning-card .btn {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .idle-warning { animation: none; }
+}
+
+@media (prefers-color-scheme: dark) {
+  .idle-warning-card {
+    background: #111827;
+    border-color: #f59e0b;
+  }
+  .idle-warning-card strong { color: #f9fafb; }
+  .idle-warning-card p { color: #d1d5db; }
+  .idle-warning-ring { background: #1f2937; }
+}

@@ -1,0 +1,370 @@
+/* ====================================================================
+   Dashboard additions.
+
+   Dashboard.css already carries the base.html shell plus the .strip,
+   .kpi, .legend, .auth-grid and .life-row rules. This file only adds
+   what that file does not define, so the two never fight over the same
+   property. Anything already styled there is deliberately absent here.
+   ==================================================================== */
+
+/* ---- Quick actions ----------------------------------------------------- */
+
+.quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.1rem;
+}
+
+/* KPI tiles are links now. Keep them reading as tiles, not as blue text -
+   Dashboard.css styles .kpi but predates them being clickable. */
+a.kpi {
+  color: inherit;
+  text-decoration: none;
+  border-radius: 8px;
+  padding-left: 6px;
+  padding-right: 6px;
+  margin-left: -6px;
+  transition: background 0.15s ease;
+}
+
+a.kpi:hover { background: rgba(255, 255, 255, 0.12); }
+a.kpi .big, a.kpi .lbl { text-decoration: none; }
+
+.kpi .note {
+  font-size: 0.7rem;
+  opacity: 0.75;
+  margin-top: 2px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ---- Donut ------------------------------------------------------------- */
+
+.donut-wrap { display: flex; justify-content: center; }
+
+/* An SVG ring, not a masked conic-gradient - see the note on <Donut>. The
+   strokes ARE the ring, so there is no hole to punch and nothing that can
+   erase the label sitting in the middle. */
+.donut {
+  display: block;
+  width: 128px;
+  height: 128px;
+  overflow: visible;
+}
+
+.donut circle {
+  fill: none;
+  stroke-width: 5;
+}
+
+.donut .donut-track { stroke: rgba(255, 255, 255, 0.18); }
+
+.donut .donut-arc {
+  /* Butt caps: rounded ones overlap the neighbouring slice. */
+  stroke-linecap: butt;
+  transition: stroke-width 0.15s ease;
+}
+
+.donut .donut-arc:hover { stroke-width: 6.5; }
+
+.donut text {
+  text-anchor: middle;
+  fill: #fff;
+  /* The ring is decoration; the numbers are the content. Keep them out of
+     text selection so a drag across the strip does not grab "8.4Kthis month". */
+  user-select: none;
+}
+
+.donut .donut-value {
+  font-size: 5.2px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.donut .donut-cap {
+  font-size: 3px;
+  opacity: 0.75;
+}
+
+/* Square swatches keyed to the donut slices. */
+.legend .sw-cash   { background: #e8f2fa; }
+.legend .sw-cheque { background: #9ecbe8; }
+.legend .sw-online { background: #4a9fd4; }
+.legend .sw-other  { background: #c7ddec; }
+.legend b { font-variant-numeric: tabular-nums; }
+
+/* Amounts push the two-column legend into wrapping inside the narrow strip
+   column, so give it a single column and let the value sit flush right. */
+.strip .legend {
+  grid-template-columns: 1fr;
+  gap: 3px;
+  font-size: 0.76rem;
+}
+.strip .legend > div { display: flex; align-items: center; }
+.strip .legend b { margin-left: auto; }
+
+.strip-link { text-align: center; }
+.strip-link a { color: #fff; font-size: 0.8rem; text-decoration: underline; opacity: 0.85; }
+.strip-link a:hover { opacity: 1; }
+
+/* ---- Plan lifecycle chips --------------------------------------------- */
+
+.pill-total {
+  padding: 2px 11px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: #fff;
+  background: #64748b;
+}
+
+.pill-total.warn   { background: #d97706; }
+.pill-total.danger { background: #dc2626; }
+/* Green, because this is the only row in the lifecycle panel reporting
+   something that went right. */
+.pill-total.ok     { background: #15803d; }
+.pill-total:hover  { filter: brightness(1.08); color: #fff; }
+
+/* One track per day, all equal, so the Expiring / Expired / Renewed rows read
+   as columns down the panel. `minmax(0, 1fr)` rather than `1fr`: a grid track
+   refuses to shrink below its content by default, which is what let a chip
+   push the row wider than the card it sits in. */
+.life-days {
+  display: grid;
+  /* One track per day on the SHARED axis, not per day in this row. All three
+     rows draw the same dates in the same columns, so a column is one real
+     date and time runs left to right across the whole panel. */
+  grid-template-columns: repeat(var(--life-cols, 7), minmax(0, 1fr));
+  gap: 6px;
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.chip-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 7px 6px;
+  /* 2px and a mid-slate, not 1px of near-white. The chips are the clickable
+     part of this panel and the old hairline made them read as plain text. */
+  border: 2px solid #cbd5e1;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #334155;
+  background: #fff;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.chip-day:hover,
+.chip-day:focus-visible {
+  border-color: #1a76b8;
+  background: #f1f7fc;
+  color: #1a76b8;
+  box-shadow: 0 2px 6px rgba(26, 118, 184, 0.18);
+}
+
+/* Today, marked on every row - the hinge the whole panel turns on. Past is
+   to the left of it, future to the right. */
+.chip-day.is-today {
+  border-color: #1a76b8;
+  background: #eff6fc;
+}
+
+.chip-day.is-today .day { color: #1a76b8; font-weight: 700; }
+
+.chip-day .day {
+  font-size: 0.7rem;
+  color: #475569;
+  white-space: nowrap;
+  /* The label is the widest thing in the chip. Let it shrink rather than
+     force the track open. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.chip-day .cnt { font-size: 0.95rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* A day with nothing on it is still a column - greyed, not hidden, so the
+   dates stay evenly spaced and the eye can count along the row. */
+.chip-day .cnt.zero { color: #94a3b8; font-weight: 600; }
+.chip-day:has(.cnt.zero) { border-color: #e2e8f0; background: #f8fafc; }
+
+/* Seven columns again, so the chips can breathe. */
+.chip-day { padding: 7px 5px; }
+.chip-day .day { font-size: 0.7rem; }
+.chip-day .cnt { font-size: 0.92rem; }
+
+/* Which week this row covers. The three rows show three different weeks and
+   the dates no longer line up between them, so each row says its own span. */
+.life-row .name { display: grid; gap: 1px; }
+
+.life-span {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+/* Narrow screens: scroll the axis sideways rather than wrapping it.
+ *
+ * Wrapping was right when each row was a self-contained week. It is wrong
+ * now: the three rows share one axis, and a wrapped row breaks the columns
+ * that make a date mean the same thing on every line. A chip you have to
+ * scroll to is worth more than fourteen too narrow to read - and all three
+ * rows scroll together because they are the same width.
+ */
+/* Phones: seven tracks do not fit 390px, so wrap to four and let the row be
+   two lines. Every row wraps identically, so they still read as a set. */
+@media (max-width: 900px) {
+  .life-days { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (max-width: 480px) {
+  .life-days { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .chip-day .day { font-size: 0.66rem; }
+}
+
+/* ---- Responsive -------------------------------------------------------- */
+
+@media (max-width: 700px) {
+  .tbl .bar-col { display: none; }
+  .quick-actions .btn { flex: 1 1 auto; justify-content: center; }
+}
+
+@media print {
+  .quick-actions, .no-print { display: none !important; }
+}
+
+/* ---- Drill-down counts in the monthly summary -------------------------- */
+
+.tbl a.drill {
+  display: inline-block;
+  min-width: 26px;
+  padding: 1px 6px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #1a76b8;
+  text-decoration: none;
+  border-radius: 5px;
+  border-bottom: 1px dotted currentColor;
+}
+
+.tbl a.drill:hover,
+.tbl a.drill:focus-visible {
+  background: rgba(26, 118, 184, 0.1);
+  border-bottom-style: solid;
+}
+
+.tbl a.drill.due { color: #b91c1c; }
+.tbl a.drill.due:hover { background: rgba(185, 28, 28, 0.09); }
+
+/* The money sitting in the authorisation queue. A bare count does not tell an
+   operator whether the queue is worth opening now or after lunch. */
+.auth-grid .sub {
+  margin-top: 2px;
+  font-size: 0.68rem;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+/* ---- Pending authorisation, day by day --------------------------------- */
+
+.auth-queue {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.auth-queue.is-loading { gap: 8px; padding: 4px 0; }
+
+.auth-queue-row {
+  display: grid;
+  /* Date takes the slack; count and amount are fixed so the columns line up
+     down the list instead of jittering with the width of each figure. */
+  grid-template-columns: 1fr 34px 72px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 0.78rem;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.auth-queue-row:hover,
+.auth-queue-row:focus-visible {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.6);
+  color: #fff;
+}
+
+.auth-queue-row .c,
+.auth-queue-row .a {
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.auth-queue-more {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: underline;
+  text-align: center;
+}
+
+/* An empty queue is a result, not a blank. */
+.auth-queue-empty {
+  margin: 0 0 10px;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* ---- "View all" on each lifecycle row ---------------------------------- */
+/*
+   Sits beside the week's pill, not instead of it. The pill is this week and
+   is the number the chips add up to; this one is the whole book, which is
+   almost always the larger and more alarming figure - so it is deliberately
+   quieter than the pill until hovered, and carries its own count so nobody has
+   to open the board to find out whether it is worth opening.
+*/
+.life-all {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 50px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #475467;
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
+}
+.life-all strong { font-size: 0.86rem; font-weight: 800; }
+.life-all:hover { text-decoration: none; background: #f1f5f9; color: #1d2939; }
+
+.life-all.danger { border-color: #fecaca; color: #b42318; }
+.life-all.danger:hover { background: #fef3f2; color: #912018; }
+.life-all.warn { border-color: #fed7aa; color: #b54708; }
+.life-all.warn:hover { background: #fffaeb; color: #93370d; }
+.life-all.ok { border-color: #bbf7d0; color: #067647; }
+.life-all.ok:hover { background: #ecfdf3; color: #05603a; }
+
+/* The chips take the rest of the row; the two controls stay together. */
+.life-row .life-days { margin-left: auto; }
+
+@media (max-width: 900px) {
+  .life-row .life-days { margin-left: 0; }
+}

@@ -1,0 +1,235 @@
+/* ====================================================================
+   Renewal queue.
+
+   One question dominates this screen: has the money arrived? Approving
+   extends service, so a paid row and an unpaid row must never look
+   alike, and the header tick must never sweep an unpaid one along.
+   ==================================================================== */
+
+.renewal-queue .page-heading { align-items: flex-start; }
+
+.queue-counts {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.84rem;
+  color: #475569;
+  white-space: nowrap;
+}
+
+.queue-counts strong { color: #243447; font-variant-numeric: tabular-nums; }
+.queue-counts .ok strong { color: #15803d; }
+
+/* ---- Filter bar -------------------------------------------------------- */
+
+.filter-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.status-tabs { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+
+.status-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+  font: inherit;
+  font-size: 0.83rem;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.status-tabs button:hover { background: #e2e8f0; }
+
+.status-tabs button.is-active {
+  color: #fff;
+  background: #1a76b8;
+  border-color: #1a76b8;
+}
+
+.tab-count {
+  padding: 0 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(15, 23, 42, 0.12);
+  border-radius: 999px;
+}
+
+.status-tabs button.is-active .tab-count { background: rgba(255, 255, 255, 0.25); }
+
+.filter-right { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+
+.filter-right select,
+.filter-right input {
+  padding: 0.38rem 0.5rem;
+  font: inherit;
+  font-size: 0.83rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+}
+
+.paid-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: #475569;
+  cursor: pointer;
+}
+
+/* ---- Queue bar --------------------------------------------------------- */
+
+.renewal-queue .queue-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.84rem;
+  color: #475569;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.renewal-queue .queue-bar strong { color: #243447; font-variant-numeric: tabular-nums; }
+.renewal-queue .warn { color: #b45309; font-weight: 600; }
+.renewal-queue .row-actions { display: flex; align-items: center; gap: 0.5rem; }
+.renewal-queue .selection-count { font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+
+/* ---- Table ------------------------------------------------------------- */
+
+.renewal-table { font-size: 0.83rem; }
+.renewal-table th { white-space: nowrap; }
+.renewal-table td { vertical-align: top; }
+.renewal-table .tick { width: 34px; text-align: center; }
+.renewal-table .tick input { width: 16px; height: 16px; cursor: pointer; }
+.renewal-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.renewal-queue .sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.renewal-queue .sub.ok { color: #15803d; font-weight: 600; }
+.renewal-queue .sub.due { color: #b91c1c; font-weight: 600; }
+.renewal-queue .sub.warn { color: #b45309; font-weight: 600; }
+.renewal-queue .sub.note { font-style: italic; }
+.renewal-queue .due { color: #b91c1c; font-weight: 600; }
+.renewal-table .arrow { color: #94a3b8; }
+
+.kind-tag {
+  display: inline-block;
+  padding: 1px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.kind-tag.change { background: #ddd6fe; color: #5b21b6; }
+
+.renewal-table tbody tr.is-selected {
+  background: #e0f2fe;
+  box-shadow: inset 3px 0 0 #1a76b8;
+}
+
+/* Unpaid pending rows carry a warning stripe. They can still be approved,
+   but never by the header tick and never without a second look. */
+.renewal-table tbody tr.is-unpaid { background: #fffbeb; }
+.renewal-table tbody tr.is-unpaid.is-selected { background: #fef3c7; }
+
+.decision { display: grid; gap: 1px; }
+.decision .st-approved { color: #15803d; text-transform: capitalize; }
+.decision .st-rejected { color: #b91c1c; text-transform: capitalize; }
+.decision .st-cancelled { color: #64748b; text-transform: capitalize; }
+
+/* ---- Bulk outcome ------------------------------------------------------ */
+
+.bulk-outcome { margin-bottom: 1rem; border-color: #1a76b8 !important; }
+
+.bulk-outcome .panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.bulk-body { padding: 0.85rem; font-size: 0.85rem; }
+
+.outcome-list {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+  line-height: 1.65;
+  max-height: 210px;
+  overflow-y: auto;
+}
+
+.outcome-skipped {
+  margin-top: 0.75rem;
+  padding: 0.7rem 0.8rem;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  color: #78350f;
+}
+
+/* ---- Expiry reminders -------------------------------------------------- */
+
+.reminder-panel { margin-top: 1.25rem; }
+.reminder-body { padding: 0.85rem; }
+
+.reminder-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+}
+
+.reminder-controls label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.83rem;
+  color: #475569;
+}
+
+.reminder-controls select {
+  padding: 0.35rem 0.5rem;
+  font: inherit;
+  font-size: 0.83rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+}
+
+.reminder-count { margin: 0; margin-right: auto; font-size: 0.85rem; color: #475569; }
+.reminder-count strong { color: #243447; }
+.more-note { margin: 0.5rem 0 0; font-size: 0.78rem; }
+
+.reminder-result {
+  margin-top: 0.85rem;
+  padding: 0.75rem 0.85rem;
+  font-size: 0.84rem;
+  border-radius: 8px;
+}
+
+.reminder-result.ok { background: #dcfce7; border: 1px solid #86efac; color: #14532d; }
+.reminder-result.warn { background: #fffbeb; border: 1px solid #fcd34d; color: #78350f; }
+.reminder-result p { margin: 0.4rem 0 0; line-height: 1.5; }
+
+@media (max-width: 900px) {
+  .filter-bar, .renewal-queue .queue-bar { flex-direction: column; align-items: flex-start; }
+  .queue-counts { flex-wrap: wrap; }
+}

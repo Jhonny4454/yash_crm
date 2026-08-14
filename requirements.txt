@@ -20,8 +20,15 @@ email-validator==2.1.1
 # ---- Background jobs ----
 APScheduler==3.10.4
 
-# ---- HTTP client (WhatsApp/Cashfree gateway) ----
+# ---- HTTP client (WhatsApp/Cashfree/Razorpay gateways) ----
 requests==2.32.3
+
+# ---- REST API auth (React admin panel + React Native app) ----
+PyJWT==2.8.0
+
+# ---- Invoice PDF generation ----
+# Pure Python, unlike WeasyPrint which needs GTK/Cairo on Windows.
+reportlab==4.2.5
 
 # ---- Production WSGI ----
 gunicorn==22.0.0

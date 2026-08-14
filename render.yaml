@@ -1,51 +1,144 @@
-# Render.com deployment configuration
-# Docs: https://render.com/docs/render-yaml
+# Render blueprint: the Flask API and the React front end as two services.
+#
+# The database is NOT defined here - it lives on Railway, and Render reaches it
+# over the public connection string. Railway hands you a URL beginning
+# `mysql://`; config.py rewrites that to `mysql+pymysql://` because SQLAlchemy 2
+# will not accept the bare prefix.
+#
+# Deploy: push this file, then in Render choose New > Blueprint and point it at
+# the repository. Every value marked `sync: false` must be filled in by hand in
+# the dashboard - they are secrets and do not belong in the repository.
+#
+#   render.com  ->  Blueprint  ->  connect repo  ->  fill the secrets
+#
+# After the first deploy, run the schema upgrade once from the API service's
+# Shell tab:
+#
+#   python upgrade_schema.py
 
 services:
+  # ----------------------------------------------------------------- API ----
   - type: web
-    name: yash-internet-services-crm
+    name: yash-crm-api
     runtime: python
+    plan: starter
+    region: singapore          # closest Render region to Navi Mumbai
+    branch: main
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn -c gunicorn.conf.py wsgi:application
-    plan: free
-
+    # 2 workers on the starter plan; more will thrash the 512 MB limit.
+    # --timeout 120 because the PDF and bulk-billing endpoints are slow.
+    startCommand: gunicorn wsgi:application --workers 2 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.10"   # matches runtime.txt
       - key: FLASK_ENV
         value: production
-      - key: SECRET_KEY
-        generateValue: true      # Render generates a secure random value
+
+      # Railway's MySQL connection string, e.g.
+      #   mysql://root:pass@containers-us-west-1.railway.app:6543/railway
       - key: DATABASE_URL
-        fromDatabase:
-          name: yash-crm-db
-          property: connectionString
-      - key: CREDENTIAL_KEY
+        sync: false
+
+      # python -c "import secrets; print(secrets.token_hex(32))"
+      # Two different values. harden() refuses to boot without them.
+      - key: SECRET_KEY
         generateValue: true
-      - key: WEB_CONCURRENCY
-        value: 1                 # Keep at 1 - scheduler must only run once
-      - key: PORT
-        value: 10000
-      - key: TZ
-        value: Asia/Kolkata
-      - key: RUN_SCHEDULER
-        value: 1
-      # --- Fill these in Render dashboard after first deploy ---
-      # - key: CASHFREE_APP_ID
-      # - key: CASHFREE_SECRET_KEY
-      # - key: CASHFREE_ENV        value: production
-      # - key: WA_ENABLED          value: 1
-      # - key: WA_API_URL
-      # - key: WA_API_TOKEN
-      # - key: WA_INSTANCE_ID
+      - key: JWT_SECRET_KEY
+        generateValue: true
 
-    healthCheckPath: /login
+      # The front end's own origin. Without this every API call from the
+      # deployed UI is blocked by the browser's cross-origin check.
+      - key: CORS_ORIGINS
+        value: https://yash-crm.onrender.com
 
-  - type: pserv       # background service alternative if you want scheduler separate
-    # Uncomment if you want to run the scheduler in its own process:
-    # name: yash-crm-scheduler
-    # startCommand: python -c "from wsgi import application"
+      # The address a CUSTOMER'S PHONE reaches this API on.
+      #
+      # The bill and receipt WhatsApp templates carry the PDF as a document
+      # header, and Meta fetches that file itself from a public link - so the
+      # link has to be built from a public https address, not from whatever
+      # host the request happened to arrive on. Behind Render's proxy that
+      # would often be an internal address, and the bill would go out with no
+      # attachment and no error.
+      #
+      # Must match this service's own public URL.
+      - key: PUBLIC_BASE_URL
+        value: https://yash-crm-api.onrender.com
 
-databases:
-  - name: yash-crm-db
-    plan: free
-    databaseName: yash_crm
-    user: yash_crm_user
+      # Session policy. The browser signs itself out after 2 minutes with no
+      # activity on the page; this bounds how long an access token that left
+      # the machine stays usable. The client refreshes silently, so shortening
+      # it is invisible to the operator.
+      - key: JWT_ACCESS_MINUTES
+        value: "15"
+
+      - key: SLOW_REQUEST_MS
+        value: "1500"
+      - key: LOGIN_MAX_ATTEMPTS
+        value: "8"
+      - key: MAX_UPLOAD_MB
+        value: "16"
+
+      # Optional integrations - leave blank until they are set up.
+      - key: WA_ENABLED
+        value: "0"
+      - key: WA_API_URL
+        sync: false
+      - key: WA_API_TOKEN
+        sync: false
+      - key: MAIL_HOST
+        sync: false
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: CASHFREE_APP_ID
+        sync: false
+      - key: CASHFREE_SECRET_KEY
+        sync: false
+
+    # Uploaded KYC documents and invoice logos must survive a redeploy.
+    # Without this disk they are wiped on every push.
+    disk:
+      name: uploads
+      mountPath: /opt/render/project/src/static/uploads
+      sizeGB: 1
+
+  # ------------------------------------------------------------ front end ---
+  - type: web
+    name: yash-crm
+    runtime: static
+    branch: main
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: frontend/dist
+    autoDeploy: true
+    envVars:
+      # Absolute API base, because the two services are on different hosts.
+      - key: VITE_API_URL
+        value: https://yash-crm-api.onrender.com/api/v1
+      # The static site is published at this service's root. The local Flask
+      # bundle uses /app/ by default; overriding it here keeps generated asset
+      # URLs and React Router paths on the static service root.
+      - key: VITE_BASE_PATH
+        value: /
+    routes:
+      # React Router owns the paths; hand every unknown one to index.html or a
+      # refresh on /app/customers returns 404 from the CDN.
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      # Hashed asset filenames, so they can be cached hard.
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable

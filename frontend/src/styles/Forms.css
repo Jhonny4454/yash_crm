@@ -1,0 +1,645 @@
+/* ====================================================================
+   Forms, field grids, pickers and the ledger statement.
+   Loaded by CustomerForm, CustomerLedger and Profile.
+   Uses the tokens already defined in index.css so the look stays
+   consistent with the rest of the admin panel.
+   ==================================================================== */
+
+/* ---- Form page shell ---------------------------------------------- */
+
+.form-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.form-page fieldset.panel {
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 12px;
+  padding: 1.25rem 1.35rem 1.4rem;
+  margin: 0;
+}
+
+.form-page legend {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted, #64748b);
+  padding: 0 0.5rem;
+}
+
+/* ---- Responsive field grid ----------------------------------------
+   3 columns on desktop, 2 on tablet, 1 on phone. A field can opt into
+   spanning the full row with .span-2 (used for textareas).            */
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem 1.15rem;
+}
+
+@media (max-width: 1100px) {
+  .field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .field-grid { grid-template-columns: 1fr; }
+}
+
+.field-grid .span-2 { grid-column: 1 / -1; }
+
+/* ---- Individual field ---------------------------------------------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.field > label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text, #1e293b);
+}
+
+.field > label abbr {
+  color: #dc2626;
+  text-decoration: none;
+  margin-left: 2px;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  padding: 0.6rem 0.7rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text, #1e293b);
+  background: #fff;
+  border: 1px solid var(--line, #cbd5e1);
+  border-radius: 8px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.field textarea { resize: vertical; min-height: 76px; }
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--brand, #0073b7);
+  box-shadow: 0 0 0 3px rgba(0, 115, 183, 0.15);
+}
+
+.field input:disabled,
+.field select:disabled,
+.field textarea:disabled {
+  background: #f1f5f9;
+  color: var(--muted, #64748b);
+  cursor: not-allowed;
+}
+
+.field > small {
+  font-size: 0.75rem;
+  color: var(--muted, #64748b);
+}
+
+/* Invalid state - border, ring and message all agree. */
+.field.has-error input,
+.field.has-error select,
+.field.has-error textarea,
+label.has-error input {
+  border-color: #dc2626;
+}
+
+.field.has-error input:focus,
+.field.has-error select:focus,
+.field.has-error textarea:focus {
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+}
+
+.field-error {
+  color: #b91c1c;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* ---- Checkbox row --------------------------------------------------- */
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.check-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--brand, #0073b7);
+  flex: 0 0 18px;
+  cursor: pointer;
+}
+
+/* ---- Sticky action bar ---------------------------------------------- */
+
+/* The bar is sticky, so form content passes UNDER it - that is the point.
+   What it must not do is let that content show through: the background was a
+   gradient fading to transparent, so the last field of the form was visible
+   between the Cancel and Create buttons and read as text printed on top of
+   text. Opaque, with a rule along the top so it is legible as a bar. */
+.form-actions {
+  position: sticky;
+  /* Clear of the app's FIXED footer. `bottom: 0` is measured against the
+     scrollport - the viewport - so the bar parked itself underneath the
+     footer bar and its buttons were sliced in half. */
+  bottom: var(--footer-h, 34px);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  padding: 0.85rem 0.2rem;
+  margin-top: 0.6rem;
+  background: var(--bg-body, #f4f6f9);
+  border-top: 2px solid var(--box-line, #94a3b8);
+  z-index: 5;
+}
+
+/* Clearance so the last field can always be scrolled clear of the bar rather
+   than living permanently beneath it. */
+.customer-form,
+form.stack,
+.form-page form { padding-bottom: 0.5rem; }
+
+@media (max-width: 640px) {
+  .form-actions { flex-direction: column-reverse; }
+  .form-actions .btn { width: 100%; text-align: center; }
+}
+
+/* ---- Password reveal toggle ----------------------------------------- */
+
+.input-with-toggle {
+  position: relative;
+  display: block;
+}
+
+.input-with-toggle input { padding-right: 4rem; width: 100%; }
+
+.input-with-toggle .reveal {
+  position: absolute;
+  right: 0.45rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: var(--brand, #0073b7);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.25rem 0.4rem;
+  border-radius: 6px;
+}
+
+.input-with-toggle .reveal:hover { background: rgba(0, 115, 183, 0.08); }
+
+/* ---- Profile ---------------------------------------------------------- */
+
+.profile-readonly {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: #f8fafc;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 10px;
+}
+
+.profile-readonly > div { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+.profile-readonly span { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted, #64748b); }
+.profile-readonly strong { font-size: 0.92rem; }
+.profile-readonly .pill { align-self: flex-start; }
+
+/* ---- Customer picker -------------------------------------------------- */
+
+.picker-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 10px;
+  overflow: hidden;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.picker-results li + li { border-top: 1px solid var(--line, #f1f5f9); }
+
+.picker-results button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  text-align: left;
+  background: #fff;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.picker-results button:hover,
+.picker-results button:focus-visible { background: #f1f5f9; }
+.picker-results button.is-selected { background: rgba(0, 115, 183, 0.09); }
+.picker-results strong { font-size: 0.9rem; }
+.picker-results span { font-size: 0.78rem; color: var(--muted, #64748b); }
+
+/* ---- Ledger ------------------------------------------------------------ */
+
+.ledger-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.ledger-head h2 { margin: 0 0 0.2rem; font-size: 1.15rem; }
+.ledger-head h2 a { color: inherit; text-decoration: none; }
+.ledger-head h2 a:hover { text-decoration: underline; }
+.ledger-head p { margin: 0; color: var(--muted, #64748b); font-size: 0.85rem; }
+
+.ledger-totals {
+  display: flex;
+  gap: 1.75rem;
+  flex-wrap: wrap;
+}
+
+.ledger-totals > div { display: flex; flex-direction: column; gap: 0.15rem; }
+.ledger-totals span { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted, #64748b); }
+.ledger-totals strong { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.ledger-totals .is-due strong { color: #b91c1c; }
+.ledger-totals .is-clear strong { color: #15803d; }
+
+@media (max-width: 640px) {
+  .ledger-totals { width: 100%; justify-content: space-between; gap: 0.9rem; }
+  .ledger-totals strong { font-size: 0.98rem; }
+}
+
+/* ---- Table toolbar / filter chips -------------------------------------- */
+
+.table-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-bottom: 0.85rem;
+}
+
+.filter-chips { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+.chip {
+  padding: 0.32rem 0.8rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted, #475569);
+  background: #f1f5f9;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.chip:hover { background: #e2e8f0; }
+
+.chip.is-active {
+  background: rgba(0, 115, 183, 0.12);
+  border-color: var(--brand, #0073b7);
+  color: var(--brand, #0073b7);
+}
+
+/* Right-align money columns and keep digits from jittering. */
+table.data th.num,
+table.data td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Horizontal scroll rather than a squashed table on small screens. */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+.alert.success {
+  background: #dcfce7;
+  color: #14532d;
+  border-radius: 10px;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.85rem;
+}
+
+/* ---- Status rails on money tables -------------------------------------
+   A 3px left border that lets you scan an invoice or payment table for
+   trouble without reading every status pill. Colours match <StatusPill>. */
+
+table.data tr.rail > td:first-child {
+  border-left: 3px solid transparent;
+  padding-left: calc(0.75rem - 3px);
+}
+
+table.data tr.rail-ok     > td:first-child { border-left-color: #16a34a; }
+table.data tr.rail-warn   > td:first-child { border-left-color: #d97706; }
+table.data tr.rail-danger > td:first-child { border-left-color: #dc2626; }
+table.data tr.rail-idle   > td:first-child { border-left-color: #cbd5e1; }
+table.data tr.rail-muted  > td:first-child { border-left-color: #e2e8f0; }
+
+table.data tr.rail-danger { background: rgba(220, 38, 38, 0.035); }
+table.data tr.rail-warn   { background: rgba(217, 119, 6, 0.035); }
+
+table.data td.right { text-align: right; }
+
+/* ---- Sortable table headers -------------------------------------------- */
+
+table.data th.sortable { padding: 0; }
+
+table.data th.sortable > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.7rem 0.75rem;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: inherit;
+}
+
+table.data th.sortable > button:hover { background: rgba(0, 115, 183, 0.06); }
+
+table.data th.right.sortable > button { justify-content: flex-end; }
+
+.sort-caret { font-size: 0.62rem; opacity: 0.4; }
+table.data th[aria-sort]:not([aria-sort="none"]) .sort-caret { opacity: 1; color: var(--brand, #0073b7); }
+
+.muted { color: var(--muted, #94a3b8); }
+
+/* ---- Row actions & misc table cells ------------------------------------ */
+
+.row-actions {
+  display: flex;
+  gap: 0.35rem;
+  justify-content: flex-end;
+  align-items: center;
+  /* Keep paired actions (+30d / Save, Approve / Reject) on one line - they
+     read as a set, and wrapping them doubles the row height. */
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.row-actions .btn.sm { padding: 0.28rem 0.6rem; font-size: 0.76rem; }
+
+@media (max-width: 900px) {
+  .row-actions { flex-wrap: wrap; }
+}
+
+.wrap-cell {
+  max-width: 260px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.chip-count {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0 0.35rem;
+  font-style: normal;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #fff;
+  background: var(--brand, #0073b7);
+  border-radius: 999px;
+}
+
+/* ---- Bulk selection ---------------------------------------------------- */
+
+.bulk-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+  padding: 0.6rem 0.9rem;
+  background: rgba(0, 115, 183, 0.08);
+  border: 1px solid rgba(0, 115, 183, 0.25);
+  border-radius: 10px;
+  font-size: 0.85rem;
+}
+
+.bulk-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+table.data th.select-col,
+table.data td.select-col {
+  width: 40px;
+  padding-left: 0.75rem;
+  padding-right: 0;
+  text-align: center;
+}
+
+table.data .select-col input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand, #0073b7);
+  cursor: pointer;
+}
+
+table.data tr.is-selected { background: rgba(0, 115, 183, 0.06); }
+
+@media (max-width: 640px) {
+  .bulk-bar { flex-direction: column; align-items: stretch; }
+  .bulk-actions .btn { flex: 1; }
+}
+
+/* ---- Bulk message composer --------------------------------------------- */
+
+.token-list { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+
+.token-list .chip { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.74rem; }
+
+.wa-preview {
+  background: #e5ddd5;
+  border-radius: 10px;
+  padding: 1rem;
+  min-height: 150px;
+}
+
+.wa-bubble {
+  position: relative;
+  max-width: 90%;
+  background: #dcf8c6;
+  border-radius: 8px 0 8px 8px;
+  padding: 0.6rem 0.75rem;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.wa-bubble p { margin: 0 0 0.35rem; }
+.wa-bubble p:last-child { margin-bottom: 0; }
+
+.alert.warning {
+  background: #fef3c7;
+  color: #78350f;
+  border-radius: 10px;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.85rem;
+}
+
+/* ---- Inline date editing on the plan-expiry board ---------------------- */
+
+.input.mini-date {
+  width: 140px;
+  padding: 0.35rem 0.4rem;
+  font-size: 0.8rem;
+}
+
+.input.mini-date.is-invalid {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15);
+}
+
+table.data tfoot td {
+  border-top: 2px solid var(--line, #e2e8f0);
+  background: #f8fafc;
+  padding-top: 0.7rem;
+  padding-bottom: 0.7rem;
+}
+
+@media (max-width: 900px) {
+  .input.mini-date { width: 128px; }
+}
+
+/* A helper button sitting in a field slot (e.g. "Use my current location")
+   inherits the grid but not the input styling - give it button proportions so
+   it does not read as an empty text box. */
+.field > .btn {
+  justify-self: start;
+  width: auto;
+}
+
+/* ---- KYC slot: the file on record, and getting rid of it ---------------- */
+
+.kyc-onfile {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+/* Destructive, so it does not get a button's weight - it sits beside a link
+   and must not read as the primary thing to do with a document on file. */
+.link-danger {
+  padding: 0;
+  font: inherit;
+  font-size: inherit;
+  color: #b91c1c;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.link-danger:hover:not(:disabled) { color: #7f1d1d; }
+.link-danger:disabled { color: #cbd5e1; cursor: progress; text-decoration: none; }
+
+/* Live field verdicts (username availability).
+ *
+ * Deliberately distinct from .field-error: an error is about what was typed
+ * and blocks the form; a status is about whether the value can be used and is
+ * information the operator acts on while typing.
+ */
+.field-status { display: block; margin-top: 4px; font-size: 0.78rem; font-weight: 600; }
+.field-status.is-checking { color: #6b7280; font-weight: 500; }
+.field-status.is-free { color: #15803d; }
+.field-status.is-taken { color: #b91c1c; }
+
+/* A field the system owns rather than the operator - the username after the
+   account exists. Greyed and not focusable, with the reason spelled out
+   underneath rather than left as a mystery. */
+.field input[readonly],
+.field input:disabled {
+  background: #f3f4f6;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+/* ---- Bulk send progress -------------------------------------------------- */
+/* A bar, because "sending" with no number is indistinguishable from stuck. */
+.bulk-progress {
+  height: 6px;
+  margin: 8px 0 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+}
+
+.bulk-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #2563eb;
+  transition: width 0.4s ease;
+}
+
+/* ---- Date field ---------------------------------------------------------- */
+/* The native input plus a year select. Sized so the pair fits where a single
+   date input used to, and wraps rather than overflowing on a phone. */
+.date-field { display: grid; gap: 3px; min-width: 0; }
+
+.date-field-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.date-field-row input[type="date"] {
+  flex: 1 1 9.5rem;
+  min-width: 0;
+}
+
+.date-field-row select {
+  flex: 0 0 5.2rem;
+  min-width: 0;
+}
+
+/* The unambiguous echo. Quiet, but always there once a date is set - it is
+   the only thing on screen that distinguishes 8 Nov from 11 Aug. */
+.date-field-echo {
+  font-size: 0.75rem;
+  color: #475569;
+  font-variant-numeric: tabular-nums;
+}
+
+.date-field-echo.muted { color: #94a3b8; }
+
+@media (max-width: 520px) {
+  .date-field-row input[type="date"],
+  .date-field-row select { flex: 1 1 100%; }
+}
+
+/* A date field is two controls and a caption, so it is taller than the inputs
+   beside it. Align the row at the top or every neighbour floats to the middle
+   of it - which is what put "Bill amount" half a line below "Renew date". */
+.dlg-grid,
+.pay-grid,
+.field-grid,
+.addon-grid { align-items: start; }

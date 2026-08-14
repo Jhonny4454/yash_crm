@@ -1,0 +1,930 @@
+/* ====================================================================
+   Customer workspace.
+
+   Rebuilt around the tab layout the live CRM uses: an identity header
+   carrying the money chips, a tab strip, then one panel at a time. The
+   previous two-column "record + action rail" is gone - the rail could
+   only ever show three or four of the fifteen things you can do to an
+   account, so the rest were unreachable.
+   ==================================================================== */
+
+.customer-detail { display: block; }
+
+/* ---- Header ------------------------------------------------------------ */
+
+.cd-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.cd-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: 1.5rem;
+  color: #243447;
+}
+
+.cd-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.cd-chips { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+.cd-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.cd-chip b {
+  font-size: 0.9rem;
+  color: #243447;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A due balance is the one number on this screen that changes what the
+   operator says next, so it gets the only colour in the row. */
+.cd-chip.is-due { background: #fef2f2; border-color: #fca5a5; }
+.cd-chip.is-due b { color: #b91c1c; }
+
+.cd-busy {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  text-transform: capitalize;
+}
+
+/* ---- Options dropdown -------------------------------------------------- */
+
+.cd-options { position: relative; }
+
+.cd-options-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 60;
+  min-width: 220px;
+  margin: 0;
+  padding: 0.3rem 0;
+  list-style: none;
+  background: #fff;
+  border: 2px solid #94a3b8;
+  border-radius: 8px;
+  box-shadow: 0 14px 34px -12px rgba(15, 23, 42, 0.4);
+}
+
+.cd-options-menu li.divider {
+  height: 1px;
+  margin: 0.3rem 0;
+  background: #e2e8f0;
+}
+
+.cd-options-menu button {
+  display: block;
+  width: 100%;
+  padding: 0.45rem 0.9rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: #243447;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.cd-options-menu button:hover:not(:disabled) { background: #f1f7fc; color: #1a76b8; }
+.cd-options-menu button.danger:hover:not(:disabled) { background: #fef2f2; color: #b91c1c; }
+
+.cd-options-menu button:disabled {
+  color: #cbd5e1;
+  cursor: not-allowed;
+}
+
+/* ---- Tab strip --------------------------------------------------------- */
+
+.cd-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 0.4rem 0.4rem 0;
+  background: #f1f5f9;
+  border: 2px solid #94a3b8;
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+}
+
+.cd-tabs button {
+  position: relative;
+  padding: 0.55rem 0.95rem;
+  font: inherit;
+  font-size: 0.84rem;
+  color: #64748b;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 7px 7px 0 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cd-tabs button:hover { color: #1a76b8; background: rgba(255, 255, 255, 0.7); }
+
+.cd-tabs button.is-active {
+  color: #243447;
+  font-weight: 600;
+  background: #fff;
+  border-color: #94a3b8;
+  /* Cover the panel's top border so the tab reads as joined to it. */
+  margin-bottom: -2px;
+  padding-bottom: calc(0.55rem + 2px);
+}
+
+.tab-count {
+  display: inline-block;
+  margin-left: 0.4rem;
+  min-width: 18px;
+  padding: 0 5px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  color: #fff;
+  background: #b91c1c;
+  border-radius: 9px;
+}
+
+.cd-panel {
+  padding: 1rem;
+  background: #fff;
+  border: 2px solid #94a3b8;
+  border-radius: 0 0 10px 10px;
+}
+
+/* The panel already draws the outer frame; a panel-card inside it would
+   double up, so soften the inner ones. */
+.cd-panel > .panel-card,
+.cd-panel .cd-overview > .panel-card,
+.cd-panel .cd-wallet > .panel-card {
+  border-width: 1px !important;
+  box-shadow: none;
+}
+
+/* ---- Overview ---------------------------------------------------------- */
+
+.cd-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.cd-record { padding-bottom: 0.9rem; }
+
+.cd-fields {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0 0.9rem;
+}
+
+.cd-field {
+  display: grid;
+  grid-template-columns: 42% 1fr;
+  gap: 0.6rem;
+  align-items: baseline;
+  padding: 0.42rem 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.85rem;
+}
+
+.cd-field:last-child { border-bottom: none; }
+
+.cd-field dt { color: #64748b; font-size: 0.79rem; }
+.cd-field dd { margin: 0; color: #243447; font-weight: 500; overflow-wrap: anywhere; }
+
+.customer-detail .mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+}
+
+.customer-detail .muted { color: #94a3b8; }
+.customer-detail .small { font-size: 0.78rem; }
+.customer-detail .due { color: #b91c1c; }
+.customer-detail .credit { color: #15803d; }
+.customer-detail .cap { text-transform: capitalize; }
+.customer-detail .padded { padding: 0.75rem 0.9rem; }
+
+.cd-subhead {
+  margin: 1rem 0 0.35rem;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #243447;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.cd-address {
+  margin: 0;
+  padding: 0 0.9rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.cd-docs { margin: 0; padding: 0 0.9rem; list-style: none; }
+
+.cd-docs li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+  font-size: 0.84rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.cd-docs li:last-child { border-bottom: none; }
+.cd-docs a { color: #1a76b8; }
+
+.cd-notes-body { padding: 0.9rem; display: grid; gap: 0.6rem; }
+
+.cd-notes-body textarea {
+  width: 100%;
+  padding: 0.55rem;
+  font: inherit;
+  font-size: 0.86rem;
+  color: #1e293b;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  resize: vertical;
+}
+
+.cd-notes-body .btn { justify-self: start; }
+
+.customer-detail .hint {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.customer-detail .field-error {
+  margin: 0.2rem 0 0;
+  font-size: 0.76rem;
+  font-style: normal;
+  color: #b91c1c;
+}
+
+/* ---- Wallet ------------------------------------------------------------ */
+
+.cd-wallet { display: grid; gap: 1rem; }
+
+.wallet-balance {
+  display: flex;
+  align-items: baseline;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  padding: 0.9rem;
+}
+
+.wallet-balance strong {
+  font-size: 1.7rem;
+  color: #15803d;
+  font-variant-numeric: tabular-nums;
+}
+
+.wallet-balance span { font-size: 0.8rem; color: #64748b; max-width: 46ch; }
+
+.wallet-form {
+  display: grid;
+  grid-template-columns: 140px 150px minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: end;
+  padding: 0 0.9rem 0.9rem;
+}
+
+.wallet-form label { display: grid; gap: 0.25rem; font-size: 0.78rem; color: #475569; }
+.wallet-form input,
+.wallet-form select {
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+  font-size: 0.85rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+}
+
+/* ---- Tab toolbars and tables ------------------------------------------- */
+
+.cd-tab-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.ledger-summary {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.84rem;
+  color: #475569;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.ledger-summary strong {
+  margin-left: 0.4rem;
+  color: #243447;
+  font-variant-numeric: tabular-nums;
+}
+
+.log-body {
+  max-width: 46ch;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.row-actions { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+
+/* ---- Addon invoice form ------------------------------------------------ */
+
+.addon-form { margin: 0.9rem; }
+
+.addon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  padding: 0.9rem 0.9rem 0;
+}
+
+.addon-reference {
+  margin: 0.35rem 0.9rem 0;
+  padding: 0.75rem 0.9rem 0.9rem;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+}
+
+.addon-field { display: grid; gap: 0.25rem; font-size: 0.78rem; color: #475569; }
+.addon-field.wide { grid-column: span 2; }
+.addon-field > span b { color: #dc2626; }
+
+.addon-field input,
+.addon-field select {
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: #1e293b;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+}
+
+.addon-field.has-error input,
+.addon-field.has-error select { border-color: #dc2626; }
+
+.addon-field input:focus,
+.addon-field select:focus {
+  outline: none;
+  border-color: #1a76b8;
+  box-shadow: 0 0 0 3px rgba(26, 118, 184, 0.15);
+}
+
+.field-hint { font-size: 0.72rem; font-style: normal; color: #94a3b8; }
+
+.addon-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+  padding: 0.8rem 0.9rem;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+}
+
+.addon-total { display: grid; gap: 0.15rem; font-size: 0.8rem; color: #475569; }
+.addon-total strong { font-size: 1rem; color: #243447; }
+.addon-total .less { color: #b45309; }
+.addon-total em { font-size: 0.75rem; font-style: normal; color: #15803d; }
+.addon-buttons { display: flex; gap: 0.5rem; }
+
+/* ---- One-time password reveal ------------------------------------------ */
+
+.cd-temp-password {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.8rem 0.9rem;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+}
+
+.cd-temp-password > span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #78350f;
+}
+
+.cd-temp-password code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #78350f;
+  overflow-wrap: anywhere;
+}
+
+.cd-temp-password small { font-size: 0.72rem; color: #92400e; }
+
+/* ---- Responsive -------------------------------------------------------- */
+
+@media (max-width: 1100px) {
+  .cd-overview { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 860px) {
+  .wallet-form { grid-template-columns: 1fr 1fr; }
+  .wallet-form .wide,
+  .wallet-form button { grid-column: span 2; }
+  .addon-field.wide { grid-column: span 1; }
+}
+
+@media (max-width: 640px) {
+  .cd-header h1 { font-size: 1.2rem; }
+  .cd-header-right { width: 100%; justify-content: space-between; }
+  .cd-field { grid-template-columns: 1fr; gap: 0.1rem; }
+  .cd-tabs { border-radius: 10px; border-bottom: 2px solid #94a3b8; }
+  .cd-panel { border-radius: 10px; margin-top: 0.5rem; }
+  .cd-tabs button.is-active { margin-bottom: 0; padding-bottom: 0.55rem; }
+  .wallet-form { grid-template-columns: 1fr; }
+  .wallet-form .wide, .wallet-form button { grid-column: span 1; }
+}
+
+@media print {
+  .cd-tabs, .cd-options, .cd-tab-toolbar, .doc-actions, .row-actions,
+  .modal-scrim { display: none !important; }
+  .cd-panel { border: none; padding: 0; }
+}
+
+/* The invoice picker only appears for a debit, and needs the full row. */
+.wallet-form .span-all { grid-column: 1 / -1; }
+
+/* ---- Renew and collect ------------------------------------------------- */
+
+/* Three blocks - what they are buying, what it costs, what they handed over.
+   Grouped because an operator taking money at the counter is working down a
+   physical sequence, not filling in a flat form. */
+.renew-form { display: grid; gap: 0.9rem; }
+
+.renew-block {
+  margin: 0;
+  padding: 0.75rem 0.85rem 0.85rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+.renew-block > legend {
+  padding: 0 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #475569;
+}
+
+.renew-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.6rem 0.75rem;
+}
+
+.renew-grid label { display: grid; gap: 0.22rem; }
+
+.renew-grid label > span {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.renew-grid input,
+.renew-grid select {
+  padding: 0.42rem 0.5rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: #1e293b;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+}
+
+.renew-grid input:focus,
+.renew-grid select:focus {
+  outline: none;
+  border-color: #1a76b8;
+  box-shadow: 0 0 0 3px rgba(26, 118, 184, 0.15);
+}
+
+/* The running sum, so the figure on the button is never a surprise. */
+.renew-total {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.7rem;
+  padding-top: 0.6rem;
+  font-size: 0.8rem;
+  color: #64748b;
+  border-top: 1px dashed #cbd5e1;
+  font-variant-numeric: tabular-nums;
+}
+
+.renew-total strong {
+  margin-left: auto;
+  font-size: 0.95rem;
+  color: #243447;
+}
+
+.renew-warn,
+.renew-note {
+  margin: 0.6rem 0 0;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  border-radius: 7px;
+}
+
+.renew-warn { color: #78350f; background: #fffbeb; border: 1px solid #fcd34d; }
+.renew-note { color: #14532d; background: #dcfce7; border: 1px solid #86efac; }
+
+.dlg-check.inline { margin: 0; font-size: 0.78rem; text-transform: none; letter-spacing: 0; }
+
+@media (max-width: 620px) {
+  .renew-grid { grid-template-columns: 1fr; }
+}
+
+/* ---- Pending Invoice: what is owed, and taking the money --------------- */
+
+.pending-total { margin-left: auto; font-size: 0.85rem; color: #475569; }
+.pending-total strong { color: #243447; font-variant-numeric: tabular-nums; }
+
+.pending-table { font-size: 0.83rem; }
+.pending-table .tick { width: 34px; text-align: center; }
+.pending-table .tick input { width: 16px; height: 16px; cursor: pointer; }
+.pending-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.pending-table tbody tr.is-selected {
+  background: #e0f2fe;
+  box-shadow: inset 3px 0 0 #1a76b8;
+}
+
+.type-tag {
+  display: inline-block;
+  padding: 1px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.type-tag.addon { background: #ddd6fe; color: #5b21b6; }
+.type-tag.plan { background: #dbeafe; color: #1e40af; }
+
+/* ---- The payment entry form itself ------------------------------------- */
+
+.pay-entry { display: grid; gap: 0.75rem; padding: 0 0.85rem 0.85rem; }
+
+.pay-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.55rem 0.7rem;
+}
+
+.pay-grid label { display: grid; gap: 0.22rem; }
+.pay-grid label.span-2 { grid-column: span 2; }
+
+.pay-grid label > span {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.pay-grid input,
+.pay-grid select {
+  padding: 0.42rem 0.5rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: #1e293b;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+}
+
+.pay-grid input:focus,
+.pay-grid select:focus {
+  outline: none;
+  border-color: #1a76b8;
+  box-shadow: 0 0 0 3px rgba(26, 118, 184, 0.15);
+}
+
+/* The running figure sits beside the button, so what is about to be taken
+   is never a surprise. */
+.pay-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  padding: 0.7rem 0.8rem;
+  font-size: 0.84rem;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pay-summary strong { margin-left: auto; font-size: 0.98rem; color: #243447; }
+
+/* ---- Addon invoice: raise only ----------------------------------------- */
+
+.addon-form { display: grid; gap: 0.75rem; padding: 0.85rem; }
+
+.addon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.55rem 0.7rem;
+}
+
+.addon-grid label { display: grid; gap: 0.22rem; }
+.addon-grid label.span-2 { grid-column: span 2; }
+
+.addon-grid label > span {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.addon-grid input,
+.addon-grid select {
+  padding: 0.42rem 0.5rem;
+  font: inherit;
+  font-size: 0.85rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+}
+
+.addon-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  padding-top: 0.6rem;
+  border-top: 1px dashed #cbd5e1;
+}
+
+/* Says plainly that this does not take money - the form it replaced did. */
+.addon-total { flex: 1 1 260px; font-size: 0.8rem; color: #64748b; }
+.addon-total strong { color: #243447; }
+
+@media (max-width: 640px) {
+  /* One column. Two at phone width leaves ~150px per field, which
+     truncates the value being read back to the customer. */
+  .pay-grid, .addon-grid { grid-template-columns: 1fr; }
+  .pay-summary strong { margin-left: 0; }
+}
+
+/* ---- Bill actions in the pending table --------------------------------- */
+
+/* The rail plus Delete used to wrap onto a second line and sit on top of each
+   other. One row, no wrapping, and the column is wide enough to hold it. */
+.pending-actions {
+  white-space: nowrap;
+}
+
+.pending-actions .doc-actions {
+  display: inline-flex;
+  gap: 2px;
+  vertical-align: middle;
+}
+
+.pending-actions .link-danger,
+.pending-actions .muted {
+  margin-left: 0.5rem;
+  vertical-align: middle;
+  font-size: 0.76rem;
+}
+
+/* Compact rail: small square buttons that read as one control, not five. */
+.doc-actions.compact .icon-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font-size: 0.78rem;
+}
+
+.pending-table th:last-child,
+.pending-table td:last-child { width: 1%; }
+
+/* ---- Edit bill --------------------------------------------------------- */
+
+.edit-invoice { width: min(520px, calc(100vw - 2rem)); }
+.edit-invoice form { padding: 0.9rem; display: grid; gap: 0.8rem; }
+.edit-invoice .hint { margin: 0; font-size: 0.78rem; line-height: 1.5; color: #64748b; }
+
+/* Sits with the icon rail, so it matches Delete's weight rather than
+   competing with it. */
+.link-edit {
+  margin-left: 0.4rem;
+  padding: 0;
+  font: inherit;
+  font-size: 0.76rem;
+  color: #1a76b8;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.link-edit:hover { color: #14496e; }
+
+/* ---- Due-reminder bell -------------------------------------------------- */
+/* Sits beside Options, so chasing a payment is one press from any tab rather
+   than only from Overview. Square, so it reads as an icon control next to a
+   labelled button instead of a button whose label failed to load. */
+.cd-bell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 2.45rem;
+  height: 2.45rem;
+  flex: 0 0 auto;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 9px;
+  background: #fff;
+  color: #475569;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.14s, border-color 0.14s, color 0.14s;
+}
+
+.cd-bell:hover:not(:disabled) { background: #f1f5f9; color: #243447; }
+
+.cd-bell:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+/* Money is owed: the bell earns colour. Without a balance it is grey and
+   unpressable, so the colour means something. */
+.cd-bell.is-due {
+  border-color: #fca5a5;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.cd-bell.is-due:hover:not(:disabled) { background: #fee2e2; }
+
+.cd-bell:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.cd-bell-dot {
+  position: absolute;
+  top: 0.34rem;
+  right: 0.34rem;
+  width: 0.44rem;
+  height: 0.44rem;
+  border-radius: 50%;
+  background: #dc2626;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+/* ---- Receipt row: the destructive actions ------------------------------- */
+/* Behind a menu, not in the row. Reversing money should never be one stray
+   click away from "open the receipt". */
+.rcp-more { position: relative; display: inline-flex; }
+
+.rcp-more-btn {
+  width: 1.9rem;
+  height: 1.9rem;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 7px;
+  background: #fff;
+  color: #475569;
+  line-height: 1;
+  font-size: 1rem;
+}
+
+.rcp-more-btn:hover:not(:disabled) { background: #f1f5f9; color: #243447; }
+.rcp-more-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Fixed, not absolute: this list is portalled to <body> so it is not clipped
+   by the card or the scrolling table. Its top/left come from the button's
+   position, measured when it opens. */
+.rcp-menu {
+  position: fixed;
+  z-index: 1090;
+  min-width: 13rem;
+  margin: 0;
+  padding: 0.25rem 0;
+  list-style: none;
+  background: #fff;
+  border: 2px solid #94a3b8;
+  border-radius: 8px;
+  box-shadow: 0 14px 34px -12px rgba(15, 23, 42, 0.4);
+}
+
+.rcp-menu button {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.85rem;
+  text-align: left;
+  font-size: 0.85rem;
+  background: none;
+  border: 0;
+  color: #243447;
+}
+
+.rcp-menu button:hover:not(:disabled) { background: #f1f5f9; }
+.rcp-menu button.danger { color: #b91c1c; }
+.rcp-menu button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* The dialog body. Everything structural - padding, the header bar, the
+   button rail - comes from the shared <Modal> and .dlg-* rules in Shared.css.
+   What is left here is only the spacing this particular form needs. */
+
+/* The explanation above the fields is context, not a heading: it needs air
+   beneath it or it reads as part of the first field's label. */
+.rcp-dialog > .hint {
+  margin: 0 0 0.9rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+/* A note under a field. <em> so it is a real aside in the markup, but upright
+   - italic small print is harder to read, not softer. */
+.rcp-dialog .dlg-block .hint {
+  display: block;
+  margin-top: 0.3rem;
+  font-style: normal;
+  font-size: 0.76rem;
+  color: #64748b;
+}
+
+.rcp-dialog .dlg-block { margin-bottom: 0.8rem; }
+.rcp-dialog .dlg-block > span { font-weight: 600; color: #334155; }
+.rcp-dialog .alert { margin-bottom: 0.8rem; }
+
+/* Solid red, the same as the confirm dialog's destructive button.
+   The plain `.btn.danger` is an outline, and Boxes.css then makes that
+   outline transparent - so on a white footer it was red text on white with
+   no edge at all, reading as a link rather than the button that voids a
+   receipt. */
+.rcp-dialog .dlg-buttons .btn.danger {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+
+.rcp-dialog .dlg-buttons .btn.danger:hover:not(:disabled) {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #fff;
+}
+
+/* A returned amount in the payment column. */
+.tbl td.num.due small {
+  font-size: 0.68rem;
+  color: #b91c1c;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}

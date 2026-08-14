@@ -1,0 +1,156 @@
+/* Settings
+   ---------------------------------------------------------------------------
+   Label and help on the left, the control on the right. A settings row is a
+   sentence about what the system will do, not a form field - so the
+   explanation sits with the label rather than being hidden in a tooltip, and
+   the control column is narrow enough that the eye can run down it. */
+
+.set-page form { padding-bottom: 24px; }
+
+.set-alert { margin-bottom: 16px; }
+.set-alert ul { margin: 8px 0 0; padding-left: 18px; }
+.set-alert li { margin: 2px 0; }
+.set-alert p { margin: 4px 0 0; }
+
+.set-group { margin-bottom: 16px; padding: 0; overflow: hidden; }
+
+.set-group-head {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  background: #f8fafc;
+}
+.set-group-head h2 {
+  margin: 0;
+  font-size: 1rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.set-group-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: .84rem;
+  max-width: 70ch;
+}
+
+.set-fields { display: grid; }
+
+.set-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 320px);
+  gap: 12px 24px;
+  align-items: start;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.set-row:last-child { border-bottom: 0; }
+
+/* A changed-but-unsaved row is marked, so the count in the save bar can be
+   traced back to the fields it refers to without hunting. */
+.set-row.is-dirty { background: #fffbeb; box-shadow: inset 3px 0 0 #f59e0b; }
+
+.set-row-text label {
+  display: block;
+  font-weight: 600;
+  font-size: .9rem;
+  color: #344054;
+}
+.set-help {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: .81rem;
+  line-height: 1.45;
+  max-width: 62ch;
+}
+.set-unknown { font-style: italic; }
+
+.set-control { display: grid; gap: 6px; justify-items: stretch; }
+.set-control .input { width: 100%; }
+
+.set-error {
+  margin: 0;
+  color: #b42318;
+  font-size: .81rem;
+  font-weight: 600;
+}
+
+.set-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .82rem;
+  line-height: 1.5;
+}
+
+.set-secret { display: flex; gap: 8px; align-items: center; }
+.set-secret .input { flex: 1 1 auto; }
+
+.set-suffixed { display: flex; gap: 8px; align-items: center; }
+.set-suffixed .input { flex: 1 1 auto; }
+.set-suffix { color: var(--muted); font-size: .84rem; white-space: nowrap; }
+
+/* Switch --------------------------------------------------------------- */
+.set-row-switch .set-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  justify-self: start;
+}
+.set-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.set-switch-track {
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  padding: 3px;
+  display: block;
+  transition: background .15s ease;
+  flex: 0 0 auto;
+}
+.set-switch-track > span {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .3);
+  transition: transform .15s ease;
+}
+.set-switch input:checked + .set-switch-track { background: var(--brand, #1570ef); }
+.set-switch input:checked + .set-switch-track > span { transform: translateX(18px); }
+.set-switch input:focus-visible + .set-switch-track { outline: 3px solid #dbeafe; }
+.set-switch-state { font-size: .85rem; font-weight: 600; color: #475467; min-width: 26px; }
+
+/* Save bar ------------------------------------------------------------- */
+.set-savebar {
+  position: sticky;
+  /* Clear of .app-footer, which is fixed to the bottom of the window with a
+     z-index of 1020 - sticking this at bottom:0 put the Save button behind
+     the copyright line. */
+  bottom: calc(var(--footer-h, 34px) + 10px);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 -6px 20px rgba(16, 24, 40, .08);
+  font-size: .88rem;
+  font-weight: 600;
+  color: #475467;
+}
+.set-savebar-actions { display: flex; gap: 8px; }
+
+@media (max-width: 760px) {
+  .set-row { grid-template-columns: 1fr; }
+  .set-row-switch { grid-template-columns: 1fr auto; align-items: center; }
+  .set-savebar { flex-direction: column; align-items: stretch; }
+  .set-savebar-actions { justify-content: flex-end; }
+}

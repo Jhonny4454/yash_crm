@@ -1,0 +1,96 @@
+/* ====================================================================
+   Shared surfaces: panels, dense tables and tab strips.
+
+   These started life in DashboardBoard.css, but Vite splits CSS per lazy
+   chunk - so any page that was not the dashboard rendered them unstyled.
+   Imported once from main.jsx instead.
+   ==================================================================== */
+
+/* ---- White panels ------------------------------------------------------ */
+
+.panel-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  margin-bottom: 1.25rem;
+}
+
+.panel-head {
+  background: #1a76b8;
+  color: #fff;
+  padding: 11px 18px;
+  font-weight: 600;
+  font-size: 0.93rem;
+}
+
+.panel-body { padding: 6px 18px 14px; }
+
+/* ---- Dense numeric tables --------------------------------------------- */
+
+.tbl { width: 100%; font-size: 0.84rem; border-collapse: collapse; }
+
+.tbl th {
+  background: #f8fafc;
+  color: #243447;
+  font-weight: 600;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.tbl td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+.tbl tbody tr:hover { background: #f8fafc; }
+
+.tbl th.num,
+.tbl td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tbl tfoot td {
+  background: #f8fafc;
+  border-top: 2px solid #e2e8f0;
+  border-bottom: none;
+}
+
+.tbl .due { color: #b91c1c; }
+
+.panel-card .scroll-y { max-height: 380px; overflow-y: auto; }
+
+/* ---- Zone tabs and bars ------------------------------------------------ */
+
+.zone-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 10px 14px 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.zone-tabs button {
+  padding: 7px 14px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #64748b;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.zone-tabs button:hover { color: #1a76b8; }
+
+.zone-tabs button.is-active {
+  color: #1a76b8;
+  font-weight: 600;
+  border-bottom-color: #1a76b8;
+}
+
+.tbl .bar-col { width: 34%; }
+
+.zbar { display: block; height: 8px; border-radius: 4px; min-width: 3px; }
+.zbar.outstanding { background: #f0a4a4; }
+.zbar.collection  { background: #7fb8dd; }

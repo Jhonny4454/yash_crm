@@ -31,7 +31,7 @@ from functools import wraps
 
 from flask import (
     Blueprint, render_template, request, redirect, url_for, flash,
-    current_app, Response, send_file, abort, jsonify
+    current_app, Response, send_file, abort, jsonify, has_request_context
 )
 from flask_login import login_required, current_user
 from sqlalchemy import inspect, text
@@ -64,13 +64,27 @@ def admin_only(f):
 
 
 def _audit(action, details):
-    """Mirror of app.log_audit without the circular import."""
+    """Mirror of app.log_audit without the circular import.
+
+    Tolerates being called without a request / logged-in user, and never lets
+    an audit failure roll back the operation it is recording.
+    """
     from models import AuditLog
-    db.session.add(AuditLog(
-        user_id=current_user.id if current_user.is_authenticated else None,
-        action=action, details=(details or '')[:500],
-        ip_address=request.remote_addr))
-    db.session.commit()
+    try:
+        try:
+            user_id = current_user.id if (current_user and
+                                          current_user.is_authenticated) else None
+        except Exception:                                # noqa: BLE001
+            user_id = None
+        ip = request.remote_addr if has_request_context() else None
+        db.session.add(AuditLog(
+            user_id=user_id, action=action,
+            details=(details or '')[:500], ip_address=ip))
+        db.session.commit()
+    except Exception:                                    # noqa: BLE001
+        db.session.rollback()
+        current_app.logger.warning("Could not write audit log for %r", action,
+                                   exc_info=True)
 
 
 # =========================================================================== #
@@ -196,6 +210,8 @@ def settings():
         for key, (vtype, val) in staged.items():
             Setting.set(key, val, vtype, user_id=current_user.id)
         db.session.commit()
+        from services.messaging import invalidate_settings_cache
+        invalidate_settings_cache()
         _audit('Update Settings', f"Changed {len(staged)} setting(s)")
         flash(f'{len(staged)} setting(s) saved.', 'success')
         return redirect(url_for('settings'))
@@ -841,8 +857,7 @@ def register(app):
             rule.rule, short, app.view_functions[rule.endpoint],
             methods=sorted(rule.methods - {'HEAD', 'OPTIONS'}))
 
-    with app.app_context():
-        try:
-            seed_settings()
-        except Exception:                                # noqa: BLE001
-            app.logger.warning("Could not seed settings (run migrate_v2.py first)")
+    # init_database() owns data seeding after it has created/synchronised the
+    # schema.  Doing it here runs while app.py is still importing blueprints,
+    # before a new database has its ``settings`` table, and used to emit the
+    # stale "run migrate_v2.py" warning on every clean start.

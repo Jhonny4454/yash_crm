@@ -1,4 +1,8 @@
 import os
+import re
+import traceback
+
+from werkzeug.exceptions import HTTPException
 import csv
 import time
 import io
@@ -7,11 +11,10 @@ from functools import wraps
 from threading import Lock
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
-from api import api
 
 from flask import (
     Flask, render_template, redirect, url_for, flash, request, jsonify,
-    session, Response, abort
+    session, Response, abort, has_request_context
 )
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_wtf.csrf import CSRFProtect, CSRFError
@@ -25,14 +28,19 @@ from models import (
     ExpenseCategory, ExpenseAccount, ExpensePayee, Expense,
     Company, Address, Zone, TaxMaster,
     Locality, Area, Building, InventoryAssignment, ServiceProvider, VendorBill, VendorBillItem,
-    ServiceRequest, MessageTemplate, MessageLog, OnlinePaymentOrder,
+    MessageTemplate, MessageLog, OnlinePaymentOrder,
+    AddonCategory,
 )
 from models_ext import (
     Setting, InvoiceItem, ISPCredential, ISPSyncLog, BackupLog, ImportJob,
 )
+import models_api  # noqa: F401  - registers device_tokens / notifications tables
+from models_api import Notification, NotificationTemplate, seed_notification_templates
 from services import isp_providers
 from services import messaging
 from services import cashfree
+from services import renewals as renewal_service
+from services import payments as payment_service
 from services.invoicing import amount_in_words
 from forms import (
     LoginForm, CustomerForm, PlanForm, InvoiceForm, PaymentForm,
@@ -66,19 +74,28 @@ if not app.config.get('SECRET_KEY') or app.config.get('SECRET_KEY') in ('dev', '
           "environment for production.")
 
 _prod = os.environ.get('FLASK_ENV') == 'production'
+# ==================== DISABLED SECURITY FEATURES ====================
+# The following settings are commented out to disable security features.
+# Uncomment them when you are ready to re-enable protection.
+# app.config.update(
+#     SESSION_COOKIE_HTTPONLY=True,
+#     SESSION_COOKIE_SAMESITE='Lax',
+#     SESSION_COOKIE_SECURE=_prod,
+#     SESSION_COOKIE_NAME='yash_session',
+#     REMEMBER_COOKIE_HTTPONLY=True,
+#     REMEMBER_COOKIE_SECURE=_prod,
+#     REMEMBER_COOKIE_SAMESITE='Lax',
+#     PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
+#     WTF_CSRF_TIME_LIMIT=7200,
+#     WTF_CSRF_SSL_STRICT=_prod,
+#     MAX_CONTENT_LENGTH=16 * 1024 * 1024,
+# )
 app.config.update(
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE='Lax',
-    SESSION_COOKIE_SECURE=_prod,
-    SESSION_COOKIE_NAME='yash_session',
-    REMEMBER_COOKIE_HTTPONLY=True,
-    REMEMBER_COOKIE_SECURE=_prod,
-    REMEMBER_COOKIE_SAMESITE='Lax',
-    PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
-    WTF_CSRF_TIME_LIMIT=7200,           # 2 h – covers a long data-entry session
-    WTF_CSRF_SSL_STRICT=_prod,          # enforce HTTPS referer in prod
     MAX_CONTENT_LENGTH=16 * 1024 * 1024,
 )
+# Disable CSRF protection globally for now
+app.config['WTF_CSRF_ENABLED'] = False
+# ====================================================================
 
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
@@ -89,14 +106,27 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 db.init_app(app)
 
+# CSRF protection is disabled. This line is kept for future re‑enablement.
 csrf = CSRFProtect(app)
-csrf.exempt(api)
+# ================= DISABLED: csrf = CSRFProtect(app) ================
+# The global CSRF protection is turned off via WTF_CSRF_ENABLED=False.
+# ====================================================================
 
 login_manager = LoginManager()
 login_manager.init_app(app)
-...
-# Register REST API blueprint
-app.register_blueprint(api)
+login_manager.login_view = 'login'
+# login_manager.session_protection = 'strong'   # Disabled for now
+
+# ---------- Register the REST API (/api/v1) ----------
+# register_api() attaches every sub-blueprint, mounts it on the app and marks
+# the whole prefix CSRF-exempt (the SPA / mobile app use Bearer tokens).
+from blueprints.api import register_api
+register_api(app, csrf=csrf)
+
+# The React application is deployed beside the Jinja2 site at /app.  Keeping
+# the legacy routes intact makes the migration safe for existing bookmarks.
+from blueprints.spa_bp import register as register_spa
+register_spa(app)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -110,6 +140,25 @@ def unauthorized():
 # ---------- Feature blueprints (Settings / Backup / Import-Export / ISP) ----------
 from blueprints.settings_bp import register as register_settings
 register_settings(app)
+
+# ---------- Feature blueprints added in this release ----------
+#   portal_bp -> still registered for its OTP helpers, which the REST API
+#   imports (blueprints/api/auth.py). Its own screens are server-rendered.
+from blueprints.portal_bp import register as register_portal
+
+register_portal(app)
+
+# renewals_bp, gateway_bp, staff_auth_bp and portal_admin_bp were registered
+# here and have been removed.
+#
+# They were the last of the server-rendered admin screens: 1,330 lines across
+# four files, every route ending in render_template() or a redirect to another
+# one. There is no templates/ directory in this project any more - the React
+# app replaced all of it - so every one of those routes answered 500
+# TemplateNotFound. They were not a feature waiting to be finished; they were
+# URLs that could not work, taking up import time and search results.
+#
+# The files are in _removed/, not deleted. Nothing else imports them.
 
 # Amount-in-words filter used by the invoice templates
 app.jinja_env.globals['amount_in_words'] = amount_in_words
@@ -147,15 +196,41 @@ def inject_template_helpers():
     )
 
 def log_audit(action, details):
-    safe_details = (details or '')[:500]
-    log = AuditLog(
-        user_id=current_user.id if current_user.is_authenticated else None,
-        action=action,
-        details=safe_details,
-        ip_address=request.remote_addr
-    )
-    db.session.add(log)
-    db.session.commit()
+    """
+    Write one audit row.
+
+    Safe to call from anywhere, including the background scheduler, where
+    there is no request and no logged-in user: `current_user` resolves to
+    None outside a request context, so touching `.is_authenticated`
+    directly used to raise AttributeError and kill the nightly jobs.
+    Auditing must never break the operation it is recording, so any failure
+    here is logged and swallowed.
+    """
+    try:
+        user_id = None
+        try:
+            if current_user and current_user.is_authenticated:
+                user_id = current_user.id
+        except Exception:                                # noqa: BLE001
+            user_id = None
+
+        ip = None
+        try:
+            if has_request_context():
+                ip = request.remote_addr
+        except Exception:                                # noqa: BLE001
+            ip = None
+
+        db.session.add(AuditLog(
+            user_id=user_id,
+            action=action,
+            details=(details or '')[:500],
+            ip_address=ip,
+        ))
+        db.session.commit()
+    except Exception:                                    # noqa: BLE001
+        db.session.rollback()
+        app.logger.warning("Could not write audit log for %r", action, exc_info=True)
 
 def enable_connection_on_network(customer):
     log_audit('Network Enable (stub)', f"Requested network enable for {customer.full_name}")
@@ -206,53 +281,55 @@ def send_template_message(customer, template_type, context=None, *,
         plan=plan, customer_plan=customer_plan,
         invoice=invoice, payment=payment, extra=context,
     )
-    if result.status in ('sent', 'dry-run'):
+    if result.status in messaging.DELIVERABLE_STATUSES:
         log_audit('Send Message',
                   f"{template_type} -> {getattr(customer, 'full_name', '?')} "
                   f"({result.status})")
     return result
 
-# ---------- Rate limiting ----------
-_login_attempts = {}
-_login_lock = Lock()
-MAX_ATTEMPTS = 5
-LOCKOUT_WINDOW_SECONDS = 300
+# ===================== DISABLED RATE LIMITING =====================
+# The following rate-limiting functions are commented out.
+# _login_attempts = {}
+# _login_lock = Lock()
+# MAX_ATTEMPTS = 5
+# LOCKOUT_WINDOW_SECONDS = 300
 
-def _rate_limit_key(ip, username):
-    return f"{ip}:{(username or '').strip().lower()}"
+# def _rate_limit_key(ip, username):
+#     return f"{ip}:{(username or '').strip().lower()}"
 
-def is_rate_limited(ip, username):
-    now = datetime.utcnow()
-    key = _rate_limit_key(ip, username)
-    with _login_lock:
-        stale = [k for k, (t, _c) in _login_attempts.items()
-                 if (now - t).total_seconds() > LOCKOUT_WINDOW_SECONDS]
-        for k in stale:
-            _login_attempts.pop(k, None)
-        if key not in _login_attempts:
-            return False
-        last_time, count = _login_attempts[key]
-        if (now - last_time).total_seconds() > LOCKOUT_WINDOW_SECONDS:
-            _login_attempts.pop(key, None)
-            return False
-        return count >= MAX_ATTEMPTS
+# def is_rate_limited(ip, username):
+#     now = datetime.utcnow()
+#     key = _rate_limit_key(ip, username)
+#     with _login_lock:
+#         stale = [k for k, (t, _c) in _login_attempts.items()
+#                  if (now - t).total_seconds() > LOCKOUT_WINDOW_SECONDS]
+#         for k in stale:
+#             _login_attempts.pop(k, None)
+#         if key not in _login_attempts:
+#             return False
+#         last_time, count = _login_attempts[key]
+#         if (now - last_time).total_seconds() > LOCKOUT_WINDOW_SECONDS:
+#             _login_attempts.pop(key, None)
+#             return False
+#         return count >= MAX_ATTEMPTS
 
-def register_failed_attempt(ip, username):
-    now = datetime.utcnow()
-    key = _rate_limit_key(ip, username)
-    with _login_lock:
-        if key not in _login_attempts:
-            _login_attempts[key] = [now, 1]
-        else:
-            last_time, count = _login_attempts[key]
-            if (now - last_time).total_seconds() > LOCKOUT_WINDOW_SECONDS:
-                _login_attempts[key] = [now, 1]
-            else:
-                _login_attempts[key][1] = count + 1
+# def register_failed_attempt(ip, username):
+#     now = datetime.utcnow()
+#     key = _rate_limit_key(ip, username)
+#     with _login_lock:
+#         if key not in _login_attempts:
+#             _login_attempts[key] = [now, 1]
+#         else:
+#             last_time, count = _login_attempts[key]
+#             if (now - last_time).total_seconds() > LOCKOUT_WINDOW_SECONDS:
+#                 _login_attempts[key] = [now, 1]
+#             else:
+#                 _login_attempts[key][1] = count + 1
 
-def clear_attempts(ip, username):
-    with _login_lock:
-        _login_attempts.pop(_rate_limit_key(ip, username), None)
+# def clear_attempts(ip, username):
+#     with _login_lock:
+#         _login_attempts.pop(_rate_limit_key(ip, username), None)
+# ===================================================================
 
 # ---------- Access control ----------
 def admin_required(f):
@@ -299,7 +376,7 @@ def generate_auto_invoices():
                 invoice_no=generate_invoice_no(),
                 issue_date=today,
                 due_date=today + timedelta(days=15),
-                total_amount=plan.price_monthly,
+                total_amount=cp.effective_price,
                 tax_amount=0.00,
                 status='sent'
             )
@@ -429,7 +506,77 @@ def rate_limited(e):  return _err(429, "Too many requests. Please slow down and 
 @app.errorhandler(500)
 def server_error(e):
     app.logger.exception("Unhandled server error")
-    return _err(500, "Something went wrong on our end. It's been logged.", db.session.rollback)
+    try:
+        db.session.rollback()
+    except Exception:
+        pass
+
+    # An API caller cannot do anything with an HTML error page - and there is
+    # no templates/ folder, so _err() was falling through to the plain string
+    # "500 Something went wrong on our end". The React client parses JSON, so
+    # every server fault arrived in the browser as an unexplained failure with
+    # the actual reason visible only in the Flask console.
+    if request.path.startswith('/api/'):
+        original = getattr(e, 'original_exception', None) or e
+        payload = {
+            'ok': False,
+            'error': 'server_error',
+            'detail': f'{type(original).__name__}: {original}'[:400],
+        }
+        # The traceback is a development aid. Never in production - it names
+        # file paths and can echo query values back to the browser.
+        if not _is_production_env():
+            payload['traceback'] = traceback.format_exc()[-3000:]
+        return jsonify(payload), 500
+
+    return _err(500, "Something went wrong on our end. It's been logged.")
+
+
+@app.errorhandler(Exception)
+def api_exception(exc):
+    """Turn any unhandled exception on an /api/ route into JSON.
+
+    errorhandler(500) alone was not enough, and the gap only shows in the one
+    place it matters. Flask's `PROPAGATE_EXCEPTIONS` defaults to `debug or
+    testing`, and `app.run(debug=True)` is how this app is started locally -
+    so an unhandled error was re-raised for the Werkzeug debugger to render as
+    an HTML page, and the 500 handler was never consulted. The React client
+    then had no JSON to read and reported the useless
+    "Request failed with status code 500".
+
+    A handler registered for `Exception` IS consulted before that propagation
+    decision, so this runs in development too.
+
+    Non-API routes deliberately re-raise: the interactive debugger is genuinely
+    useful on the Jinja pages, and swallowing it there would be a downgrade.
+    """
+    if isinstance(exc, HTTPException):
+        return exc
+
+    if not request.path.startswith('/api/'):
+        raise exc
+
+    app.logger.exception('Unhandled error on %s %s', request.method, request.path)
+    try:
+        db.session.rollback()
+    except Exception:
+        pass
+
+    payload = {
+        'ok': False,
+        'error': 'server_error',
+        'detail': f'{type(exc).__name__}: {exc}'[:400],
+    }
+    if not _is_production_env():
+        payload['traceback'] = traceback.format_exc()[-3000:]
+    return jsonify(payload), 500
+
+
+def _is_production_env():
+    if os.environ.get('FLASK_ENV', '').lower() == 'production':
+        return True
+    return any(os.environ.get(k) for k in
+               ('RENDER', 'RAILWAY_ENVIRONMENT', 'DYNO', 'FLY_APP_NAME'))
 
 @app.errorhandler(CSRFError)
 def csrf_error(e):
@@ -440,17 +587,24 @@ def csrf_error(e):
         }), 400
     flash('Your session expired or the form was tampered with. Please try again.', 'danger')
     return redirect(request.referrer or url_for('dashboard')), 400
-# ── Security headers (added to every response) ──────────────────────────────
-@app.after_request
-def set_security_headers(response):
-    """Minimal security headers safe for a Bootstrap + CDN app."""
-    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
-    response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
-    response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
-    # Permissions-Policy: restrict microphone/camera/geolocation
-    response.headers.setdefault(
-        'Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
-    return response
+# ── Security: CORS, headers, cookie flags, login rate limiting ──────────────
+#
+# All of it lives in security.py so the rules cannot drift apart. CORS in
+# particular was configured here (CORS_ORIGINS) and never applied - harmless
+# locally because Vite proxies /api, fatal the moment the front end is deployed
+# on its own domain.
+try:
+    from security import harden
+    harden(app)
+except RuntimeError as _sec_exc:
+    # Only raised when FLASK_ENV=production and the secrets are still the
+    # shipped defaults. That must stop a deployment - but it must never stop a
+    # local server, which is why _is_production() now requires an explicit
+    # flag rather than inferring it from app.debug.
+    print(f'\nREFUSING TO START: {_sec_exc}\n')
+    raise
+except Exception as _sec_exc:  # pragma: no cover
+    app.logger.error('Security hardening could not be applied: %s', _sec_exc)
 
 # ---------- Request timing (set SLOW_REQUEST_MS env var to control threshold) ----------
 _SLOW_MS = int(os.environ.get('SLOW_REQUEST_MS', 500))
@@ -458,6 +612,156 @@ _SLOW_MS = int(os.environ.get('SLOW_REQUEST_MS', 500))
 @app.before_request
 def _timing_start():
     request._t0 = time.perf_counter()
+
+
+# The application is now React-first, but this backend used to publish a large
+# Jinja site at these same addresses.  The templates were removed during that
+# migration, leaving old bookmarks such as /login, /customers/42 and
+# /customer/invoices to fail with TemplateNotFound.  Send page requests to the
+# maintained SPA before the retired handlers can do database work or try to
+# render a file which no longer exists.  API, download, webhook and form POST
+# routes deliberately stay untouched.
+_LEGACY_SPA_EXACT = {
+    '': '',
+    'dashboard': '',
+    'login': 'login',
+    'profile': 'profile',
+    'payments/authorizations': 'authorizations',
+    'reports/plan-expiry': 'reports/plan-expiry',
+    'hr/attendance/report': 'reports/attendance',
+    'hr/leaves/report': 'reports/leaves',
+    'hr/payroll/report': 'reports/payroll',
+    'zones': 'masters/zones',
+    'masters': 'masters/zones',
+    'masters/company': 'companies',
+    'masters/templates': 'masters/message-templates',
+    'masters/addon-categories': 'masters/addon-categories',
+    'masters/service-providers': 'plan-master/service-providers',
+    'customers': 'customers',
+    'customers/add': 'customers/add',
+    'customers/search': 'customers',
+    'customers/ledger': 'customers/ledger',
+    'plans': 'plans',
+    'invoices': 'invoices',
+    'payments': 'payments',
+    'staff': 'staff',
+    'staff/types': 'staff/types',
+    'hr': 'hr/attendance',
+    'hr/attendance': 'hr/attendance',
+    'hr/leaves': 'hr/leaves',
+    'hr/payroll': 'hr/payroll',
+    'expenses': 'expenses',
+    'expenses/categories': 'expenses/categories',
+    'expenses/accounts': 'expenses/accounts',
+    'expenses/payees': 'expenses/payees',
+    'inventory': 'inventory/vendors',
+    'inventory/vendors': 'inventory/vendors',
+    'inventory/products': 'inventory/products',
+    'inventory/stock': 'inventory/stock',
+    'inventory/vendor-bills': 'inventory/vendor-bills',
+    'messages/bulk': 'masters/bulk-messages',
+    'settings': 'settings',
+    'settings/sms-templates': 'masters/message-templates',
+    'settings/backup': 'masters/backup',
+    'settings/import-export': 'masters/import-export',
+    'settings/isp': 'masters/isp',
+    'customer/login': 'customer/login',
+    'customer/register': 'customer/login',
+    'customer/forgot-password': 'customer/forgot-password',
+    'customer/dashboard': 'customer',
+    'customer/profile': 'customer/profile',
+    'customer/invoices': 'customer/invoices',
+    'customer/payments': 'customer/payments',
+    'customer/payments/new': 'customer/payments',
+    'customer/plans': 'customer/plans',
+    'customer/renew': 'customer/plans',
+    'customer/renew/history': 'customer/plans',
+    'customer/notifications': 'customer/notifications',
+    'customer/messages': 'customer/notifications',
+}
+
+
+def _legacy_spa_path(path):
+    """Return the SPA page for a retired server-rendered page, if any."""
+    clean = path.strip('/')
+    if clean in _LEGACY_SPA_EXACT:
+        return _LEGACY_SPA_EXACT[clean]
+
+    for legacy, spa in (
+        ('masters/localities', 'masters/localities'),
+        ('masters/areas', 'masters/areas'),
+        ('masters/buildings', 'masters/buildings'),
+        ('masters/tax', 'masters/tax'),
+        ('masters/addresses', 'masters/addresses'),
+        ('masters/addon-categories', 'masters/addon-categories'),
+        ('masters/templates', 'masters/message-templates'),
+        ('masters/service-providers', 'plan-master/service-providers'),
+        ('zones', 'masters/zones'),
+    ):
+        if clean == legacy or clean.startswith(f'{legacy}/'):
+            return spa
+
+    match = re.fullmatch(r'customers/edit/(\d+)', clean)
+    if match:
+        return f'customers/{match.group(1)}/edit'
+    match = re.fullmatch(r'customers/(\d+)(?:/(ledger|messages))?', clean)
+    if match:
+        customer_id, section = match.groups()
+        return (f'customers/{customer_id}/ledger' if section == 'ledger'
+                else f'customers/{customer_id}')
+    if clean.startswith('customers/plan-status'):
+        return 'customers/plan-status'
+
+    # The React plan page owns create/edit as dialogs, rather than separate
+    # documents.  Preserve the useful destination instead of serving a 500.
+    if clean.startswith('plans/'):
+        return 'plans'
+
+    match = re.fullmatch(r'invoices/(\d+)(?:/(?:print|summary|detailed))?', clean)
+    if match:
+        return f'invoices/{match.group(1)}'
+
+    # /payments/add/<invoice_id> was the only retired Jinja GET this map still
+    # missed, so it fell through to a handler whose template is gone and
+    # answered a logged-in operator with a 500. The React equivalent is the
+    # invoice, which carries the Record payment action.
+    match = re.fullmatch(r'payments/add/(\d+)', clean)
+    if match:
+        return f'invoices/{match.group(1)}'
+
+    for legacy, spa in (
+        ('inventory/vendor-bills/', 'inventory/vendor-bills'),
+        ('inventory/vendors/', 'inventory/vendors'),
+        ('inventory/products/', 'inventory/products'),
+        ('inventory/stock/', 'inventory/stock'),
+        ('expenses/', 'expenses'),
+        ('staff/', 'staff'),
+        ('hr/', 'hr/attendance'),
+        ('settings/isp/', 'masters/isp'),
+    ):
+        if clean.startswith(legacy):
+            return spa
+
+    if re.fullmatch(r'customer/(?:invoice|invoices|payments)/\d+(?:/\w+)?', clean):
+        return ('customer/invoices' if clean.startswith('customer/invoices/')
+                or clean.startswith('customer/invoice/') else 'customer/payments')
+    if clean == 'customer/payment/return':
+        return 'customer/payments'
+    return None
+
+
+@app.before_request
+def _redirect_retired_server_pages():
+    """Keep old GET bookmarks working through the current React interface."""
+    if request.method not in {'GET', 'HEAD'}:
+        return None
+    spa_path = _legacy_spa_path(request.path)
+    if spa_path is None:
+        return None
+    target = f'/app/{spa_path}' if spa_path else '/app/'
+    if request.query_string:
+        target = f"{target}?{request.query_string.decode('utf-8', 'replace')}"
+    return redirect(target)
 
 @app.after_request
 def _timing_end(response):
@@ -475,12 +779,13 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     form = LoginForm()
-    client_ip = request.remote_addr
-    submitted_username = form.username.data if request.method == 'POST' else None
+    # client_ip = request.remote_addr
+    # submitted_username = form.username.data if request.method == 'POST' else None
 
-    if request.method == 'POST' and is_rate_limited(client_ip, submitted_username):
-        flash('Too many login attempts. Please wait 5 minutes and try again.', 'danger')
-        return render_template('login.html', form=form), 429
+    # Rate limiting disabled
+    # if request.method == 'POST' and is_rate_limited(client_ip, submitted_username):
+    #     flash('Too many login attempts. Please wait 5 minutes and try again.', 'danger')
+    #     return render_template('login.html', form=form), 429
 
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
@@ -488,12 +793,12 @@ def login():
             session.permanent = True
             login_user(user, remember=form.remember.data)
             log_audit('Login', f"User {user.username} logged in")
-            clear_attempts(client_ip, submitted_username)
+            # clear_attempts(client_ip, submitted_username)
             next_page = request.args.get('next')
             if next_page and urlsplit(next_page).netloc == '' and next_page.startswith('/'):
                 return redirect(next_page)
             return redirect(url_for('dashboard'))
-        register_failed_attempt(client_ip, submitted_username)
+        # register_failed_attempt(client_ip, submitted_username)
         log_audit('Failed Login', f"Failed login attempt for username '{form.username.data}'")
         flash('Invalid username or password.', 'danger')
     return render_template('login.html', form=form)
@@ -678,7 +983,7 @@ def dashboard():
             'plan': cp,
             'customer': cust,
             'plan_name': cp.plan.name if cp.plan else '-',
-            'price': float(cp.plan.price_monthly) if cp.plan else 0.0,
+            'price': float(cp.effective_price),
             'renew_date': cp.start_date,
             'expiry_date': cp.end_date,
             'days_left': (cp.end_date - today).days,
@@ -887,7 +1192,7 @@ def plan_expiry_report():
         rows.append({
             'plan': cp, 'customer': cust,
             'plan_name': cp.plan.name if cp.plan else '-',
-            'price': float(cp.plan.price_monthly) if cp.plan else 0.0,
+            'price': float(cp.effective_price),
             'renew_date': cp.start_date, 'expiry_date': cp.end_date,
             'days_left': (cp.end_date - today).days,
             'outstanding': outstanding,
@@ -970,13 +1275,13 @@ def payment_authorizations():
 @admin_required
 def payment_reject(id):
     payment = Payment.query.get_or_404(id)
-    payment.status = 'rejected'
-    payment.authorized_at = datetime.utcnow()
-    payment.authorized_by_user_id = current_user.id
-    if payment.invoice and payment.invoice.status == 'paid':
-        payment.invoice.status = 'sent'
-    db.session.commit()
-    log_audit('Reject Payment', f"Rejected payment #{id}")
+    reason = (request.form.get('reason') or '').strip()
+    ok, _ = payment_service.reject_payment(payment, current_user, reason)
+    if not ok:
+        flash('That payment is already rejected.', 'info')
+        return redirect(request.referrer or url_for('payment_authorizations'))
+    log_audit('Reject Payment',
+              f"Rejected payment #{id}: {payment.rejection_reason}")
     flash('Payment rejected.', 'warning')
     return redirect(request.referrer or url_for('payment_authorizations'))
 
@@ -2433,12 +2738,16 @@ def terminate_customer(id):
 @login_required
 def customer_plan_status(status):
     today = date.today()
-    if status == 'expiring':
+    if status in ('expiring', 'active'):
         plans = CustomerPlan.query.filter(CustomerPlan.end_date >= today, CustomerPlan.status == 'active').all()
     elif status == 'expired':
         plans = CustomerPlan.query.filter(CustomerPlan.end_date < today, CustomerPlan.status == 'active').all()
     elif status == 'renewed':
         plans = CustomerPlan.query.filter(CustomerPlan.start_date == today).all()
+    elif status == 'suspended':
+        plans = CustomerPlan.query.filter(CustomerPlan.status.in_(('cancelled', 'terminated'))).all()
+    elif status == 'all':
+        plans = CustomerPlan.query.order_by(CustomerPlan.end_date.desc()).all()
     else:
         abort(404)
     return render_template('customers/plan_status_list.html', plans=plans,
@@ -2506,7 +2815,7 @@ def renew_plan(customer_id):
         invoice_no=generate_invoice_no(),
         issue_date=date.today(),
         due_date=date.today() + timedelta(days=15),
-        total_amount=plan.price_monthly,
+        total_amount=active_plan.effective_price,
         tax_amount=0.00,
         customer_plan_id=active_plan.id,
         caption=plan.name,
@@ -2522,7 +2831,7 @@ def renew_plan(customer_id):
     send_template_message(customer, 'renewal', {
         'customer_name': customer.full_name,
         'username': customer.username,
-        'amount': plan.price_monthly
+        'amount': active_plan.effective_price
     })
 
     send_sms(customer.mobile, f"Dear {customer.full_name}, your plan has been renewed until {new_end_date.strftime('%d-%b-%Y')}.")
@@ -2637,7 +2946,7 @@ def generate_invoice(customer_id):
         invoice_no=generate_invoice_no(),
         issue_date=date.today(),
         due_date=date.today() + timedelta(days=15),
-        total_amount=active_plan.plan.price_monthly,
+        total_amount=active_plan.effective_price,
         tax_amount=0.00,
         status='sent'
     )
@@ -2754,20 +3063,19 @@ def add_payment(invoice_id):
 @admin_required
 def payment_approve(id):
     payment = Payment.query.get_or_404(id)
-    if payment.authorized_at is not None:
+    # Shared with the portal-activity screen so approving from either place
+    # settles the invoice AND applies any renewal the payment was buying.
+    ok, renewal_applied = payment_service.approve_payment(payment, current_user)
+    if not ok:
         flash('That payment is already authorized.', 'info')
         return redirect(request.referrer or url_for('payment_authorizations'))
-    payment.status = 'approved'
-    payment.authorized_at = datetime.utcnow()
-    payment.authorized_by_user_id = current_user.id
-    invoice = payment.invoice
-    if invoice and invoice.balance <= 0:
-        invoice.status = 'paid'
-    db.session.commit()
     log_audit('Authorize Payment',
               f"Authorized {payment.source_label.lower()} #{payment.id} "
               f"of Rs.{payment.amount}")
-    flash('Payment authorized.', 'success')
+    if renewal_applied:
+        flash('Payment authorized and the plan was renewed.', 'success')
+    else:
+        flash('Payment authorized.', 'success')
     return redirect(request.referrer or url_for('customer_view', id=payment.customer_id))
 
 # ---------- Service Provider Master CRUD ----------
@@ -3986,7 +4294,7 @@ def bulk_messages():
             for customer, cp in recipients:
                 res = send_template_message(customer, template_type,
                                             customer_plan=cp)
-                if res.status in ('sent', 'dry-run'):
+                if res.status in messaging.DELIVERABLE_STATUSES:
                     sent += 1
                 else:
                     failed += 1
@@ -4060,10 +4368,11 @@ def customer_login():
     if form.validate_on_submit():
         ip = request.remote_addr
         uname = (form.username.data or '').strip()
-        if is_rate_limited(ip, uname):
-            flash('Too many failed attempts. Please try again in a few minutes.',
-                  'danger')
-            return render_template('customer/login.html', form=form)
+        # Rate limiting disabled
+        # if is_rate_limited(ip, uname):
+        #     flash('Too many failed attempts. Please try again in a few minutes.',
+        #           'danger')
+        #     return render_template('customer/login.html', form=form)
 
         customer = Customer.query.filter_by(username=uname).first()
         if customer and customer.password_hash and customer.check_password(form.password.data):
@@ -4071,7 +4380,7 @@ def customer_login():
                 flash('Your connection is currently disabled. Please contact support.',
                       'warning')
                 return render_template('customer/login.html', form=form)
-            clear_attempts(ip, uname)
+            # clear_attempts(ip, uname)
             session['customer_id'] = customer.id
             session.permanent = True
             log_audit('Customer Login', f"Customer {customer.full_name} logged in")
@@ -4079,7 +4388,7 @@ def customer_login():
             if nxt and urlsplit(nxt).netloc == '' and nxt.startswith('/'):
                 return redirect(nxt)
             return redirect(url_for('customer_dashboard'))
-        register_failed_attempt(ip, uname)
+        # register_failed_attempt(ip, uname)
         flash('Invalid username or password.', 'danger')
     return render_template('customer/login.html', form=form)
 
@@ -4169,7 +4478,7 @@ def _portal_renewal_invoice(customer, active_plan):
         invoice_no=generate_invoice_no(),
         issue_date=date.today(),
         due_date=date.today() + timedelta(days=15),
-        total_amount=plan.price_monthly,
+        total_amount=active_plan.effective_price,
         tax_amount=0.00,
         caption='Online Payment',
         invoice_type='plan',
@@ -4196,7 +4505,7 @@ def customer_renew_plan():
         return redirect(url_for('customer_dashboard'))
 
     invoice, _created = _portal_renewal_invoice(customer, active_plan)
-    amount = round(float(invoice.balance) or float(active_plan.plan.price_monthly), 2)
+    amount = round(float(invoice.balance) or float(active_plan.effective_price), 2)
     if amount <= 0:
         flash('There is nothing outstanding on your account.', 'info')
         return redirect(url_for('customer_dashboard'))
@@ -4417,6 +4726,25 @@ def init_database(flask_app=None):
     flask_app = flask_app or app
     with flask_app.app_context():
         db.create_all()
+
+        # Add any column the models gained since this database was created,
+        # so an upgrade does not need a separate manual migration step.
+        # Only ever adds - never drops or rewrites. `python migrate.py` runs
+        # the same logic with verbose output.
+        try:
+            from services.schema_sync import sync_schema
+            changes = sync_schema(db)
+            if changes['added_columns']:
+                flask_app.logger.info(
+                    "Schema sync added %s column(s): %s",
+                    len(changes['added_columns']),
+                    ', '.join(f"{t}.{c}" for t, c in changes['added_columns']))
+            for table, col, msg in changes['failed']:
+                flask_app.logger.warning("Schema sync could not add %s.%s: %s",
+                                         table, col, msg)
+        except Exception as exc:                        # noqa: BLE001
+            flask_app.logger.warning("Schema sync skipped: %s", exc)
+
         try:
             from blueprints.settings_bp import seed_settings
             seed_settings()
@@ -4442,6 +4770,14 @@ def init_database(flask_app=None):
                 flask_app.logger.info("Seeded %s message templates.", created)
         except Exception as exc:
             flask_app.logger.warning("Could not seed message templates: %s", exc)
+
+        # Push / in-app notification templates used by the portal + mobile app
+        try:
+            created = seed_notification_templates()
+            if created:
+                flask_app.logger.info("Seeded %s notification templates.", created)
+        except Exception as exc:
+            flask_app.logger.warning("Could not seed notification templates: %s", exc)
 
         admin = User.query.filter_by(username='admin').first()
         if not admin:

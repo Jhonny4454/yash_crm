@@ -1,0 +1,124 @@
+/* ====================================================================
+   Authorising report.
+
+   Sixteen columns of money that someone is about to sign off on, so the
+   priorities here are: every row scannable at a glance, the selected
+   ones unmistakable, and the whole thing printable - the reconciliation
+   is often done against a paper round sheet.
+   ==================================================================== */
+
+.auth-report .page-heading { align-items: flex-start; }
+
+/* ---- Search panel ------------------------------------------------------ */
+
+.search-panel { margin-bottom: 1rem; }
+
+.search-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.7rem;
+  padding: 0.9rem;
+  align-items: end;
+}
+
+.search-field { display: grid; gap: 0.25rem; font-size: 0.76rem; color: #475569; }
+
+.search-field input,
+.search-field select {
+  padding: 0.42rem 0.5rem;
+  font: inherit;
+  font-size: 0.84rem;
+  color: #1e293b;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+}
+
+.search-field input:focus,
+.search-field select:focus {
+  outline: none;
+  border-color: #1a76b8;
+  box-shadow: 0 0 0 3px rgba(26, 118, 184, 0.15);
+}
+
+.search-actions { display: flex; gap: 0.5rem; }
+
+/* ---- Queue bar --------------------------------------------------------- */
+
+.queue-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.84rem;
+  color: #475569;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.queue-bar strong { color: #243447; font-variant-numeric: tabular-nums; }
+
+.selection-count {
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: #475569;
+}
+
+/* ---- Table ------------------------------------------------------------- */
+
+.auth-table { font-size: 0.82rem; }
+.auth-table th { white-space: nowrap; }
+.auth-table td { vertical-align: middle; }
+
+.auth-table .tick { width: 34px; text-align: center; }
+.auth-table .tick input { width: 16px; height: 16px; cursor: pointer; }
+
+/* Bank references run long; let them wrap rather than stretching the table
+   past the viewport and hiding the amount columns. */
+.auth-table .details {
+  max-width: 22ch;
+  overflow-wrap: anywhere;
+  font-size: 0.78rem;
+  color: #475569;
+}
+
+.auth-table .mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+}
+
+.auth-table .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.auth-table .due { color: #b91c1c; font-weight: 600; }
+
+.auth-table tbody tr:hover { background: #f8fafc; }
+
+/* Selected rows carry a left bar as well as a tint: the tint alone is too
+   faint to survive a projector or a bright office screen. */
+.auth-table tbody tr.is-selected {
+  background: #e0f2fe;
+  box-shadow: inset 3px 0 0 #1a76b8;
+}
+
+.auth-table tbody tr.is-selected:hover { background: #cfe9fb; }
+
+.auth-report .row-actions { display: flex; align-items: center; gap: 0.5rem; }
+
+/* ---- Print ------------------------------------------------------------- */
+
+@media print {
+  .auth-report .no-print,
+  .auth-report .search-panel,
+  .auth-report .pager { display: none !important; }
+
+  .auth-report .panel-card { border: none; box-shadow: none; }
+  .auth-table { font-size: 9pt; }
+  .auth-table tbody tr.is-selected { background: none; box-shadow: none; }
+  .auth-table tbody tr { page-break-inside: avoid; }
+}
+
+@media (max-width: 900px) {
+  .search-grid { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+  .queue-bar { flex-direction: column; align-items: flex-start; }
+}

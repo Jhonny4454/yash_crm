@@ -1,6 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from datetime import datetime, date, timedelta
+from decimal import Decimal
 from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
@@ -37,6 +38,39 @@ class StaffType(db.Model):
     name = db.Column(db.String(50), nullable=False)
 
 
+class UsernameReservation(db.Model):
+    """Every portal username that has ever been issued.
+
+    The rule is that a username is spent the moment it is handed out and is
+    never handed out again - not after the customer is deactivated, not after
+    their row is deleted. A UNIQUE constraint on ``customers.username`` cannot
+    express that on its own: it only knows about rows that still exist, so the
+    day a customer record is removed their username silently becomes available
+    and the next person to get it inherits their identity in every log, ticket
+    and message history that still names them.
+
+    So the reservation outlives the customer. ``customer_id`` is deliberately
+    NOT a foreign key: the whole point is that this row survives its customer.
+
+    ``username_key`` is the lowercased form and carries the UNIQUE index,
+    because "Amar" and "amar" are the same login to a person even where the
+    database collation says otherwise (SQLite compares case-sensitively;
+    MySQL usually does not). Storing the comparison key explicitly means the
+    rule does not change with the database engine.
+    """
+    __tablename__ = 'username_reservations'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), nullable=False)
+    username_key = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    #: 'customer' or 'staff' - separate login namespaces, reserved separately.
+    scope = db.Column(db.String(16), nullable=False, default='customer')
+    customer_id = db.Column(db.Integer, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<UsernameReservation {self.username} ({self.scope})>'
+
+
 class Customer(db.Model):
     __tablename__ = 'customers'
     id = db.Column(db.Integer, primary_key=True)
@@ -59,6 +93,27 @@ class Customer(db.Model):
     reference_id = db.Column(db.String(50), unique=True)
     zone = db.Column(db.String(50))
     registration_date = db.Column(db.Date, default=date.today)
+
+    # ---- connection identity ------------------------------------------- #
+    #: Static IP handed to this line, shown on the customer detail screen.
+    ip_address = db.Column(db.String(45))
+    #: The account id this customer has with the upstream provider (L2S etc.).
+    ipacct_id = db.Column(db.String(50))
+    service_provider_id = db.Column(db.Integer,
+                                    db.ForeignKey('service_providers.id'))
+    #: Prepaid bills before the period, Postpaid after it.
+    billing_type = db.Column(db.Enum('Prepaid', 'Postpaid'), default='Prepaid')
+    #: Day of month the recurring invoice is raised on.
+    invoice_date = db.Column(db.Date)
+
+    # ---- where the line physically is ---------------------------------- #
+    latitude = db.Column(db.String(32))
+    longitude = db.Column(db.String(32))
+
+    #: Credit sitting on the account: overpayments and refunds land here and
+    #: are drawn down by the next invoice. Never negative.
+    wallet_balance = db.Column(db.Numeric(10, 2), default=0.00)
+
     flat_no = db.Column(db.String(50))
     locality = db.Column(db.String(100))
     area = db.Column(db.String(100))
@@ -80,6 +135,8 @@ class Customer(db.Model):
 
     plans = db.relationship('CustomerPlan', backref='customer', lazy=True)
     invoices = db.relationship('Invoice', backref='customer', lazy=True)
+    service_provider = db.relationship('ServiceProvider',
+                                       foreign_keys=[service_provider_id])
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -131,12 +188,32 @@ class CustomerPlan(db.Model):
     auto_renew = db.Column(db.Boolean, default=True)
     grace_period_days = db.Column(db.Integer, default=1)
     last_invoice_date = db.Column(db.Date)
+    # What THIS customer pays for the plan, when it differs from the master
+    # price - the editable Total Amount on Assign Plan. NULL means "use the
+    # master price", so an untouched row keeps following the plan.
+    price = db.Column(db.Numeric(10, 2), nullable=True)
     suspension_review_status = db.Column(db.Enum('none', 'pending_review', 'terminated', 're_enabled'), default='none')
     suspended_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     plan = db.relationship('Plan', backref='customer_plans')
     invoices = db.relationship('Invoice', backref='customer_plan', lazy=True)
+
+    @property
+    def effective_price(self):
+        """The agreed price for this customer's current plan.
+
+        ``price`` is deliberately nullable: NULL means follow the shared plan
+        price, while zero is a valid negotiated price and must stay zero.  A
+        number of screens used ``price or plan.price_monthly`` before this
+        property existed, which made an override appear to disappear after a
+        refresh and made a free plan bill at its master price.
+        """
+        if self.price is not None:
+            return self.price
+        if self.plan is not None and self.plan.price_monthly is not None:
+            return self.plan.price_monthly
+        return Decimal('0.00')
 
 
 class Invoice(db.Model):
@@ -153,10 +230,19 @@ class Invoice(db.Model):
     discount_amount = db.Column(db.Numeric(10, 2), default=0.00)
     receipt_number = db.Column(db.String(50))
     remarks = db.Column(db.Text)
+    #: Why the discount was given, copied from Discount Master at the time the
+    #: bill was raised. Stored as text, not a FK, so renaming or retiring a
+    #: reason later cannot rewrite history on invoices already issued.
+    discount_reason = db.Column(db.String(100))
     status = db.Column(db.Enum('draft', 'sent', 'paid', 'overdue', 'cancelled'), default='draft')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     caption = db.Column(db.String(120))
     invoice_type = db.Column(db.Enum('plan', 'addon', 'discount', 'other'), default='plan')
+    # The service window this bill covers. Distinct from issue_date on purpose:
+    # a run done three days late still bills the month it was for, and matching
+    # duplicates on issue_date would let that late run bill the month twice.
+    period_start = db.Column(db.Date, nullable=True)
+    period_end = db.Column(db.Date, nullable=True)
     vendor = db.Column(db.String(100), nullable=True)
 
     payments = db.relationship('Payment', backref='invoice', lazy=True)
@@ -212,12 +298,33 @@ class Payment(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     book_receipt_no = db.Column(db.String(50))
     remarks = db.Column(db.Text)
+    #: The payer. There was no relationship here at all, which is why the
+    #: Payments screen printed a bare customer id where a name belongs -
+    #: payment_dict had nothing to read a name from.
+    customer = db.relationship('Customer', foreign_keys=[customer_id])
+
     received_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     received_by_user = db.relationship('User', foreign_keys=[received_by_user_id])
     authorized_at = db.Column(db.DateTime)
     authorized_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     authorized_by_user = db.relationship('User', foreign_keys=[authorized_by_user_id])
     discount_amount = db.Column(db.Numeric(10, 2), default=0.00)
+
+    # ---- customer-submitted payment entries (portal) --------------------- #
+    #: Bank / UPI reference the customer typed in. Searchable from the admin
+    #: UTR-verification screen.
+    utr = db.Column(db.String(60), index=True)
+    #: Filename under static/uploads/payment_proofs/ of the screenshot the
+    #: customer attached as proof.
+    proof_file = db.Column(db.String(255))
+    #: Why an admin rejected the entry, shown back to the customer.
+    rejection_reason = db.Column(db.String(255))
+    rejected_at = db.Column(db.DateTime)
+    rejected_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    rejected_by_user = db.relationship('User', foreign_keys=[rejected_by_user_id])
+
+    #: Same snapshot-not-FK reasoning as Invoice.discount_reason.
+    discount_reason = db.Column(db.String(100))
 
     @property
     def is_authorized(self):
@@ -239,7 +346,31 @@ class Payment(db.Model):
 
     @property
     def source_label(self):
-        return 'Online Payment' if (self.source or '') == 'portal' else 'Counter Entry'
+        src = (self.source or '')
+        if src == 'gateway':
+            return 'Online Payment'
+        if src == 'portal':
+            return 'Customer Entry'
+        return 'Counter Entry'
+
+    @property
+    def status_label(self):
+        """Customer-facing wording for the portal."""
+        return {'pending': 'Pending verification',
+                'approved': 'Approved',
+                'rejected': 'Rejected'}.get(self.status or '', self.status or '')
+
+    @property
+    def status_badge(self):
+        """Bootstrap contextual class matching `status`."""
+        return {'pending': 'warning',
+                'approved': 'success',
+                'rejected': 'danger'}.get(self.status or '', 'secondary')
+
+    @property
+    def reference(self):
+        """The bank reference, wherever it was recorded."""
+        return self.utr or self.gateway_transaction_id or self.mode_detail or ''
 
     @property
     def mode_group(self):
@@ -262,6 +393,12 @@ class AuditLog(db.Model):
     details = db.Column(db.Text)
     ip_address = db.Column(db.String(45))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    #: Set when the action was about one customer, so the Customer Log tab is
+    #: an indexed lookup rather than a LIKE over every audit row ever written.
+    #: Rows written before this column existed have it NULL; the log endpoint
+    #: falls back to a name match for those.
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'),
+                            nullable=True, index=True)
     user = db.relationship('User', backref='audit_logs')
 
 
@@ -441,7 +578,15 @@ class Attendance(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     date = db.Column(db.Date)
-    status = db.Column(db.Enum('present', 'absent', 'half-day'), default='present')
+    # 'leave' and 'holiday' are days the office marks but nobody worked, and
+    # the attendance screen has always offered them in its dropdown. The column
+    # did not accept them: choosing either wrote a value the ORM then refused
+    # to read back, so the row saved and every later load of the Attendance
+    # page died on it. Widened here; upgrade_schema.py widens the live MySQL
+    # column to match.
+    status = db.Column(
+        db.Enum('present', 'absent', 'half-day', 'leave', 'holiday'),
+        default='present')
 
 
 class Leave(db.Model):
@@ -582,6 +727,61 @@ class AddonCategory(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+class WalletEntry(db.Model):
+    """
+    One movement of the customer's account credit.
+
+    `Customer.wallet_balance` is the running total; this table is the history
+    behind it. Storing only the balance would make the Wallet tab a number
+    nobody could explain, so every credit and debit lands here with the
+    invoice or payment that caused it and a `balance_after` snapshot, which
+    also makes a drifted balance obvious instead of silent.
+
+    `amount` is signed: positive credits the customer, negative draws down.
+    """
+    __tablename__ = 'wallet_entries'
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'),
+                            nullable=False, index=True)
+    amount = db.Column(db.Numeric(10, 2), nullable=False)
+    balance_after = db.Column(db.Numeric(10, 2), default=0.00)
+    #: credit | debit - derived from the sign, stored so reports can group.
+    kind = db.Column(db.String(10), default='credit')
+    reason = db.Column(db.String(200))
+    invoice_id = db.Column(db.Integer, db.ForeignKey('invoices.id'))
+    payment_id = db.Column(db.Integer, db.ForeignKey('payments.id'))
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    customer = db.relationship('Customer', backref=db.backref(
+        'wallet_entries', lazy='dynamic'))
+    invoice = db.relationship('Invoice')
+    payment = db.relationship('Payment')
+    created_by = db.relationship('User')
+
+
+class DiscountReason(db.Model):
+    """
+    Discount Master: the reasons an operator is allowed to knock money off an
+    addon invoice ("Power Supply", "wire supply", ...).
+
+    This is a controlled list on purpose. Before it existed the discount was a
+    free-text amount with no explanation attached, so a month later nobody
+    could say why a bill was short. Picking from a master means every discount
+    on the ledger carries its reason.
+    """
+    __tablename__ = 'discount_reasons'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    #: Pre-filled when the reason is chosen; the operator can still override it.
+    default_amount = db.Column(db.Numeric(10, 2), default=0.00)
+    #: Percent discounts are stored here instead when the reason is a rate.
+    default_percent = db.Column(db.Numeric(5, 2), default=0.00)
+    description = db.Column(db.String(255))
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class MessageTemplate(db.Model):
     """
     An editable WhatsApp / SMS message. `template_type` is the stable key the
@@ -600,6 +800,30 @@ class MessageTemplate(db.Model):
     channel = db.Column(db.String(20), default='whatsapp')
     description = db.Column(db.String(255))
     is_active = db.Column(db.Boolean, default=True)
+
+    # ---- Meta template mapping ------------------------------------------- #
+    #
+    # WhatsApp will not carry free text to somebody who has not messaged you in
+    # the last 24 hours - and a bill, by definition, goes to somebody who has
+    # not. Outside that window the message must be one Meta has approved in
+    # advance, sent by NAME with its variables supplied separately.
+    #
+    # So each of these rows can carry two forms of the same message: the body
+    # above, used inside the 24-hour window and by SMS, and the approved Meta
+    # template named here, used everywhere else.
+
+    #: The template's name as approved in Meta's WhatsApp Manager.
+    meta_template_name = db.Column(db.String(100))
+
+    #: Language code of the approved template, e.g. 'en' or 'en_US'. Meta
+    #: matches on name AND language, and rejects a mismatch.
+    meta_language = db.Column(db.String(10), default='en')
+
+    #: Comma-separated context keys filling {{1}}, {{2}}, ... IN ORDER.
+    #: e.g. "customer_name,amount,due_date". Order is the whole contract -
+    #: Meta sends positionally and has no idea what each value means.
+    meta_variables = db.Column(db.String(255))
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -608,6 +832,9 @@ class MessageTemplate(db.Model):
     SYSTEM_TYPES = (
         'renewal', 'expiry_3d', 'expiry_2d', 'expired',
         'payment_received', 'due_reminder', 'bill',
+        # Mapped to Meta-approved templates, so deleting one silently breaks
+        # sending outside the 24-hour window.
+        'summary_bill', 'detailed_bill', 'payment_approved', 'welcome',
     )
 
     @property

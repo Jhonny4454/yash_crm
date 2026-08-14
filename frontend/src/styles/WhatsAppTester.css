@@ -1,0 +1,190 @@
+/* WhatsApp gateway panel on the Settings screen. */
+
+.wa-tester { display: grid; gap: 14px; padding: 16px; }
+.wa-tester h2 { margin: 0; font-size: 1.02rem; }
+
+.wa-status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px 18px;
+  margin: 0;
+}
+
+.wa-status > div { display: grid; gap: 2px; min-width: 0; }
+.wa-status-wide { grid-column: 1 / -1; }
+
+.wa-status dt {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #64748b);
+}
+
+.wa-status dd { margin: 0; font-weight: 600; font-size: 0.88rem; }
+
+/* A URL has no spaces to break at, so it needs explicit permission or it
+   runs straight out of the panel. */
+.wa-endpoint {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.wa-test-form { display: grid; gap: 6px; }
+.wa-test-form label { font-size: 0.86rem; font-weight: 600; }
+.wa-test-form small { color: var(--text-muted, #64748b); font-size: 0.78rem; }
+
+.wa-test-row { display: flex; gap: 8px; align-items: center; }
+.wa-test-row .input { max-width: 260px; min-width: 0; }
+.wa-test-row .btn { flex-shrink: 0; }
+
+.wa-result {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 2px solid var(--box-line, #94a3b8);
+  background: #f8fafc;
+}
+
+.wa-result.is-ok   { border-color: #15803d; background: #f0fdf4; }
+.wa-result.is-warn { border-color: #d97706; background: #fffbeb; }
+.wa-result.is-bad  { border-color: #dc2626; background: #fef2f2; }
+
+.wa-result p { margin: 5px 0 0; font-size: 0.86rem; line-height: 1.45; }
+/* The hint carries a paragraph break - the rule, then how to prove it in two
+   minutes. Collapsing that into one wall of text buries the actionable half. */
+.wa-hint {
+  color: #475569;
+  white-space: pre-line;
+  line-height: 1.55;
+}
+
+.wa-result details { margin-top: 10px; }
+.wa-result summary { cursor: pointer; font-size: 0.82rem; font-weight: 600; }
+
+.wa-result pre {
+  margin: 8px 0 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  /* Wrap rather than scroll sideways: these are read, not copied wholesale. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.wa-tester .alert.error ul { margin: 6px 0 6px 18px; padding: 0; }
+
+@media (max-width: 560px) {
+  .wa-test-row { flex-direction: column; align-items: stretch; }
+  .wa-test-row .input { max-width: none; }
+}
+
+/* ---- Gateway configuration form ---------------------------------------- */
+
+.wa-config {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 2px solid var(--box-line, #94a3b8);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.wa-check { display: flex; align-items: center; gap: 9px; font-weight: 600; }
+.wa-check input { width: 17px; height: 17px; flex-shrink: 0; }
+
+.wa-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px 16px;
+}
+
+.wa-config-grid > * { min-width: 0; }
+.wa-config-wide { grid-column: 1 / -1; }
+
+.wa-config-grid label {
+  display: grid;
+  gap: 5px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #334155;
+  min-width: 0;
+}
+
+.wa-config-grid input,
+.wa-config-grid select {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  font: inherit;
+  font-size: 0.88rem;
+  border: 1.5px solid var(--box-line-soft, #cbd5e1);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.wa-config-grid small {
+  font-weight: 500;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-muted, #64748b);
+  /* A URL has no spaces to break at. */
+  overflow-wrap: anywhere;
+}
+
+.wa-config > .btn { justify-self: start; }
+
+@media (max-width: 560px) {
+  .wa-config > .btn { justify-self: stretch; width: 100%; }
+}
+
+/* Unsaved changes: the test would otherwise run the OLD configuration while
+   every field on screen shows the new one. */
+.wa-dirty { color: #b45309 !important; font-weight: 600; }
+
+.wa-provider-note {
+  margin: 0;
+  font-size: 0.79rem;
+  line-height: 1.45;
+  color: var(--text-muted, #64748b);
+}
+
+/* ---- Template health --------------------------------------------------- */
+
+.wa-templates {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 11px 14px;
+  border-radius: 10px;
+  border: 2px solid var(--box-line, #94a3b8);
+}
+
+.wa-templates.is-ok  { border-color: #15803d; background: #f0fdf4; }
+.wa-templates.is-bad { border-color: #dc2626; background: #fef2f2; }
+
+.wa-templates p {
+  margin: 3px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #475569;
+}
+
+.wa-templates .btn { flex-shrink: 0; }
+
+@media (max-width: 560px) {
+  .wa-templates .btn { width: 100%; }
+}
+
+/* A stored key that cannot possibly work. */
+.wa-key-bad { color: #b91c1c; }
+.wa-tester code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.08);
+  font-size: 0.85em;
+}
