@@ -325,7 +325,7 @@ function PlanLifecycle({ plans }) {
             say (0) with a hundred dead connections behind it. */}
         <LifecycleRow name="Expired" days={expired} tone="danger" page="expired"
                       unit="lapsed connection" span={spans.recently_expired?.label}
-                      chips={false}
+                      chips={true}
                       total={plans?.expired_total ?? plans?.expired_all ?? 0}
                       allTotal={plans?.expired_all} allRange=""
                       allLabel="every expired plan" {...shared} />
@@ -334,7 +334,7 @@ function PlanLifecycle({ plans }) {
             Green on purpose. */}
         <LifecycleRow name="Customer renewed" days={renewed} tone="ok" page="renewed"
                       unit="customer" span={spans.renewed?.label}
-                      chips={false}
+                      chips={true}
                       total={plans?.renewed_total
                         ?? renewed.reduce((s, d) => s + d.count, 0)}
                       allTotal={plans?.renewed_all} allRange="?range=all"
