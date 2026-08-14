@@ -22,6 +22,40 @@ from . import permissions as _permissions
 from .utils import iso, money
 
 
+def static_url(name):
+    """Absolute URL for a file under ``/static``.
+
+    Built from PUBLIC_BASE_URL when it is set, and only from the incoming
+    request as a fallback. That order matters in this deployment, because the
+    two things that serve this application are not the same host:
+
+      * The React app is a static site on its own domain. Any RELATIVE url
+        here - which is what the old `except` branch returned whenever there
+        was no request context, e.g. from the scheduler or a PDF build -
+        resolves against THAT host, which has no /static directory. The image
+        silently 404s and the page shows a broken logo.
+
+      * `_external=True` builds from the host the request arrived on. Behind
+        Render's proxy that is frequently an internal address, so the URL is
+        one only the datacentre can resolve. This is the same trap that made
+        WhatsApp bills go out with no attachment, and services/signed_links.py
+        already solved it - so use the same helper rather than a second answer
+        to the same question.
+    """
+    try:
+        from services.signed_links import public_base_url
+        base = public_base_url()
+    except Exception:
+        base = ''
+    if base:
+        return f"{base}/static/{name}"
+    try:
+        return url_for('static', filename=name, _external=True)
+    except Exception:
+        # Last resort. Correct only when the API and the page share an origin.
+        return '/static/' + name
+
+
 def logo_url(filename):
     """
     Resolve whatever is stored in ``Company.company_logo`` into a URL the
@@ -43,10 +77,7 @@ def logo_url(filename):
     if not name.startswith('uploads/'):
         name = 'uploads/logos/' + name.split('/')[-1]
 
-    try:
-        return url_for('static', filename=name, _external=True)
-    except Exception:
-        return '/static/' + name
+    return static_url(name)
 
 
 def company_branding(company=None):
@@ -231,10 +262,7 @@ def _upload_url(filename, folder):
             name = name[len(prefix):]
     if not name.startswith('uploads/'):
         name = f'uploads/{folder}/' + name.split('/')[-1]
-    try:
-        return url_for('static', filename=name, _external=True)
-    except Exception:
-        return '/static/' + name
+    return static_url(name)
 
 
 def plan_dict(p):

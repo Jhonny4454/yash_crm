@@ -169,25 +169,40 @@ def dashboard_summary():
 
     # ---- one GROUP BY for the lifecycle chips ----------------------------
     #
-    # ONE axis for all three rows: today on the left, then one day at a time
-    # for a week - 14 Aug, 15 Aug, ... 20 Aug. Every row is read across the
-    # same seven dates, so a column means the same day whichever row you are
-    # looking at.
+    # EVERY CHIP IS AN EXACT DATE. A plan whose end date is 15 Aug is counted
+    # in the 15 Aug column and in no other - not the day before, not the day
+    # after, and not carried forward into the rest of the week.
     #
-    # It used to be three DIFFERENT weeks stacked on top of each other: Expired
-    # showed the previous seven days, Renewed the last seven including today,
-    # and only Expiring started at today. Three rows of dates that lined up
-    # visually and did not line up in time is the worst of both - the operator
-    # reads down a column and gets three unrelated days.
+    # It was briefly a running backlog on the Expired row: today's chip held
+    # every lapsed connection and each following day added the previous day's
+    # expiries, so one customer appeared in all seven columns and the row read
+    # 3, 4, 5, 6, 7, 8, 9 for three real expiries. That answers "where am I by
+    # Wednesday if nobody renews", which is a different question from the one
+    # the chips look like they are answering, and it made a single expiry look
+    # like seven.
+    #
+    # Two rows count things that have ALREADY happened, so they look BACK from
+    # today; one counts things still to come, so it looks forward:
+    #
+    #     Expired   08 Aug .. 14 Aug   the week just gone
+    #     Renewed   08 Aug .. 14 Aug   the week just gone
+    #     Expiring  14 Aug .. 20 Aug   the week ahead
+    #
+    # The rows therefore do NOT share a column, which is why each one now
+    # carries its own date span in the label - see `window` in the payload.
+    # A shared forward axis was tried and put six structural zeros on each of
+    # the first two rows: nothing can have expired tomorrow yet.
     LIFECYCLE_DAYS = 7
-    window_end = today + timedelta(days=LIFECYCLE_DAYS - 1)
+    past_start = today - timedelta(days=LIFECYCLE_DAYS - 1)
+    future_end = today + timedelta(days=LIFECYCLE_DAYS - 1)
 
+    # One query spans both windows; the two rows read different slices of it.
     expiry_query = db.session.query(
         literal('expiry').label('kind'), CustomerPlan.end_date.label('day'),
         func.count(CustomerPlan.id).label('count')).filter(
         CustomerPlan.status == 'active',
-        CustomerPlan.end_date >= today,
-        CustomerPlan.end_date <= window_end
+        CustomerPlan.end_date >= past_start,
+        CustomerPlan.end_date <= future_end
     ).group_by(CustomerPlan.end_date)
 
     # Every renewal path - the counter, the billing run, a plan change - stamps
@@ -203,8 +218,8 @@ def dashboard_summary():
         literal('renewed').label('kind'),
         CustomerPlan.last_invoice_date.label('day'),
         func.count(func.distinct(CustomerPlan.customer_id)).label('count')).filter(
-        CustomerPlan.last_invoice_date >= today,
-        CustomerPlan.last_invoice_date <= window_end
+        CustomerPlan.last_invoice_date >= past_start,
+        CustomerPlan.last_invoice_date <= today
     ).group_by(CustomerPlan.last_invoice_date)
 
     lifecycle_rows = db.session.execute(union_all(
@@ -229,37 +244,31 @@ def dashboard_summary():
         target = expiry_counts if row.kind == 'expiry' else renewed_counts
         target[day] = target.get(day, 0) + int(row.count or 0)
 
-    week = [today + timedelta(days=offset) for offset in range(LIFECYCLE_DAYS)]
+    def chips(start, counts):
+        """Seven days from `start`, each counting only its OWN date."""
+        out = []
+        for offset in range(LIFECYCLE_DAYS):
+            d = start + timedelta(days=offset)
+            out.append({'date': iso(d), 'label': d.strftime('%d %b'),
+                        'count': int(counts.get(d, 0))})
+        return out
 
-    def chips(counts):
-        return [{'date': iso(d), 'label': d.strftime('%d %b'),
-                 'count': int(counts.get(d, 0))} for d in week]
+    def span(days):
+        return {'from': days[0]['date'], 'to': days[-1]['date'],
+                'label': f"{days[0]['label']} to {days[-1]['label']}"}
 
     # Active plans running out on that day - who has to be chased, and when.
-    expiring = chips(expiry_counts)
+    expiring = chips(today, expiry_counts)
 
-    # Already lapsed, carried forward. The chip for a day is how many dead
-    # connections you are sitting on THAT MORNING: today's is the current
-    # backlog, and each following day adds the plans that ran out the day
-    # before. So the row answers "if nobody renews, where am I by Wednesday?"
-    #
-    # "Expired" cannot be bucketed by a future date any other way - a plan that
-    # lapsed three weeks ago has no place on a forward axis - and a row of
-    # seven zeros beside two rows with figures in them is not a row, it is a
-    # gap.
-    running = expired_all
-    recently_expired = []
-    for index, day in enumerate(week):
-        if index:
-            running += int(expiry_counts.get(week[index - 1], 0))
-        recently_expired.append({'date': iso(day),
-                                 'label': day.strftime('%d %b'),
-                                 'count': running})
+    # Connections that ran out on that day and have not come back. A renewal
+    # moves end_date forward, so a customer who renewed drops out of this
+    # window on their own - the row does not need a second query to exclude
+    # them.
+    recently_expired = chips(past_start, expiry_counts)
 
-    # Renewals recorded on that day. Today's chip is live and the rest fill in
-    # left to right as the week runs, so the row reads as this week's progress
-    # against the two rows above it.
-    renewed = chips(renewed_counts)
+    # Renewals recorded on that day, as distinct customers: somebody with two
+    # connections renewed in one visit is one customer renewing, not two.
+    renewed = chips(past_start, renewed_counts)
 
     # ---- invoices (one GROUP BY) -----------------------------------------
     inv_rows = db.session.query(
@@ -348,17 +357,21 @@ def dashboard_summary():
         'plans': {
             'active': active_plans,
             'expired': expired_plans,
-            'window_start': iso(today),
-            'window_end': iso(window_end),
             'expiring': expiring,
             'recently_expired': recently_expired,
             'renewed': renewed,
-            # Each row's own figure for the week on screen. Sent rather than
-            # summed in the browser, because the Expired chips are a running
-            # backlog - adding them up would count the same lapsed connection
-            # seven times.
+            # Each row covers a different week now, so each has to say which -
+            # the dates alone no longer line up between rows to tell you.
+            'window': {
+                'expiring': span(expiring),
+                'recently_expired': span(recently_expired),
+                'renewed': span(renewed),
+            },
+            # Each row's own figure for the week on screen. Every chip is an
+            # exact date and nothing is carried forward, so these are plain
+            # sums and no customer is counted twice.
             'expiring_total': sum(day['count'] for day in expiring),
-            'expired_total': expired_all,
+            'expired_total': sum(day['count'] for day in recently_expired),
             'renewed_total': sum(day['count'] for day in renewed),
             # Everything on the books, so "View all" can say what it will show.
             'expiring_all': expiring_all,
