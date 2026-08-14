@@ -15,8 +15,6 @@ masters screens (zones, tax, addon categories, expense categories, staff
 types...) all called endpoints that did not exist and rendered an empty
 table with a network error.
 """
-import os
-
 from flask import Blueprint, jsonify
 
 API_PREFIX = '/api/v1'
@@ -95,25 +93,13 @@ def register_api(app, csrf=None):
     if csrf is not None:
         csrf.exempt(api_bp)
 
-    origins = [o.strip() for o in os.environ.get(
-        'CORS_ORIGINS',
-        'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000'
-    ).split(',') if o.strip()]
-
-    @app.after_request
-    def _cors(resp):
-        from flask import request
-        if not request.path.startswith(API_PREFIX):
-            return resp
-        origin = request.headers.get('Origin')
-        if origin and ('*' in origins or origin in origins):
-            resp.headers['Access-Control-Allow-Origin'] = origin
-            resp.headers['Vary'] = 'Origin'
-            resp.headers['Access-Control-Allow-Credentials'] = 'true'
-            resp.headers['Access-Control-Allow-Headers'] = \
-                'Content-Type, Authorization'
-            resp.headers['Access-Control-Allow-Methods'] = \
-                'GET, POST, PUT, PATCH, DELETE, OPTIONS'
-        return resp
+    # CORS is NOT set here any more. There were two after_request handlers
+    # writing the same four headers - this one and security.py's - and Flask
+    # runs them in reverse registration order, so which one won depended on
+    # import order rather than on anything anybody decided. This copy also had
+    # no Access-Control-Max-Age, so it silently discarded the pre-flight cache
+    # the other one was trying to set, and it compared the Origin header with
+    # its trailing slash intact while the other stripped it. One place, one
+    # rule: see `_install_cors` in security.py, which harden(app) applies.
 
     return api_bp

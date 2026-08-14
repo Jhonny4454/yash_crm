@@ -4745,6 +4745,29 @@ def init_database(flask_app=None):
         except Exception as exc:                        # noqa: BLE001
             flask_app.logger.warning("Schema sync skipped: %s", exc)
 
+        # Indexes, on every boot.
+        #
+        # `db.create_all()` creates missing TABLES and never touches a table
+        # that already exists, so the seventeen indexes on the hot columns -
+        # customer_plans(status, end_date), invoices(customer_id / status /
+        # issue_date), payments(invoice_id / customer_id / status /
+        # payment_date), customers(mobile / zone / is_active) - only existed if
+        # somebody had remembered to run `python upgrade_schema.py` by hand
+        # against the live database. Nobody had. Without them every dashboard
+        # load and every expiry report is a full table scan, which is most of
+        # what "the whole app is slow" actually was.
+        #
+        # The step is idempotent (each index is checked first) and every
+        # failure is caught and reported rather than being allowed to stop the
+        # process from starting. Set AUTO_INDEX=0 to skip it - for instance
+        # while running a migration by hand.
+        if os.environ.get('AUTO_INDEX', '1') != '0':
+            try:
+                from upgrade_schema import add_missing_indexes
+                add_missing_indexes(db)
+            except Exception as exc:                    # noqa: BLE001
+                flask_app.logger.warning("Index check skipped: %s", exc)
+
         try:
             from blueprints.settings_bp import seed_settings
             seed_settings()

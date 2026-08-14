@@ -4,9 +4,9 @@ import "../styles/IdleWarning.css";
 /**
  * The last few seconds of an idle session, made visible.
  *
- * A two-minute timeout with no warning means an operator who looked away
- * mid-form comes back to a login screen and an empty form. The countdown
- * costs nothing and turns a silent data loss into a keypress.
+ * An idle timeout with no warning means an operator who looked away mid-form
+ * comes back to a login screen and an empty form. The countdown costs nothing
+ * and turns a silent data loss into a keypress.
  *
  * Any real activity - including moving the mouse to reach this dialog -
  * cancels it, so the button is a fallback rather than the main way out.

@@ -461,6 +461,21 @@ table.data .select-col input[type="checkbox"] {
 
 table.data tr.is-selected { background: rgba(0, 115, 183, 0.06); }
 
+/* A button that has to read as a link, because it sits mid-sentence inside
+   the selection bar ("142 selected · Select all 3,412 matching"). A .btn there
+   would break the line into two controls and lose the sentence. */
+.linkish {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--brand, #0073b7);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.linkish:hover { color: #005a90; }
+
 @media (max-width: 640px) {
   .bulk-bar { flex-direction: column; align-items: stretch; }
   .bulk-actions .btn { flex: 1; }

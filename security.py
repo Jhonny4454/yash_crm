@@ -82,12 +82,29 @@ def _install_cors(app):
         if origin in allowed:
             response.headers['Access-Control-Allow-Origin'] = origin
             response.headers['Access-Control-Allow-Credentials'] = 'true'
-            response.headers['Vary'] = 'Origin'
+            # ADD, not assign. This used to overwrite the header outright, and
+            # the SPA blueprint sets `Vary: Accept-Encoding` on every gzipped
+            # asset it serves - so a cross-origin request wiped that out and a
+            # shared cache was free to hand compressed bytes to a client that
+            # had not asked for them.
+            _vary(response, 'Origin')
             response.headers['Access-Control-Allow-Headers'] = (
                 'Authorization, Content-Type, X-Requested-With')
             response.headers['Access-Control-Allow-Methods'] = (
                 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
-            response.headers['Access-Control-Max-Age'] = '600'
+            # Every authenticated call from the browser carries an
+            # Authorization header, which makes it a "non-simple" request: the
+            # browser sends an OPTIONS pre-flight FIRST and waits for the
+            # answer before sending the real one. Across the public internet
+            # that is a full extra round trip - to Singapore and back - on
+            # every API call whose pre-flight has expired.
+            #
+            # Ten minutes meant re-paying that several times an hour on every
+            # endpoint. Chrome caps the cache at two hours and Firefox at
+            # twenty-four; asking for a day gets each browser's maximum, and
+            # turns "every call is two round trips" into "the first call of the
+            # session is".
+            response.headers['Access-Control-Max-Age'] = '86400'
         return response
 
     @app.before_request
@@ -97,7 +114,21 @@ def _install_cors(app):
         if not request.path.startswith('/api/'):
             return None
         # An empty 204 is enough; _cors_headers above attaches the rest.
+        #
+        # Answered here, before routing, so a pre-flight never touches the
+        # database or the auth decorators: it is a question about permissions,
+        # not a request for data, and making it wait behind a remote query is
+        # how a fast endpoint ends up feeling slow.
         return ('', 204)
+
+
+def _vary(response, value):
+    """Append to Vary without discarding what is already there."""
+    existing = [v.strip() for v in
+                (response.headers.get('Vary') or '').split(',') if v.strip()]
+    if value.lower() not in {v.lower() for v in existing}:
+        existing.append(value)
+    response.headers['Vary'] = ', '.join(existing)
 
 
 # --------------------------------------------------------------------------- #

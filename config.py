@@ -78,11 +78,12 @@ class Config:
     # Used by blueprints/api - the React admin panel and the React Native app.
     # Falls back to SECRET_KEY when JWT_SECRET_KEY is not set separately.
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or SECRET_KEY
-    # Access tokens are deliberately short. The browser signs itself out after
-    # two minutes with no activity, but that only clears localStorage on THAT
-    # machine - a token already copied off it keeps working until it expires.
-    # 15 minutes bounds that window without the operator noticing, because the
-    # API client refreshes silently while they are working.
+    # Access tokens are deliberately short. The browser's idle sign-out only
+    # clears localStorage on THAT machine - a token already copied off it keeps
+    # working until it expires, so this is the setting that actually bounds
+    # what a leaked credential is worth. 15 minutes does that without the
+    # operator noticing, because the API client refreshes silently while they
+    # are working.
     #
     # JWT_ACCESS_HOURS is still honoured so an existing .env keeps working.
     JWT_ACCESS_MINUTES = int(

@@ -162,6 +162,52 @@ def outstanding_summary_for_customer(customer_id):
     return float(round(float(total or 0))), int(count or 0)
 
 
+def customers_with_balance():
+    """A sub-select of every customer id that still owes something.
+
+    Returned as a selectable, not a list, so callers can drop it straight into
+    an ``IN (...)`` and let the database do the work. The bulk-message screen
+    built the same set by loading every open invoice and reading
+    ``Invoice.balance`` on each one, which lazy-loads that invoice's payments -
+    one query per invoice, on the path that then sends a few hundred WhatsApp
+    messages.
+    """
+    paid = _paid_per_invoice()
+    balance = _balance_expression(paid)
+    return (
+        db.session.query(Invoice.customer_id)
+        .select_from(Invoice)
+        .outerjoin(paid, paid.c.invoice_id == Invoice.id)
+        .filter(Invoice.status.in_(OPEN_STATUSES), balance > 0)
+        .distinct()
+    )
+
+
+def total_outstanding_for(customer_id_select):
+    """Total owed by whichever customers a sub-select names.
+
+    Takes a SQLAlchemy selectable of customer ids rather than a Python list.
+    The expiry board's footer has to report what the WHOLE filtered set owes
+    while the operator is looking at one page of it; materialising several
+    thousand ids in Python only to send them straight back as an ``IN (...)``
+    makes the statement grow with the result set and, past a few thousand,
+    runs into MySQL's max_allowed_packet. The database already knows which
+    rows match - let it keep them.
+    """
+    paid = _paid_per_invoice()
+    balance = _balance_expression(paid)
+    total = (
+        db.session.query(func.coalesce(func.sum(balance), 0))
+        .select_from(Invoice)
+        .outerjoin(paid, paid.c.invoice_id == Invoice.id)
+        .filter(Invoice.customer_id.in_(customer_id_select),
+                Invoice.status.in_(OPEN_STATUSES),
+                balance > 0)
+        .scalar()
+    )
+    return float(round(float(total or 0)))
+
+
 def outstanding_for_customers(customer_ids):
     """``{customer_id: amount}`` for many customers, in ONE query.
 

@@ -25,9 +25,18 @@ services:
     region: singapore          # closest Render region to Navi Mumbai
     branch: main
     buildCommand: pip install -r requirements.txt
-    # 2 workers on the starter plan; more will thrash the 512 MB limit.
-    # --timeout 120 because the PDF and bulk-billing endpoints are slow.
-    startCommand: gunicorn wsgi:application --workers 2 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT
+    # Reads gunicorn.conf.py rather than repeating its settings on the command
+    # line. That file says, in capitals, KEEP WORKERS AT 1 - APScheduler runs
+    # inside the Flask process, so a second worker is a second scheduler, and
+    # every nightly job fires twice: two auto-invoices per customer, two
+    # "your plan expires" WhatsApp messages, two suspension sweeps.
+    #
+    # This command line said `--workers 2`, and a command-line flag overrides
+    # the config file, so the guard in gunicorn.conf.py was being silently
+    # ignored on every deploy. Throughput comes back through threads instead
+    # (WEB_THREADS below): these requests are almost entirely waiting on a
+    # database in another datacentre, which is exactly what threads are for.
+    startCommand: gunicorn -c gunicorn.conf.py wsgi:application
     healthCheckPath: /api/v1/health
     autoDeploy: true
     envVars:
@@ -35,6 +44,23 @@ services:
         value: "3.12.10"   # matches runtime.txt
       - key: FLASK_ENV
         value: production
+
+      # Render containers run in UTC. Every "today" in this app - the
+      # dashboard's seven-day cycle, plan expiry, collected-today - is a
+      # business day in Navi Mumbai, and between midnight and 05:30 IST the
+      # UTC date is still yesterday. The API pins its own date arithmetic to
+      # Asia/Kolkata regardless; this makes the process clock, the scheduler's
+      # cron times and the logs agree with it.
+      - key: TZ
+        value: Asia/Kolkata
+
+      # One process (see startCommand), several threads. Each request spends
+      # most of its life waiting on Railway, so threads are nearly free here
+      # and 8 of them fit the 512 MB starter plan comfortably.
+      - key: WEB_CONCURRENCY
+        value: "1"
+      - key: WEB_THREADS
+        value: "8"
 
       # Railway's MySQL connection string, e.g.
       #   mysql://root:pass@containers-us-west-1.railway.app:6543/railway
@@ -66,10 +92,16 @@ services:
       - key: PUBLIC_BASE_URL
         value: https://yash-crm-api.onrender.com
 
-      # Session policy. The browser signs itself out after 2 minutes with no
-      # activity on the page; this bounds how long an access token that left
-      # the machine stays usable. The client refreshes silently, so shortening
-      # it is invisible to the operator.
+      # Session policy. This is the number that actually bounds how long an
+      # access token that left the machine stays usable - not the browser's
+      # idle timer, which only clears localStorage on the machine it runs on.
+      # The client refreshes silently, so a short access token is invisible to
+      # the operator.
+      #
+      # The browser's own idle sign-out is 30 minutes (frontend/src/session/
+      # idle.js). It was 2, which signed people out mid-phone-call and is the
+      # loudest reason the login flow felt broken. Override per deployment
+      # with VITE_IDLE_MINUTES on the static service if a site wants tighter.
       - key: JWT_ACCESS_MINUTES
         value: "15"
 

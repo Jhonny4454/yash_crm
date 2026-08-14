@@ -23,7 +23,7 @@ from sqlalchemy import String, and_, case, func, literal, union_all
 
 from models import Customer, CustomerPlan, Invoice, Payment, db
 
-from .utils import body, fail, iso, ok, staff_required
+from .utils import body, fail, iso, ok, staff_required, today_local
 
 bp = Blueprint('api_dashboard', __name__)
 
@@ -102,7 +102,7 @@ def _month_key(col):
 @bp.get('/dashboard/summary')
 @staff_required
 def dashboard_summary():
-    today = date.today()
+    today = today_local()
     month_start = _month_start(today)
     days_in_month = monthrange(today.year, today.month)[1]
     month_end = month_start.replace(day=days_in_month)
@@ -111,92 +111,33 @@ def dashboard_summary():
     # These used to be two aggregate queries (customer figures and plan
     # figures).  Scalar subqueries keep their independent aggregates while
     # sending only one request across a remote database connection.
-    customer_counts = db.session.query(
-        func.count(Customer.id).label('total'),
-        func.coalesce(func.sum(case((Customer.is_active.is_(True), 1),
-                                    else_=0)), 0).label('active'),
-        func.coalesce(func.sum(case((Customer.registration_date >= month_start, 1),
-                                    else_=0)), 0).label('new_this_month'),
-    ).subquery()
-    plan_counts = db.session.query(
-        func.coalesce(func.sum(case((CustomerPlan.status == 'active', 1),
-                                    else_=0)), 0).label('active'),
-        func.coalesce(func.sum(case((and_(CustomerPlan.status == 'active',
-                                           CustomerPlan.end_date < today), 1),
-                                    else_=0)), 0).label('expired'),
-    ).subquery()
+    #
+    # Written as five scalar sub-selects rather than as two multi-column
+    # subqueries joined together. The join had no ON clause - it did not need
+    # one, since both sides are a single aggregate row - but SQLAlchemy
+    # correctly reports that as a cartesian product on every dashboard load,
+    # and a warning that is always wrong is a warning nobody reads when it is
+    # finally right.
+    def _scalar(expression, model):
+        return db.session.query(expression).select_from(model).scalar_subquery()
+
     top_counts = db.session.query(
-        customer_counts.c.total,
-        customer_counts.c.active,
-        customer_counts.c.new_this_month,
-        plan_counts.c.active,
-        plan_counts.c.expired,
+        _scalar(func.count(Customer.id), Customer),
+        _scalar(func.coalesce(func.sum(case((Customer.is_active.is_(True), 1),
+                                            else_=0)), 0), Customer),
+        _scalar(func.coalesce(func.sum(case((Customer.registration_date >= month_start, 1),
+                                            else_=0)), 0), Customer),
+        _scalar(func.coalesce(func.sum(case((CustomerPlan.status == 'active', 1),
+                                            else_=0)), 0), CustomerPlan),
+        _scalar(func.coalesce(func.sum(case((and_(CustomerPlan.status == 'active',
+                                                  CustomerPlan.end_date < today), 1),
+                                            else_=0)), 0), CustomerPlan),
     ).one()
     total_customers = int(top_counts[0] or 0)
     active_customers = int(top_counts[1] or 0)
     new_this_month = int(top_counts[2] or 0)
     active_plans = int(top_counts[3] or 0)
     expired_plans = int(top_counts[4] or 0)
-
-    # ---- one GROUP BY for the lifecycle chips ----------------------------
-    window_start = today - timedelta(days=7)
-    window_end = today + timedelta(days=7)
-
-    expiry_query = db.session.query(
-        literal('expiry').label('kind'), CustomerPlan.end_date.label('day'),
-        func.count(CustomerPlan.id).label('count')).filter(
-        CustomerPlan.status == 'active',
-        CustomerPlan.end_date >= window_start,
-        CustomerPlan.end_date <= window_end
-    ).group_by(CustomerPlan.end_date)
-
-    def chips(start, days, counts):
-        out = []
-        for offset in range(days):
-            d = start + timedelta(days=offset)
-            out.append({'date': iso(d),
-                        'label': d.strftime('%d %b'),
-                        'count': counts.get(d, 0)})
-        return out
-
-    # ---- renewed in the last 7 days --------------------------------------
-    # Every renewal path - the counter, the billing run, a plan change - stamps
-    # CustomerPlan.last_invoice_date with the day the new period was raised.
-    # It is the only field all three write, which is why it is the marker here
-    # rather than "a CustomerPlan row was created": renewing onto the SAME plan
-    # updates the existing row in place and creates nothing.
-    #
-    # Counted as DISTINCT customers, because the row is labelled "Renewed"
-    # under a customer heading - somebody with two connections renewed on one
-    # visit is one customer renewing, not two.
-    renewed_start = today - timedelta(days=6)          # 7 days, today included
-    renewed_query = db.session.query(
-        literal('renewed').label('kind'),
-        CustomerPlan.last_invoice_date.label('day'),
-        func.count(func.distinct(CustomerPlan.customer_id)).label('count')).filter(
-        CustomerPlan.last_invoice_date >= renewed_start,
-        CustomerPlan.last_invoice_date <= today
-    ).group_by(CustomerPlan.last_invoice_date)
-    lifecycle_rows = db.session.execute(union_all(
-        expiry_query.statement, renewed_query.statement)).all()
-    expiry_counts = {row.day: row.count for row in lifecycle_rows
-                     if row.kind == 'expiry'}
-    renewed_counts = {row.day: row.count for row in lifecycle_rows
-                      if row.kind == 'renewed'}
-
-    # 7 days, not 8. The window above deliberately fetches today+7 so nothing
-    # is missed at the boundary, but the ROW is labelled "next 7 days" and was
-    # drawing eight chips - one more column than the two rows beneath it, which
-    # is what made the three rows fail to line up.
-    #
-    # These three lines have to come AFTER the union above: they read the
-    # dictionaries it builds. Sitting before it, `expiring` referenced
-    # `expiry_counts` before it existed and every dashboard load - the first
-    # screen after login - died with UnboundLocalError, so the whole admin
-    # home page was a 500.
-    expiring = chips(today, 7, expiry_counts)
-    recently_expired = chips(today - timedelta(days=7), 7, expiry_counts)
-    renewed = chips(renewed_start, 7, renewed_counts)
 
     # ---- how many there are ALTOGETHER, not just in the visible week ------
     #
@@ -205,6 +146,9 @@ def dashboard_summary():
     # A customer whose plan expired three weeks ago appeared in neither the
     # chips nor the count, so the panel could read (0) with a hundred expired
     # connections sitting behind it. One grouped query, three figures.
+    #
+    # This runs BEFORE the chips now, because the Expired row is built from
+    # `expired_all` - see the cumulative note below.
     totals = db.session.query(
         func.coalesce(func.sum(case(
             (and_(CustomerPlan.status == 'active',
@@ -222,6 +166,100 @@ def dashboard_summary():
     expiring_all = int(totals[0] or 0)
     expired_all = int(totals[1] or 0)
     renewed_all = int(totals[2] or 0)
+
+    # ---- one GROUP BY for the lifecycle chips ----------------------------
+    #
+    # ONE axis for all three rows: today on the left, then one day at a time
+    # for a week - 14 Aug, 15 Aug, ... 20 Aug. Every row is read across the
+    # same seven dates, so a column means the same day whichever row you are
+    # looking at.
+    #
+    # It used to be three DIFFERENT weeks stacked on top of each other: Expired
+    # showed the previous seven days, Renewed the last seven including today,
+    # and only Expiring started at today. Three rows of dates that lined up
+    # visually and did not line up in time is the worst of both - the operator
+    # reads down a column and gets three unrelated days.
+    LIFECYCLE_DAYS = 7
+    window_end = today + timedelta(days=LIFECYCLE_DAYS - 1)
+
+    expiry_query = db.session.query(
+        literal('expiry').label('kind'), CustomerPlan.end_date.label('day'),
+        func.count(CustomerPlan.id).label('count')).filter(
+        CustomerPlan.status == 'active',
+        CustomerPlan.end_date >= today,
+        CustomerPlan.end_date <= window_end
+    ).group_by(CustomerPlan.end_date)
+
+    # Every renewal path - the counter, the billing run, a plan change - stamps
+    # CustomerPlan.last_invoice_date with the day the new period was raised.
+    # It is the only field all three write, which is why it is the marker here
+    # rather than "a CustomerPlan row was created": renewing onto the SAME plan
+    # updates the existing row in place and creates nothing.
+    #
+    # Counted as DISTINCT customers, because the row is labelled "Renewed"
+    # under a customer heading - somebody with two connections renewed on one
+    # visit is one customer renewing, not two.
+    renewed_query = db.session.query(
+        literal('renewed').label('kind'),
+        CustomerPlan.last_invoice_date.label('day'),
+        func.count(func.distinct(CustomerPlan.customer_id)).label('count')).filter(
+        CustomerPlan.last_invoice_date >= today,
+        CustomerPlan.last_invoice_date <= window_end
+    ).group_by(CustomerPlan.last_invoice_date)
+
+    lifecycle_rows = db.session.execute(union_all(
+        expiry_query.statement, renewed_query.statement)).all()
+
+    def _as_date(value):
+        """MySQL hands back date, SQLite a string. Key on one of them."""
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+        try:
+            return datetime.strptime(str(value)[:10], '%Y-%m-%d').date()
+        except (TypeError, ValueError):
+            return None
+
+    expiry_counts, renewed_counts = {}, {}
+    for row in lifecycle_rows:
+        day = _as_date(row.day)
+        if day is None:
+            continue
+        target = expiry_counts if row.kind == 'expiry' else renewed_counts
+        target[day] = target.get(day, 0) + int(row.count or 0)
+
+    week = [today + timedelta(days=offset) for offset in range(LIFECYCLE_DAYS)]
+
+    def chips(counts):
+        return [{'date': iso(d), 'label': d.strftime('%d %b'),
+                 'count': int(counts.get(d, 0))} for d in week]
+
+    # Active plans running out on that day - who has to be chased, and when.
+    expiring = chips(expiry_counts)
+
+    # Already lapsed, carried forward. The chip for a day is how many dead
+    # connections you are sitting on THAT MORNING: today's is the current
+    # backlog, and each following day adds the plans that ran out the day
+    # before. So the row answers "if nobody renews, where am I by Wednesday?"
+    #
+    # "Expired" cannot be bucketed by a future date any other way - a plan that
+    # lapsed three weeks ago has no place on a forward axis - and a row of
+    # seven zeros beside two rows with figures in them is not a row, it is a
+    # gap.
+    running = expired_all
+    recently_expired = []
+    for index, day in enumerate(week):
+        if index:
+            running += int(expiry_counts.get(week[index - 1], 0))
+        recently_expired.append({'date': iso(day),
+                                 'label': day.strftime('%d %b'),
+                                 'count': running})
+
+    # Renewals recorded on that day. Today's chip is live and the rest fill in
+    # left to right as the week runs, so the row reads as this week's progress
+    # against the two rows above it.
+    renewed = chips(renewed_counts)
 
     # ---- invoices (one GROUP BY) -----------------------------------------
     inv_rows = db.session.query(
@@ -310,9 +348,17 @@ def dashboard_summary():
         'plans': {
             'active': active_plans,
             'expired': expired_plans,
+            'window_start': iso(today),
+            'window_end': iso(window_end),
             'expiring': expiring,
             'recently_expired': recently_expired,
             'renewed': renewed,
+            # Each row's own figure for the week on screen. Sent rather than
+            # summed in the browser, because the Expired chips are a running
+            # backlog - adding them up would count the same lapsed connection
+            # seven times.
+            'expiring_total': sum(day['count'] for day in expiring),
+            'expired_total': expired_all,
             'renewed_total': sum(day['count'] for day in renewed),
             # Everything on the books, so "View all" can say what it will show.
             'expiring_all': expiring_all,
@@ -342,7 +388,7 @@ def dashboard_zones():
     Follows the same shape as the rest of this module: a small number of
     GROUP BY queries pivoted in Python, rather than one query per zone.
     """
-    today = date.today()
+    today = today_local()
     month_start = _month_start(today)
 
     # --- collection this month, by zone (one GROUP BY) --------------------
@@ -382,7 +428,7 @@ def dashboard_monthly():
 
     Empty months are left out rather than printed as rows of dashes.
     """
-    today = date.today()
+    today = today_local()
     start = _month_start(today - timedelta(days=365))
 
     # New customers per month
@@ -489,7 +535,7 @@ def customer_plan_dates(cpid):
     cp.start_date = next_start
     cp.end_date = next_end
 
-    if cp.end_date >= date.today():
+    if cp.end_date >= today_local():
         cp.status = 'active'
 
     db.session.commit()

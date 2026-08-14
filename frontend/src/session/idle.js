@@ -31,11 +31,38 @@
  *    never reach zero.
  */
 
-/** How long a session survives with no activity. */
-export const IDLE_MS = 2 * 60 * 1000;
+/**
+ * How long a session survives with no activity.
+ *
+ * This was TWO MINUTES, and two minutes is not an idle timeout - it is a
+ * timer. Reading an invoice, taking a phone call, typing an address off a
+ * paper form, or simply looking at another window all take longer than that,
+ * and every one of them ended with the operator back at the login screen with
+ * whatever they were typing gone. It is the single loudest reason this app
+ * feels like "the login keeps breaking".
+ *
+ * Thirty minutes is the usual figure for an internal back-office tool: long
+ * enough that nobody meets it during normal work, short enough that an
+ * unattended machine in a shop does not stay signed in all afternoon. The
+ * security argument for two minutes was never really about the browser
+ * anyway - it is the ACCESS TOKEN's fifteen-minute life that bounds what a
+ * copied credential is worth, and that has not changed.
+ *
+ * Override per deployment with VITE_IDLE_MINUTES if a site wants it tighter.
+ */
+const configuredMinutes = Number(import.meta.env?.VITE_IDLE_MINUTES);
+export const IDLE_MINUTES = Number.isFinite(configuredMinutes) && configuredMinutes > 0
+  ? configuredMinutes
+  : 30;
 
-/** How long the "you are about to be signed out" warning is shown for. */
-export const WARN_MS = 20 * 1000;
+export const IDLE_MS = IDLE_MINUTES * 60 * 1000;
+
+/** How long the "you are about to be signed out" warning is shown for.
+ *
+ * Sixty seconds, not twenty. The warning is only useful if it is on screen
+ * long enough to be noticed by somebody who is looking somewhere else - which
+ * is, by definition, everybody who is about to hit an idle timeout. */
+export const WARN_MS = 60 * 1000;
 
 /** Shared across tabs, so activity anywhere keeps every tab alive. */
 export const ACTIVITY_KEY = "unicrm.lastActivity";

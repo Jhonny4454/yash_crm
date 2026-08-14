@@ -279,18 +279,24 @@ function AuthorisationQueue({ days }) {
 /**
  * The three lifecycle rows: Expired, Renewed, Expiring.
  *
- * Each row carries its own seven days and starts at the same left edge, so
- * the three read as three equal bands and the dates inside each run left to
- * right, oldest first.
+ * ONE axis, shared by all three: today at the left edge, then one day at a
+ * time for a week — 14 Aug, 15 Aug … 20 Aug. A column therefore means the same
+ * calendar day whichever row you read it on.
  *
- * A shared fourteen-day axis was tried instead - one column per real date
- * across all three rows. It was technically more correct and looked broken:
- * because the three windows only overlap at their edges, every row sat on
- * roughly half the panel with a stretch of nothing beside its own label. Rows
- * of equal width that line up beat columns that are individually meaningful.
+ * Before this, the three rows carried three DIFFERENT weeks stacked on top of
+ * each other — Expired showed the previous seven days, Renewed the last seven
+ * including today, and only Expiring began at today. They lined up visually
+ * and did not line up in time, which is the one arrangement guaranteed to
+ * mislead: reading down a column gave three unrelated dates.
  *
- * The row ORDER is what carries the time: past at the top, the future at the
- * bottom.
+ * What each row counts on day D, given the axis now runs forwards:
+ *   Expiring  — active plans whose end date IS D. Who to chase, and when.
+ *   Expired   — how many lapsed connections you are sitting on that morning:
+ *               today's chip is the current backlog and each later day adds
+ *               the plans that ran out the day before. A plan that lapsed
+ *               three weeks ago has no place on a forward axis any other way.
+ *   Renewed   — renewals recorded on D. Today's chip is live; the rest fill
+ *               in left to right as the week runs.
  */
 function PlanLifecycle({ plans }) {
   const expiring = plans?.expiring || [];
@@ -298,44 +304,45 @@ function PlanLifecycle({ plans }) {
   const renewed = plans?.renewed || [];
   if (!expiring.length && !expired.length && !renewed.length) return null;
 
-  // Today, in the browser's own timezone - "en-CA" is ISO order.
+  // Today, in the browser's own timezone - "en-CA" is ISO order. The server
+  // now answers in Asia/Kolkata too, so these agree instead of drifting a day
+  // apart between midnight and 05:30 IST.
   const todayIso = new Date().toLocaleDateString("en-CA");
   const columns = Math.max(expired.length, renewed.length, expiring.length, 7);
+  // One axis, so one span caption for the whole panel rather than one per row.
+  const axis = expiring.length ? expiring : expired.length ? expired : renewed;
+  const span = axis.length ? `${axis[0].label} to ${axis[axis.length - 1].label}` : "";
   const shared = { todayIso, columns };
-
-  const span = (days) => (days.length
-    ? `${days[0].label} to ${days[days.length - 1].label}` : "");
 
   return (
     <div className="panel-card">
-      <div className="panel-head">Plan lifecycle — last &amp; next 7 days</div>
+      <div className="panel-head">
+        Plan lifecycle — next 7 days{span ? ` (${span})` : ""}
+      </div>
       <div className="panel-body">
-        {/* Past first, future last, matching the direction time runs.
-
-            Each row carries TWO numbers now. The pill is this week - the sum
-            of the chips beside it, and what the row is actually showing. "View
-            all" is the whole book: every expired connection, not the ones that
-            expired since Monday. They were the same control before, which read
-            as a total and was not one: a customer who lapsed three weeks ago
-            appeared in neither the chips nor the count, so the row could say
-            (0) with a hundred dead connections behind it. */}
+        {/* Each row carries TWO numbers. The pill is the week on screen; "View
+            all" is the whole book. They were the same control before, which
+            read as a total and was not one: a customer who lapsed three weeks
+            ago appeared in neither the chips nor the count, so the row could
+            say (0) with a hundred dead connections behind it. */}
         <LifecycleRow name="Expired" days={expired} tone="danger" range="expired"
-                      span={span(expired)}
-                      total={expired.reduce((s, d) => s + d.count, 0)}
+                      unit="lapsed connection" cumulative
+                      total={plans?.expired_total ?? plans?.expired_all ?? 0}
                       allTotal={plans?.expired_all} allRange="expired"
                       allLabel="every expired plan" {...shared} />
         {/* Between the two: without it the panel only ever reports trouble,
             and the operator has no read on whether the chasing is working.
             Green on purpose. */}
         <LifecycleRow name="Customer renewed" days={renewed} tone="ok" range="renewed"
-                      span={span(renewed)}
+                      unit="customer"
                       total={plans?.renewed_total
                         ?? renewed.reduce((s, d) => s + d.count, 0)}
                       allTotal={plans?.renewed_all} allRange="renewedall"
                       allLabel="every renewal on record" {...shared} />
         <LifecycleRow name="Expiring" days={expiring} tone="warn" range="7"
-                      span={span(expiring)}
-                      total={expiring.reduce((s, d) => s + d.count, 0)}
+                      unit="plan"
+                      total={plans?.expiring_total
+                        ?? expiring.reduce((s, d) => s + d.count, 0)}
                       allTotal={plans?.expiring_all} allRange="all"
                       allLabel="every plan still to expire" {...shared} />
       </div>
@@ -344,17 +351,15 @@ function PlanLifecycle({ plans }) {
 }
 
 function LifecycleRow({ name, days, total, allTotal, allRange, allLabel, tone,
-                       range, span, todayIso, columns }) {
+                       range, unit = "plan", cumulative = false,
+                       todayIso, columns }) {
   return (
     <div className="life-row">
-      <span className="name">
-        {name}
-        {/* Each row covers a different week, so the row has to say which -
-            the dates alone no longer line up between rows to tell you. */}
-        {span && <small className="life-span">{span}</small>}
-      </span>
+      <span className="name">{name}</span>
       <Link className={`pill-total ${tone}`} to={`/reports/plan-expiry?range=${range}`}
-            title={`${total} in the ${span || "window"} shown here`}>
+            title={cumulative
+              ? `${total} already lapsed as of today`
+              : `${total} across the week shown here`}>
         ({total})
       </Link>
       {Number.isFinite(allTotal) && (
@@ -375,8 +380,8 @@ function LifecycleRow({ name, days, total, allTotal, allRange, allLabel, tone,
             <Link key={day.date}
                   className={`chip-day${isToday ? " is-today" : ""}`}
                   to={`/reports/plan-expiry?range=${range}`}
-                  title={`${day.count} ${range === "renewed" ? "customer" : "plan"}`
-                    + `${day.count === 1 ? "" : "s"} on ${day.label}`
+                  title={`${day.count} ${unit}${day.count === 1 ? "" : "s"} `
+                    + `${cumulative ? "lapsed by" : "on"} ${day.label}`
                     + (isToday ? " (today)" : "")}>
               <span className="day">{day.label}</span>
               <span className={`cnt${day.count ? "" : " zero"}`}>({day.count})</span>

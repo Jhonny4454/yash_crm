@@ -29,7 +29,7 @@ from models_ext import (BackupLog, ImportJob, ISPCredential, ISPSyncLog,
                         Setting, SETTING_DEFAULTS)
 
 from .utils import (admin_required, body, current_staff_id, fail, iso, ok,
-                    paginate, staff_required)
+                    paginate, staff_required, today_local)
 
 bp = Blueprint('api_integrations', __name__)
 
@@ -721,7 +721,7 @@ def message_log():
 
 def _audience_customers(audience, zone=None):
     """Resolve an audience key to a list of Customer rows."""
-    today = date.today()
+    today = today_local()
     query = Customer.query.filter_by(is_active=True)
     if zone:
         query = query.filter(Customer.zone == zone)
@@ -730,23 +730,29 @@ def _audience_customers(audience, zone=None):
         return query.all()
 
     if audience == 'expiring_7':
-        ids = [cp.customer_id for cp in CustomerPlan.query.filter(
+        # A sub-select rather than a list of ids. Fetching every matching
+        # CustomerPlan row into Python only to send its customer_id straight
+        # back as an IN (...) makes the statement grow with the audience.
+        expiring = db.session.query(CustomerPlan.customer_id).filter(
             CustomerPlan.status == 'active',
             CustomerPlan.end_date >= today,
-            CustomerPlan.end_date <= today + timedelta(days=7)).all()]
-        return query.filter(Customer.id.in_(ids or [0])).all()
+            CustomerPlan.end_date <= today + timedelta(days=7))
+        return query.filter(Customer.id.in_(expiring)).all()
 
     if audience == 'expired':
-        ids = [cp.customer_id for cp in CustomerPlan.query.filter(
+        expired = db.session.query(CustomerPlan.customer_id).filter(
             CustomerPlan.status == 'active',
-            CustomerPlan.end_date < today).all()]
-        return query.filter(Customer.id.in_(ids or [0])).all()
+            CustomerPlan.end_date < today)
+        return query.filter(Customer.id.in_(expired)).all()
 
     if audience == 'unpaid':
-        ids = {i.customer_id for i in Invoice.query.filter(
-            Invoice.status.in_(('draft', 'sent', 'overdue'))).all()
-            if i.balance > 0}
-        return query.filter(Customer.id.in_(list(ids) or [0])).all()
+        # This loaded EVERY open invoice and then read `i.balance` on each one
+        # - a Python property that lazy-loads that invoice's payments. So
+        # choosing the "unpaid" audience cost one query for the invoices plus
+        # one more per invoice, growing forever, before a single message had
+        # been composed. The same arithmetic already exists in SQL.
+        from services.outstanding import customers_with_balance
+        return query.filter(Customer.id.in_(customers_with_balance())).all()
 
     return query.all()
 

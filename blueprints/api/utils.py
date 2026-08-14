@@ -223,6 +223,43 @@ def iso(value):
     return str(value)
 
 
+#: The business's own timezone. Everything the operator reads as "today" is
+#: this timezone, never the server's.
+#:
+#: Render runs its containers in UTC. `date.today()` therefore answers with the
+#: UTC date, which between 00:00 and 05:30 IST is YESTERDAY in Navi Mumbai. So
+#: every date-anchored screen - the dashboard's seven-day cycle, the plan expiry
+#: board, "expiring today", "collected today" - silently shifted by a day for
+#: five and a half hours every night, and an operator opening the app before
+#: half past five saw a week that started on the wrong date. Both halves of the
+#: app have to agree on which day it is, and the browser is already in IST.
+APP_TIMEZONE = 'Asia/Kolkata'
+
+#: Fallback when the container ships without a tz database. IST has no daylight
+#: saving, so a fixed offset is exactly right rather than merely close.
+_IST_OFFSET = timedelta(hours=5, minutes=30)
+
+
+def local_now():
+    """Now, in the business's timezone, as a naive datetime.
+
+    Naive on purpose: every date column in this schema is naive, and mixing
+    aware and naive values is how comparisons start raising TypeError in
+    production only.
+    """
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo(APP_TIMEZONE)).replace(tzinfo=None)
+    except Exception:
+        # No tzdata on this image - use the fixed offset.
+        return datetime.utcnow() + _IST_OFFSET
+
+
+def today_local():
+    """Today's date in the business's timezone. Use instead of date.today()."""
+    return local_now().date()
+
+
 def paginate(query, default_per_page=25, max_per_page=200):
     """
     Reads ``?page=`` and ``?per_page=`` and returns
