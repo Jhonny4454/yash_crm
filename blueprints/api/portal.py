@@ -13,8 +13,10 @@ Flow for an in-app payment:
 Because step 4 writes into the same ``payments`` table the counter staff use,
 an app payment shows up in the admin panel automatically - no extra sync.
 """
+import re
 from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from urllib.parse import urlparse
 
 from flask import Blueprint, Response, current_app, g, request
 
@@ -535,11 +537,44 @@ def portal_invoice_pdf(iid):
     })
 
 
+_PRIVATE_HOST = re.compile(
+    r'^(localhost|127\.|0\.0\.0\.0|::1|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)')
+
+
+def _public_webhook_url():
+    """The webhook address, or '' when this host cannot receive one.
+
+    Cashfree has to be able to REACH notify_url. On a developer machine
+    `request.url_root` is http://localhost:5000/, which it cannot - and sending
+    it either has the order refused for an invalid notify URL or registers a
+    callback that can never fire, so the payment sits unconfirmed with nothing
+    to explain why.
+
+    Nothing is lost by leaving it out: /portal/pay/status confirms every
+    payment server-side with fetch_order(), which is the authoritative check
+    the browser redirect was never allowed to replace. The webhook is a
+    belt-and-braces path for the case where the customer closes the tab.
+    """
+    root = (request.url_root or '').rstrip('/')
+    host = (urlparse(root).hostname or '').lower()
+    if not host or host.endswith('.local') or _PRIVATE_HOST.match(host):
+        return ''
+    return f'{root}/api/v1/portal/pay/webhook'
+
+
 @bp.post('/portal/pay/order')
 @customer_required
 def portal_pay_order():
-    if not cashfree.is_configured():
-        return fail('payment_gateway_not_configured', 503)
+    # config_problem() rather than is_configured(): credentials being PRESENT
+    # is not the same as them WORKING, and a bare 503 sent the customer to a
+    # dead end while the office had no idea anything was wrong.
+    problem = cashfree.config_problem()
+    if problem:
+        return fail('payment_gateway_not_configured', 503,
+                    detail='Online payment is not available right now. '
+                           'You can still pay by bank transfer or at the '
+                           'office.',
+                    admin_detail=problem)
 
     data = body()
     invoice_id = data.get('invoice_id')
@@ -599,7 +634,7 @@ def portal_pay_order():
             customer_name=customer.full_name,
             customer_email=customer.email or '',
             return_url=return_url,
-            notify_url=request.url_root.rstrip('/') + '/api/v1/portal/pay/webhook',
+            notify_url=_public_webhook_url(),
             note=order.note,
         )
     except cashfree.CashfreeError as exc:
