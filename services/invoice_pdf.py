@@ -108,6 +108,50 @@ def _company():
     return out
 
 
+def _logo_path(explicit=None):
+    """Filesystem path to the company logo, or None if there isn't one.
+
+    This is why bills went out with an empty letterhead. An uploaded logo lives
+    at  static/uploads/logos/<name>  - that is where the upload writes it and
+    what blueprints/api/serializers.logo_url() resolves for the web views - but
+    the PDF route looked under  static/uploads/<name>, one directory short.
+    os.path.exists() was therefore always False, logo_path arrived as None, and
+    the letterhead cell rendered empty on every invoice and receipt. Nothing
+    logged an error, because a company with no logo is not an error.
+
+    Resolving it HERE rather than in each caller means the admin invoice, the
+    portal download, the WhatsApp attachment and the receipt all get the same
+    answer from one place.
+    """
+    if explicit and os.path.exists(explicit):
+        return explicit
+
+    stored = str(_company().get('logo') or '').replace('\\', '/').strip()
+    if not stored or stored.startswith(('http://', 'https://')):
+        # A remote URL cannot be handed to ReportLab as a local file.
+        return None
+
+    bare = stored.lstrip('/').split('/')[-1]
+
+    try:
+        from flask import current_app
+        root = current_app.root_path
+    except Exception:
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    # Current layout first, then the places older uploads landed.
+    for candidate in (
+        os.path.join(root, 'static', 'uploads', 'logos', bare),
+        os.path.join(root, 'static', 'uploads', bare),
+        os.path.join(root, 'static', 'images', bare),
+        os.path.join(root, 'static', bare),
+        os.path.join(root, stored.lstrip('/')),
+    ):
+        if os.path.exists(candidate):
+            return candidate
+    return None
+
+
 def _payment_breakdown(invoice, W, small, heading, grid):
     """Payment rows for the detailed bill.
 
@@ -201,9 +245,14 @@ def build_invoice_pdf(invoice, logo_path=None, detailed=False):
 
     # ---- letterhead: logo | company block ------------------------------
     logo_cell = ''
-    if logo_path and os.path.exists(logo_path):
+    # Resolved here rather than trusted from the caller: every route that
+    # builds a document used to reimplement this, and the portal's version
+    # looked in the wrong directory.
+    resolved_logo = _logo_path(logo_path)
+    if resolved_logo:
         try:
-            logo_cell = Image(logo_path, width=32 * mm, height=20 * mm, kind='proportional')
+            logo_cell = Image(resolved_logo, width=32 * mm, height=20 * mm,
+                              kind='proportional')
         except Exception:
             logo_cell = ''
 
@@ -394,9 +443,14 @@ def build_receipt_pdf(payment, logo_path=None):
     W = doc.width
 
     logo_cell = ''
-    if logo_path and os.path.exists(logo_path):
+    # Resolved here rather than trusted from the caller: every route that
+    # builds a document used to reimplement this, and the portal's version
+    # looked in the wrong directory.
+    resolved_logo = _logo_path(logo_path)
+    if resolved_logo:
         try:
-            logo_cell = Image(logo_path, width=32 * mm, height=20 * mm, kind='proportional')
+            logo_cell = Image(resolved_logo, width=32 * mm, height=20 * mm,
+                              kind='proportional')
         except Exception:
             logo_cell = ''
 

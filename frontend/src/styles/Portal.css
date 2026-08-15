@@ -666,3 +666,40 @@ body.portal-mode {
   .portal-shell .pt-main { margin: 0; padding: 0; max-width: none; }
   body.portal-mode { background: #fff; }
 }
+
+/* ---- A bill you can click ------------------------------------------------
+   Applies to the invoice table rows and to the dashboard's recent-bills list.
+   The affordance has to be visible before the pointer arrives, or nobody
+   discovers it - and it has to survive on a touch screen, where there is no
+   hover at all. Hence the persistent cursor + focus ring, not hover alone. */
+
+.portal-shell .is-billrow { cursor: pointer; }
+.portal-shell .is-billrow:hover { background: #f4f9fd; }
+.portal-shell .is-billrow:focus-visible {
+  outline: 2px solid var(--pt-brand);
+  outline-offset: -2px;
+}
+.portal-shell .is-billrow[aria-busy="true"] { opacity: .6; cursor: progress; }
+
+/* In the recent-bills list the rows are cards, so the cue is a lift rather
+   than a fill. */
+.portal-shell .list-cards article.is-billrow {
+  transition: border-color .15s, box-shadow .15s;
+}
+.portal-shell .list-cards article.is-billrow:hover {
+  background: #fff;
+  border-color: var(--pt-brand) !important;
+  box-shadow: 0 4px 14px rgba(0, 115, 183, .12);
+}
+
+/* On a phone the invoice rows are stacked cards (cards-sm), and a whole card
+   being tappable needs to read as one object. */
+@media (max-width: 720px) {
+  .portal-shell table.data.cards-sm tr.is-billrow:active {
+    background: #f0f7fd;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-shell .list-cards article.is-billrow { transition: none; }
+}

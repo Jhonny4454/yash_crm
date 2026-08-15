@@ -1,7 +1,6 @@
 import { useState } from "react";
-import api from "../api/client";
 import { useFetch } from "../api/useFetch";
-import { useToast } from "../context/ToastContext";
+import { billRowProps, useOpenBill } from "../components/BillLink";
 import { PayButton, PayDuesPanel, usePayConfig } from "../components/PayNow";
 import {
   Empty, ErrorNote, fmtDate, inr, Loading, Pager, StatusPill,
@@ -24,6 +23,7 @@ export default function PortalInvoices() {
   const [page, setPage] = useState(1);
   const { data, meta, loading, error, refetch } = useFetch("/portal/invoices", { page });
   const gateway = usePayConfig();
+  const { openingId, openBill } = useOpenBill();
 
   const rows = Array.isArray(data) ? data : [];
   const outstanding = Number(meta?.outstanding || 0);
@@ -60,7 +60,8 @@ export default function PortalInvoices() {
                 </thead>
                 <tbody>
                   {rows.map((invoice) => (
-                    <tr key={invoice.id}>
+                    <tr key={invoice.id}
+                        {...billRowProps(invoice, openBill, openingId)}>
                       <td className="mono" data-label="Invoice">{invoice.invoice_no}</td>
                       <td data-label="Raised">{fmtDate(invoice.issue_date)}</td>
                       <td data-label="Due by">{fmtDate(invoice.due_date)}</td>
@@ -72,7 +73,11 @@ export default function PortalInvoices() {
                       </td>
                       <td data-label="Status"><StatusPill value={invoice.status} /></td>
                       <td className="row-actions" data-label="">
-                        <DownloadBill invoice={invoice} />
+                        <button type="button" className="btn sm"
+                                disabled={openingId === invoice.id}
+                                onClick={() => openBill(invoice)}>
+                          {openingId === invoice.id ? "…" : "View / print"}
+                        </button>
                         {Number(invoice.balance) > 0 && gateway?.enabled && (
                           <PayButton invoice={invoice} gateway={gateway}
                                      onPaid={refetch} />
@@ -87,43 +92,5 @@ export default function PortalInvoices() {
 
       <Pager meta={meta} onPage={setPage} />
     </section>
-  );
-}
-
-function DownloadBill({ invoice }) {
-  const { toast } = useToast();
-  const [busy, setBusy] = useState(false);
-
-  async function open() {
-    setBusy(true);
-    // Open the tab NOW, inside the click gesture. Opening it after the
-    // `await` below trips the popup blocker - by then the user-gesture has
-    // expired - and on Android the bill is silently dropped with no error to
-    // show. We get the handle first, then point it at the downloaded PDF.
-    const win = window.open("", "_blank");
-    try {
-      // Token-protected, so fetch it with the auth header and hand the browser
-      // a local blob rather than navigating to a URL that arrives signed out.
-      const response = await api.get(`/portal/invoices/${invoice.id}/pdf`,
-                                     { responseType: "blob" });
-      const url = URL.createObjectURL(response.data);
-      if (win) {
-        win.location.href = url;
-      } else {
-        window.open(url, "_blank", "noopener");
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch {
-      try { win?.close(); } catch { /* a window we cannot reach is not ours */ }
-      toast.error("That bill could not be opened. Please try again shortly.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <button type="button" className="btn sm" onClick={open} disabled={busy}>
-      {busy ? "…" : "Bill"}
-    </button>
   );
 }

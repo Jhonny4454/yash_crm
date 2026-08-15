@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { get, post } from "../api/client";
 import { useFetch } from "../api/useFetch";
+import { billRowProps, useOpenBill } from "../components/BillLink";
 import { PayDuesPanel, usePayConfig, usePayNow } from "../components/PayNow";
 import { Empty, ErrorNote, fmtDate, inr, Loading, Pager, StatusPill } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
@@ -550,5 +551,41 @@ export function PortalProfile() {
   </section>;
 }
 
-function Rows({ title, rows, empty }) { return <section className="panel"><h2>{title}</h2>{!rows?.length ? <Empty title="Nothing to show" hint={empty} /> : <div className="list-cards">{rows.map((row) => <article key={row.id}><div><strong>{row.invoice_no || row.receipt_no || row.payment_mode}</strong><p>{fmtDate(row.issue_date || row.payment_date)}</p></div><div><strong>{inr(row.total_amount ?? row.amount)}</strong><StatusPill value={row.status} /></div></article>)}</div>}</section>; }
+/**
+ * A short list of invoices or payments.
+ *
+ * Invoice rows open the bill; payment rows do not, because there is no
+ * document behind a payment row to open. Same component, and the difference is
+ * decided per row by whether it carries an invoice_no - a row that looks
+ * clickable and is not is worse than one that plainly is not.
+ */
+function Rows({ title, rows, empty }) {
+  const { openingId, openBill } = useOpenBill();
+
+  return (
+    <section className="panel">
+      <h2>{title}</h2>
+      {!rows?.length ? <Empty title="Nothing to show" hint={empty} /> : (
+        <div className="list-cards">
+          {rows.map((row) => {
+            const isBill = Boolean(row.invoice_no);
+            return (
+              <article key={row.id}
+                       {...(isBill ? billRowProps(row, openBill, openingId) : {})}>
+                <div>
+                  <strong>{row.invoice_no || row.receipt_no || row.payment_mode}</strong>
+                  <p>{fmtDate(row.issue_date || row.payment_date)}</p>
+                </div>
+                <div>
+                  <strong>{inr(row.total_amount ?? row.amount)}</strong>
+                  <StatusPill value={row.status} />
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
 function renderValue(key, value) { if (key.includes("amount") || key === "balance") return inr(value); if (key.includes("date")) return fmtDate(value); if (key === "status") return <StatusPill value={value} />; return value || "—"; }

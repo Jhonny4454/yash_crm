@@ -511,22 +511,13 @@ def portal_invoice_pdf(iid):
                     detail='Bill downloads are temporarily unavailable. '
                            'Please contact the office.')
 
-    logo = None
-    try:
-        import os
-        from models import Company
-        company = Company.query.first()
-        name = getattr(company, 'company_logo', None)
-        if name:
-            candidate = os.path.join(current_app.root_path, 'static',
-                                     'uploads', name)
-            logo = candidate if os.path.exists(candidate) else None
-    except Exception:
-        logo = None
-
+    # The logo is resolved inside build_invoice_pdf now. This route used to do
+    # it here and looked under static/uploads/<name> when an upload actually
+    # lands in static/uploads/logos/<name> - one directory short, so the check
+    # always failed and every bill printed with an empty letterhead.
     try:
         detailed = (request.args.get('detail') or '').strip() in ('1', 'true', 'yes')
-        pdf = build_invoice_pdf(invoice, logo_path=logo, detailed=detailed)
+        pdf = build_invoice_pdf(invoice, detailed=detailed)
     except Exception:
         return fail('pdf_failed', 500,
                     detail='That bill could not be generated. Please contact us.')
