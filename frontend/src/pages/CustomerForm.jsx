@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { del, get, post, put, upload } from "../api/client";
 import { useDebounced } from "../api/useFetch";
-import { sanitizeDigits } from "../components/MoneyInput";
 import PlanPicker from "../components/customers/PlanPicker";
+import MoneyInput from "../components/MoneyInput";
 import { ErrorNote, Loading } from "../components/ui";
 import { useToast } from "../context/ToastContext";
 import "../styles/Forms.css";
@@ -51,7 +51,7 @@ const KYC_SLOTS = [
 const ACCEPT = ".pdf,.jpg,.jpeg,.png,.webp,.gif";
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 
-const today = () => new Date().toLocaleDateString("en-CA");
+const today = () => new Date().toISOString().slice(0, 10);
 
 const EMPTY = {
   title: "Mr.",
@@ -654,17 +654,8 @@ export default function CustomerForm() {
           <div className="field-grid">
             {/* Rupees only. A discount that was a percentage on one customer
                 and a flat amount on the next could not be totalled on any
-                screen, and the header chip showed two different units.
-                Whole rupees only - a text field with a numeric keypad, no
-                spinner arrows. */}
-            {field("discount_amount", "Discount (₹)", {
-              type: "text", inputMode: "numeric", pattern: "[0-9]*",
-              autoComplete: "off", maxLength: 7,
-              onChange: (event) => {
-                event.target.value = sanitizeDigits(event.target.value);
-                change(event);
-              },
-            })}
+                screen, and the header chip showed two different units. */}
+            {field("discount_amount", "Discount (₹)", { as: "money" })}
             {field("notes", "Internal notes", { as: "textarea", span: 2 })}
           </div>
         </fieldset>
@@ -763,6 +754,10 @@ function Field({
       ) : as === "textarea" ? (
         <textarea id={id} name={name} value={value} onChange={onChange} onBlur={onBlur} rows={3}
                   aria-invalid={Boolean(error)} aria-describedby={describedBy} {...rest} />
+      ) : as === "money" ? (
+        // Whole rupees, no spinner - see components/MoneyInput.jsx.
+        <MoneyInput id={id} name={name} value={value} onChange={onChange} onBlur={onBlur}
+                    aria-invalid={Boolean(error)} aria-describedby={describedBy} {...rest} />
       ) : (
         <input id={id} name={name} value={value} onChange={onChange} onBlur={onBlur}
                aria-invalid={Boolean(error)} aria-describedby={describedBy} {...rest} />

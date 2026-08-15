@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { del, post, put } from "../api/client";
 import { useDebounced, useFetch } from "../api/useFetch";
 import { invalidateLookup, useLookup } from "../api/useLookup";
@@ -122,14 +122,6 @@ export default function CrudPage({
 
   const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
 
-  // A different search or a different page is a DIFFERENT list. The old code
-  // kept every tick forever, so a selection from page 3 silently survived onto
-  // page 1 - and the select-all checkbox, which decided "all" by comparing
-  // sizes, would clear three invisible rows when the page happened to hold
-  // three rows of its own. Clearing on a list change also means "Delete
-  // selected" can only ever touch rows the operator can see.
-  useEffect(() => { setSelected(new Set()); }, [q, page]);
-
   function toggleRow(id) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -140,15 +132,8 @@ export default function CrudPage({
   }
 
   function toggleAll() {
-    // Decided against the CURRENT page, not against the size of the whole
-    // selection - which is what made the old version clear the wrong rows
-    // whenever a previous page's picks made the sizes match by accident.
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (allSelected) rows.forEach((r) => next.delete(r.id));
-      else rows.forEach((r) => next.add(r.id));
-      return next;
-    });
+    setSelected((prev) =>
+      prev.size === rows.length ? new Set() : new Set(rows.map((r) => r.id)));
   }
 
   async function removeSelected() {
@@ -552,41 +537,39 @@ function CrudDialog({ endpoint, singular, columns, value, onClose, onSaved }) {
                 );
               }
 
-              if (c.type === "money" || c.type === "number") {
-                return (
-                  <div className={`field${fieldError ? " has-error" : ""}`} key={c.key}>
-                    <label>{c.label}{c.required && " *"}</label>
+              /* Amounts and counts go through MoneyInput, never
+                 `type="number"`: no spinner to nudge a price by a rupee, no
+                 mouse wheel silently changing a figure while the operator
+                 scrolls the dialog, and no way to type paise into a business
+                 that bills in whole rupees. `decimals: true` on a column
+                 opts back into a decimal point, and only rates use it. */
+              const isNumeric = c.type === "money" || c.type === "number";
+
+              return (
+                <div className={`field${fieldError ? " has-error" : ""}`} key={c.key}>
+                  <label>{c.label}{c.required && " *"}</label>
+                  {isNumeric ? (
                     <MoneyInput
                       className="input"
-                      value={form[c.key] ?? ""}
+                      allowDecimal={Boolean(c.decimals)}
                       max={c.max}
-                      placeholder={c.placeholder}
-                      required={c.required}
+                      value={form[c.key] ?? ""}
+                      onChange={set(c.key)}
+                      onBlur={blur(c.key)}
+                      aria-invalid={Boolean(fieldError)}
+                    />
+                  ) : (
+                    <input
+                      className="input"
+                      type={inputType(c.type)}
+                      inputMode={c.type === "tel" ? "numeric" : undefined}
+                      value={form[c.key] ?? ""}
                       onChange={set(c.key)}
                       onBlur={blur(c.key)}
                       aria-invalid={Boolean(fieldError)}
                       autoFocus={c.key === "name"}
                     />
-                    {fieldError
-                      ? <div className="field-error">{fieldError}</div>
-                      : c.suffix && <div className="hint">Enter a whole number. Suffix “{c.suffix}” is added automatically.</div>}
-                  </div>
-                );
-              }
-
-              return (
-                <div className={`field${fieldError ? " has-error" : ""}`} key={c.key}>
-                  <label>{c.label}{c.required && " *"}</label>
-                  <input
-                    className="input"
-                    type={inputType(c.type)}
-                    inputMode={c.type === "tel" ? "numeric" : undefined}
-                    value={form[c.key] ?? ""}
-                    onChange={set(c.key)}
-                    onBlur={blur(c.key)}
-                    aria-invalid={Boolean(fieldError)}
-                    autoFocus={c.key === "name"}
-                  />
+                  )}
                   {fieldError
                     ? <div className="field-error">{fieldError}</div>
                     : c.hint && <div className="hint">{c.hint}</div>}
@@ -739,6 +722,9 @@ function LookupField({ column, value, onChange, onBlur, error, wide }) {
   );
 }
 
+/* Never returns "number". Amounts and counts are handled by MoneyInput above,
+   and this is the fallback for everything else - so nothing rendered by this
+   screen can grow a spinner. */
 function inputType(type) {
   if (["date", "email", "password", "tel"].includes(type)) return type;
   return "text";

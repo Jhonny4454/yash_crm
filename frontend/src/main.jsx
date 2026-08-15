@@ -31,6 +31,24 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode><App /></React.StrictMode>
 );
 
+/* A focused `<input type="number">` changes its VALUE when the mouse wheel
+ * scrolls over it. Somebody reviewing a long payment form, scrolling with the
+ * pointer resting on the amount they just typed, silently rebills the
+ * customer - and nothing on screen says it happened.
+ *
+ * Every amount in this application is a MoneyInput (a text field), so this
+ * should never fire. It is here for anything added later that forgets, and
+ * for browser-injected controls we do not own. Blur rather than
+ * preventDefault: the listener has to be passive to avoid holding up scroll,
+ * and a passive listener is not allowed to cancel the event.
+ */
+if (typeof document !== "undefined") {
+  document.addEventListener("wheel", (event) => {
+    const el = document.activeElement;
+    if (el && el.type === "number" && el === event.target) el.blur();
+  }, { passive: true });
+}
+
 // Font Awesome is a CDN stylesheet, so it may never arrive. document.fonts
 // .check() is no use here - it answers "is this font usable", which is true
 // even when the browser has silently fallen back - so measure instead: a real

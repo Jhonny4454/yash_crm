@@ -280,8 +280,21 @@ body.portal-mode {
 .portal-shell .list-cards p { margin: 3px 0 0; font-size: .82rem; color: var(--pt-muted); }
 .portal-shell .list-cards article > div:last-child { display: grid; justify-items: end; gap: 6px; }
 
-.portal-shell .detail-grid { grid-template-columns: 1fr; gap: 12px; }
+/* Surfaces.css draws a 2px box round any `.detail-grid`. Inside a panel that
+   already has one, that is a box in a box - and the portal marks these rows
+   with dashed rules instead. */
+.portal-shell .detail-grid {
+  grid-template-columns: 1fr;
+  gap: 12px;
+  border: 0;
+  padding: 0;
+  background: none;
+}
 .portal-shell .detail-grid > div {
+  /* Without min-width: 0 a grid item is at least as wide as its longest
+     unbreakable run, so an address like sumedhchabukswar0987@gmail.com pushed
+     out of its column and printed straight over the value beside it. */
+  min-width: 0;
   display: flex;
   justify-content: space-between;
   align-items: baseline;
@@ -296,7 +309,15 @@ body.portal-mode {
   text-transform: none;
   flex: 0 0 40%;
 }
-.portal-shell .detail-grid strong { text-align: right; font-size: .9rem; }
+.portal-shell .detail-grid strong {
+  text-align: right;
+  font-size: .9rem;
+  min-width: 0;
+  /* `anywhere`, not `break-word`: an email address is one unbreakable run to
+     the line-breaker, and break-word only helps once the line has already
+     started. This is what stops it printing over the column beside it. */
+  overflow-wrap: anywhere;
+}
 
 .portal-shell .grid-two { grid-template-columns: 1fr; gap: 16px; }
 

@@ -86,7 +86,11 @@ export const RESOURCES = {
   "masters/areas": { title: "Areas", singular: "Area", endpoint: "/masters/areas", columns: [{ key: "name", label: "Name", required: true }] },
   "masters/buildings": { title: "Buildings", singular: "Building", endpoint: "/masters/buildings", columns: [{ key: "name", label: "Name", required: true }] },
   "masters/addresses": { title: "Addresses", singular: "Address", endpoint: "/masters/addresses", columns: [{ key: "name", label: "Name" }, { key: "city", label: "City" }, { key: "address", label: "Address", type: "textarea" }] },
-  "masters/tax": { title: "Tax master", singular: "Tax entry", endpoint: "/masters/tax", columns: [{ key: "name", label: "Name", required: true }, { key: "value", label: "Rate", type: "number", suffix: "%", required: true, min: 0, max: 100 }] },
+  // `decimals: true` is the ONLY place a fractional figure is still accepted,
+  // and it is a RATE rather than an amount: GST is 2.5% in places and
+  // TaxMaster.value is Numeric(5,2), so forcing whole numbers here would turn
+  // 2.5 into 2 on every invoice that used it. Money fields never set it.
+  "masters/tax": { title: "Tax master", singular: "Tax entry", endpoint: "/masters/tax", columns: [{ key: "name", label: "Name", required: true }, { key: "value", label: "Rate", type: "number", decimals: true, suffix: "%", required: true, min: 0, max: 100 }] },
   // `template_type` is the stable key the application looks a template up by
   // - 'bill', 'renewal', 'due_reminder' - NOT a transport. The old options
   // here were sms/whatsapp/email/reminder, so anything created through this
@@ -104,7 +108,8 @@ export const RESOURCES = {
     columns: [
       { key: "name", label: "Reason", required: true },
       { key: "default_amount", label: "Default amount", type: "money" },
-      { key: "default_percent", label: "Default %", type: "number", suffix: "%", min: 0, max: 100 },
+      // A rate, not an amount - see the note on the tax master above.
+      { key: "default_percent", label: "Default %", type: "number", decimals: true, suffix: "%", min: 0, max: 100 },
       { key: "description", label: "Description", type: "textarea" },
       yesNo,
     ],
@@ -117,7 +122,7 @@ export const RESOURCES = {
     { key: "amount", label: "Amount", type: "money", required: true }, { key: "expense_date", label: "Date", type: "date" }, { key: "status", label: "Status", options: APPROVAL_STATUSES }, { key: "category_id", label: "Category", type: "lookup", lookup: "/expenses/categories", required: true }, { key: "account_id", label: "Paid from account", type: "lookup", lookup: "/expenses/accounts" }, { key: "payee_id", label: "Payee", type: "lookup", lookup: "/expenses/payees" }, { key: "description", label: "Description", type: "textarea" },
   ] },
   "inventory/vendors": { title: "Vendors", singular: "Vendor", endpoint: "/inventory/vendors", columns: [{ key: "name", label: "Name", required: true }, { key: "contact_person", label: "Contact person" }, { key: "mobile", label: "Mobile", type: "tel" }, { key: "email", label: "Email", type: "email" }, { key: "gstin", label: "GSTIN" }, { key: "address", label: "Address", type: "textarea" }, yesNo] },
-  "inventory/products": { title: "Products", singular: "Product", endpoint: "/inventory/products", columns: [{ key: "name", label: "Name", required: true }, { key: "sku", label: "SKU" }, { key: "unit_price", label: "Selling price", type: "money" }, { key: "cost_price", label: "Cost price", type: "money" }, { key: "vendor_id", label: "Vendor", type: "lookup", lookup: "/inventory/vendors" }, { key: "tax_percent", label: "Tax", type: "number", suffix: "%" }, { key: "description", label: "Description", type: "textarea" }, yesNo] },
+  "inventory/products": { title: "Products", singular: "Product", endpoint: "/inventory/products", columns: [{ key: "name", label: "Name", required: true }, { key: "sku", label: "SKU" }, { key: "unit_price", label: "Selling price", type: "money" }, { key: "cost_price", label: "Cost price", type: "money" }, { key: "vendor_id", label: "Vendor", type: "lookup", lookup: "/inventory/vendors" }, { key: "tax_percent", label: "Tax", type: "number", decimals: true, suffix: "%" }, { key: "description", label: "Description", type: "textarea" }, yesNo] },
   "inventory/stock": { title: "Stock", singular: "Stock item", endpoint: "/inventory/stock", columns: [{ key: "product_id", label: "Product", type: "lookup", lookup: "/inventory/products", required: true }, { key: "quantity", label: "Quantity", type: "number", required: true }] },
   "inventory/vendor-bills": { title: "Vendor bills", singular: "Vendor bill", endpoint: "/inventory/vendor-bills", columns: [{ key: "bill_no", label: "Bill number", required: true }, { key: "vendor_id", label: "Vendor", type: "lookup", lookup: "/inventory/vendors", required: true }, { key: "bill_date", label: "Bill date", type: "date" }, { key: "due_date", label: "Due date", type: "date" }, { key: "total_amount", label: "Total", type: "money" }, { key: "status", label: "Status", options: BILL_STATUSES }, { key: "notes", label: "Notes", type: "textarea" }] },
   "hr/attendance": { title: "Attendance", singular: "Attendance entry", endpoint: "/hr/attendance", columns: [{ key: "user_id", label: "Staff member", type: "lookup", lookup: "/staff", labelKey: "full_name", required: true }, { key: "date", label: "Date", type: "date", required: true }, { key: "status", label: "Status", required: true, options: ATTENDANCE_STATUSES }] },

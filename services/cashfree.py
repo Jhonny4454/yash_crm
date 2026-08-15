@@ -91,6 +91,115 @@ def is_configured() -> bool:
     return bool(app_id() and secret_key() and requests is not None)
 
 
+def credential_env() -> str:
+    """Which environment the credentials on file BELONG to, read off the keys.
+
+    Cashfree stamps this into the values themselves, in both key generations:
+
+        Client ID   sandbox 'TEST430329ae...'   production '430329ae...'
+        Secret      sandbox 'cfsk_ma_test_...'  production 'cfsk_ma_prod_...'
+
+    Returns 'sandbox', 'production', or '' when the format is not recognised
+    (an old key, or a format Cashfree has since changed).
+    """
+    app = (app_id() or '').lower()
+    secret = (secret_key() or '').lower()
+    if app.startswith('test') or '_test_' in secret or secret.startswith('test'):
+        return 'sandbox'
+    if '_prod_' in secret:
+        return 'production'
+    return ''
+
+
+def config_problem() -> str:
+    """The reason Cashfree will refuse us, in words, or '' when it will not.
+
+    This exists because Cashfree's own answer to every credential fault is the
+    string "authentication Failed" - no code, no hint, nothing to act on. The
+    portal relayed that verbatim and the operator had a payment page that said
+    two words and stopped.
+
+    The common cause by a distance is an environment mismatch: production keys
+    saved while the environment is still on Sandbox (which is the default, and
+    what an unset CASHFREE_ENV falls back to), or sandbox keys left behind
+    after going live. Sandbox credentials are rejected by the production host
+    and vice versa, and the message is the same either way.
+    """
+    if requests is None:
+        return ('The `requests` package is not installed on the server, so the '
+                'payment gateway cannot be reached at all.')
+    if not app_id() and not secret_key():
+        return ('No Cashfree credentials are saved. Add them in '
+                'Settings -> Payment Gateway.')
+    if not app_id():
+        return ('The Cashfree App ID is blank. Copy the Client ID from '
+                'Cashfree -> Developers -> API Keys into Settings -> Payment '
+                'Gateway.')
+    if not secret_key():
+        return ('The Cashfree secret key is blank. Copy the Client Secret from '
+                'Cashfree -> Developers -> API Keys into Settings -> Payment '
+                'Gateway.')
+
+    belongs = credential_env()
+    running = environment()
+    if belongs and belongs != running:
+        return (f'The saved credentials are {belongs.upper()} keys but the '
+                f'gateway is set to {running.upper()}, so Cashfree rejects '
+                f'them. Either change "Cashfree environment" to '
+                f'{belongs.title()} in Settings -> Payment Gateway, or paste '
+                f'the {running.title()} keys from Cashfree -> Developers -> '
+                f'API Keys.')
+    return ''
+
+
+def _auth_detail() -> str:
+    """Appended to Cashfree's own refusal, so it says something useful."""
+    app = app_id() or ''
+    shown = f'{app[:6]}…{app[-4:]}' if len(app) > 12 else (app or '(blank)')
+    return (f' Cashfree refused the credentials for the {environment()} '
+            f'environment ({base_url()}); the App ID on file is {shown}. '
+            f'Check Settings -> Payment Gateway: sandbox keys only work '
+            f'against Sandbox and production keys only against Production, '
+            f'and a key that has been regenerated in the Cashfree dashboard '
+            f'stops working the moment it is replaced.')
+
+
+def _is_auth_failure(status, message) -> bool:
+    return status in (401, 403) or 'authentication' in str(message or '').lower()
+
+
+def check_credentials() -> dict:
+    """Ask Cashfree whether these keys work, without taking any money.
+
+    Fetching an order id that cannot exist is enough: a 404 means we were
+    authenticated and the order simply is not there, which is exactly the
+    answer we want. Anything about authentication means the keys are wrong.
+    """
+    problem = config_problem()
+    if problem:
+        return {'ok': False, 'environment': environment(), 'detail': problem}
+
+    probe = f'PING-{secrets.token_hex(6).upper()}'
+    try:
+        resp = requests.get(f'{base_url()}/orders/{probe}',
+                            headers=_headers(), timeout=15)
+    except Exception as exc:
+        return {'ok': False, 'environment': environment(),
+                'detail': f'Could not reach Cashfree: {exc}'}
+
+    data = _json(resp)
+    message = data.get('message') or ''
+    if _is_auth_failure(resp.status_code, message):
+        return {'ok': False, 'environment': environment(),
+                'detail': f'{message}.{_auth_detail()}'}
+    if resp.status_code in (200, 404):
+        return {'ok': True, 'environment': environment(),
+                'detail': f'Cashfree accepted these {environment()} '
+                          f'credentials.'}
+    return {'ok': False, 'environment': environment(),
+            'detail': message or f'Cashfree returned HTTP {resp.status_code}.'}
+
+
 def _headers():
     return {
         'accept': 'application/json',
@@ -122,8 +231,11 @@ def create_order(*, order_id, amount, customer_id, customer_phone,
     The important key in the response is `payment_session_id`, which the
     browser passes to the Cashfree JS SDK to open checkout.
     """
-    if not is_configured():
-        raise CashfreeError('Cashfree is not configured.')
+    # Say what is wrong BEFORE the round trip, so the operator gets the actual
+    # fault rather than Cashfree's two-word refusal relayed through a 424.
+    problem = config_problem()
+    if problem:
+        raise CashfreeError(problem)
 
     amount = round(float(amount), 2)
     if amount <= 0:
@@ -156,7 +268,10 @@ def create_order(*, order_id, amount, customer_id, customer_phone,
 
     data = _json(resp)
     if resp.status_code >= 300:
-        raise CashfreeError(data.get('message') or f"HTTP {resp.status_code}")
+        message = data.get('message') or f"HTTP {resp.status_code}"
+        if _is_auth_failure(resp.status_code, message):
+            raise CashfreeError(f'{message}.{_auth_detail()}')
+        raise CashfreeError(message)
     if not data.get('payment_session_id'):
         raise CashfreeError('Cashfree did not return a payment session.')
     return data

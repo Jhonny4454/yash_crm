@@ -438,8 +438,16 @@ def portal_pay_config():
     screen explain how to pay instead.
     """
     configured = False
+    problem = ''
     try:
         configured = bool(cashfree.is_configured())
+        # Credentials being PRESENT is not the same as them WORKING. Production
+        # keys saved against a sandbox environment pass is_configured() and are
+        # then refused by Cashfree with the word "authentication" and nothing
+        # else, so the customer met a Pay button that could only ever fail.
+        problem = cashfree.config_problem()
+        if problem:
+            configured = False
     except Exception:
         configured = False
 
@@ -472,6 +480,10 @@ def portal_pay_config():
         'detail': '' if configured else
                   'Card and UPI payment is not switched on yet. '
                   'You can still pay by bank transfer or at the office.',
+        # For the office, not the customer: the customer is shown the line
+        # above and the bank details, because "your provider has the wrong API
+        # keys" is not their problem to solve.
+        'admin_detail': problem,
     })
 
 

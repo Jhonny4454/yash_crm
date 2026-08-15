@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { get, post } from "../api/client";
 import { useToast } from "../context/ToastContext";
-import { sanitizeDigits } from "./MoneyInput";
+import MoneyInput from "./MoneyInput";
 import { inr, readableError } from "./ui";
 
 /**
@@ -23,18 +23,6 @@ import { inr, readableError } from "./ui";
  * invoice and race to define the same global.
  */
 let sdkPromise = null;
-
-/**
- * One payment in flight per page.
- *
- * Every PayButton and PayDuesPanel mounts its own usePayNow, so the per-hook
- * `stage` guard stops a double-tap on the SAME control but nothing across
- * controls - two unpaid bills on the invoice table, one customer with two
- * thumbs, two orders reaching the gateway. The checkout SDK must never be
- * handed two orders at once, so this lock is module-wide: it flips on the
- * first tap anywhere on the page and stays flipped until that flow settles.
- */
-let pagePaymentInFlight = false;
 
 /** Whether online payment is available, asked once per screen.
  *
@@ -90,20 +78,12 @@ export function usePayNow({ gateway, onPaid }) {
     return "pending";
   }, []);
 
-  // Releasing the stage state AND the page-wide lock together, so one can
-  // never come off while the other still blocks the next tap.
-  const reset = useCallback(() => {
-    pagePaymentInFlight = false;
-    setStage("idle");
-  }, []);
-
   /**
    * `invoiceId` may be omitted, which means "pay whatever is outstanding" -
    * the server spreads it across the open bills, oldest first.
    */
   const pay = useCallback(async ({ invoiceId, amount, describe }) => {
-    if (stage !== "idle" || pagePaymentInFlight) return;
-    pagePaymentInFlight = true;
+    if (stage !== "idle") return;
     setStage("starting");
 
     let order;
@@ -115,7 +95,7 @@ export function usePayNow({ gateway, onPaid }) {
       });
       order = response?.data ?? response;
     } catch (orderError) {
-      reset();
+      setStage("idle");
       toast.error(
         orderError.message === "payment_gateway_not_configured"
           ? "Online payment is not available right now. Please contact the office."
@@ -137,7 +117,7 @@ export function usePayNow({ gateway, onPaid }) {
         redirectTarget: "_modal",
       });
     } catch (sdkError) {
-      reset();
+      setStage("idle");
       // The money may still have gone through in a redirect flow, so never
       // tell the customer it failed - tell them we are checking.
       if (String(sdkError?.message || "").startsWith("checkout_sdk")) {
@@ -171,9 +151,9 @@ export function usePayNow({ gateway, onPaid }) {
         { duration: 12000 },
       );
     } finally {
-      reset();
+      setStage("idle");
     }
-  }, [confirmOrder, gateway, onPaid, reset, stage, toast]);
+  }, [confirmOrder, gateway, onPaid, stage, toast]);
 
   return { stage, busy: stage !== "idle", pay };
 }
@@ -211,13 +191,7 @@ export function PayButton({ invoice, gateway, onPaid }) {
 export function PayDuesPanel({ outstanding, invoiceCount, gateway, onPaid }) {
   const due = Number(outstanding || 0);
   const [amount, setAmount] = useState("");
-  // After a successful payment the panel refetches; leaving the old figure in
-  // the box would let a fast second tap charge the same amount twice over.
-  const handlePaid = useCallback(() => {
-    setAmount("");
-    onPaid?.();
-  }, [onPaid]);
-  const { stage, busy, pay } = usePayNow({ gateway, onPaid: handlePaid });
+  const { stage, busy, pay } = usePayNow({ gateway, onPaid });
 
   if (due <= 0) return null;
 
@@ -278,10 +252,13 @@ export function PayDuesPanel({ outstanding, invoiceCount, gateway, onPaid }) {
           <label htmlFor="pay-amount">Amount to pay</label>
           <div className="pay-dues-input">
             <span aria-hidden="true">₹</span>
-            <input id="pay-amount" className="input" type="text" inputMode="numeric"
-                   pattern="[0-9]*" autoComplete="off" maxLength={String(Math.round(due)).length + 2}
-                   value={amount} placeholder={String(Math.round(due))} disabled={busy}
-                   onChange={(event) => setAmount(sanitizeDigits(event.target.value))} />
+            {/* Whole rupees, no spinner: the bills are whole rupees, and a
+                number field here would let the mouse wheel change the amount
+                being paid while the customer scrolls the page. */}
+            <MoneyInput id="pay-amount" className="input"
+                        value={amount} placeholder={String(Math.round(due))}
+                        disabled={busy}
+                        onChange={(event) => setAmount(event.target.value)} />
           </div>
           <button type="button" className="btn primary" disabled={busy || !valid}
                   onClick={() => pay({ amount: entered, describe: "your account" })}>

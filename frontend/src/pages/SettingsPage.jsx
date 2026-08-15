@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { put } from "../api/client";
 import { useFetch } from "../api/useFetch";
-import { sanitizeDigits } from "../components/MoneyInput";
+import MoneyInput from "../components/MoneyInput";
 import { Empty, ErrorNote, Loading, readableError } from "../components/ui";
 import WhatsAppTester from "../components/WhatsAppTester";
 import "../styles/Settings.css";
@@ -39,7 +39,7 @@ function fieldError(field, value) {
   }
   if (field.input === "number") {
     if (text === "") return `${label} cannot be blank.`;
-    if (!/^\d+$/.test(text)) return `${label} must be a whole number.`;
+    if (!/^-?\d+(\.\d+)?$/.test(text)) return `${label} must be a whole number.`;
     const n = Number(text);
     if (field.min != null && n < field.min) return `${label} cannot be less than ${field.min}.`;
     if (field.max != null && n > field.max) return `${label} cannot be more than ${field.max}.`;
@@ -315,18 +315,25 @@ function SettingRow({ field, value, error, dirty, revealed, onReveal, onChange }
           </div>
         ) : (
           <div className={field.suffix ? "set-suffixed" : undefined}>
-            <input id={id} className="input" aria-describedby={describedBy}
-                   type={field.input === "email" ? "email"
-                     : field.input === "url" ? "url" : "text"}
-                   inputMode={field.input === "number" ? "numeric" : undefined}
-                   pattern={field.input === "number" ? "[0-9]*" : undefined}
-                   autoComplete={field.input === "number" ? "off" : undefined}
-                   min={field.min} max={field.max} maxLength={field.maxlength}
-                   placeholder={field.placeholder || ""} value={value}
-                   onChange={(event) => onChange(
-                     field.input === "number"
-                       ? sanitizeDigits(event.target.value, field.max)
-                       : event.target.value)} />
+            {/* Number settings go through MoneyInput rather than
+                `type="number"`. No spinner, and no decimal point - which is
+                not a new restriction, only a visible one: settings_schema.py
+                already coerces every number field with `int(float(text))`, so
+                typing 2.5 here was silently stored as 2 with nothing on screen
+                to say so. */}
+            {field.input === "number" ? (
+              <MoneyInput id={id} className="input" aria-describedby={describedBy}
+                          max={field.max}
+                          placeholder={field.placeholder || ""} value={value}
+                          onChange={(event) => onChange(event.target.value)} />
+            ) : (
+              <input id={id} className="input" aria-describedby={describedBy}
+                     type={field.input === "email" ? "email"
+                       : field.input === "url" ? "url" : "text"}
+                     maxLength={field.maxlength}
+                     placeholder={field.placeholder || ""} value={value}
+                     onChange={(event) => onChange(event.target.value)} />
+            )}
             {field.suffix && <span className="set-suffix">{field.suffix}</span>}
           </div>
         )}
