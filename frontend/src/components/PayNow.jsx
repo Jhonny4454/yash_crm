@@ -70,7 +70,14 @@ export function usePayNow({ gateway, onPaid }) {
       const response = await get(`/portal/pay/status/${orderId}`);
       const status = (response?.data ?? response)?.status;
       if (status === "paid") return "paid";
-      if (status === "failed" || status === "expired") return status;
+      if (status === "failed" || status === "expired" || status === "cancelled") {
+        return status;
+      }
+      // Still untouched after a couple of checks means the customer closed
+      // the window without attempting to pay. Sitting on "Confirming…" for
+      // the full twenty seconds after a decision they have already made is
+      // twenty seconds of pretending we do not know.
+      if (status === "created" && attempt >= 2) return "abandoned";
       // eslint-disable-next-line no-await-in-loop
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
@@ -100,7 +107,7 @@ export function usePayNow({ gateway, onPaid }) {
           ? "Online payment is not available right now. Please contact the office."
           : orderError.detail || readableError(orderError),
       );
-      return;
+      return "order_failed";
     }
 
     try {
@@ -123,7 +130,7 @@ export function usePayNow({ gateway, onPaid }) {
         toast.error(
           "The payment window could not be opened. Check your connection and try again.",
         );
-        return;
+        return "unopened";
       }
       toast.warning("Checking whether that payment went through…");
     }
@@ -143,12 +150,14 @@ export function usePayNow({ gateway, onPaid }) {
       } else {
         toast.error("That payment did not complete. Nothing has been charged.");
       }
+      return result;
     } catch {
       toast.warning(
         "We could not confirm the payment just now. Please refresh in a "
         + "moment before trying again.",
         { duration: 12000 },
       );
+      return "unknown";
     } finally {
       setStage("idle");
     }

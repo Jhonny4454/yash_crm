@@ -40,12 +40,7 @@ export function PortalDashboard() {
           {plan?.plan_name || "No active plan"}
           {plan?.speed_mbps ? ` · ${plan.speed_mbps} Mbps` : ""}
         </p>
-        <p className={`pt-hero-meta${expiring ? " is-expiring" : ""}`}>
-          {plan?.end_date ? `Runs to ${fmtDate(plan.end_date)}` : "Not active"}
-          {daysLeft === undefined ? ""
-            : daysLeft <= 0 ? " · expired"
-              : ` · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left`}
-        </p>
+        <PlanCountdown plan={plan} />
         <Link className="btn primary pt-hero-go" to="/customer/plans">
           Renew plan
         </Link>
@@ -176,9 +171,15 @@ export function PortalPlans() {
     setFailure(null);
 
     let invoice;
+    let reused = false;
     try {
       const response = await post(endpoint, payload);
-      invoice = (response?.data ?? response)?.invoice;
+      const result = response?.data ?? response;
+      invoice = result?.invoice;
+      // A renewal points at an already-open bill rather than stacking a second
+      // one. That bill existed before this click, so backing out of the
+      // checkout must not remove it.
+      reused = Boolean(result?.reused_open_invoice);
       setChanging(false);
     } catch (err) {
       // The old version put the raw error message in the success slot, so a
@@ -193,7 +194,35 @@ export function PortalPlans() {
     const reference = invoice?.invoice_no || "";
 
     if (gateway?.enabled && invoice?.id && due > 0) {
-      await pay({ invoiceId: invoice.id, amount: due, describe: reference || what });
+      const outcome = await pay({
+        invoiceId: invoice.id, amount: due, describe: reference || what,
+      });
+
+      /* Cancelling the checkout must not leave the customer owing money for a
+       * renewal they just declined. The bill is raised before the checkout so
+       * the payment has something to attach to, but if nothing was paid there
+       * is nothing to keep - the plan dates are only extended when the money
+       * lands, so withdrawing the bill undoes the whole thing.
+       *
+       * Deliberately NOT withdrawn on "pending" or "unknown": money may be in
+       * flight and a bill is the recoverable direction to be wrong in. The
+       * server checks with Cashfree before deleting anything regardless, so a
+       * payment that did go through can never lose its bill here.
+       */
+      const abandoned = ["abandoned", "cancelled", "failed", "expired",
+                         "order_failed", "unopened"].includes(outcome);
+      if (abandoned && !reused) {
+        try {
+          await post(`/portal/invoices/${invoice.id}/discard`);
+          refetchQuote();
+          refetchAccount();
+        } catch {
+          // The bill stays. Saying so is better than a silent inconsistency
+          // between what they were told and what their account shows.
+          setMessage(`Invoice ${reference} is still on your account — `
+            + "pay it when you are ready, or call the office to cancel it.");
+        }
+      }
       return;
     }
 
@@ -244,14 +273,14 @@ export function PortalPlans() {
         <div className="renew-card-head">
           <div>
             <h2>{current.plan_name}</h2>
-            <p>
-              {current.speed_mbps ? `${current.speed_mbps} Mbps · ` : ""}
-              {current.end_date ? `Runs to ${fmtDate(current.end_date)}` : "Active"}
-              {current.days_left !== undefined && ` · ${current.days_left} days left`}
-            </p>
+            <p>{current.speed_mbps ? `${current.speed_mbps} Mbps` : "Active"}</p>
           </div>
           <span className="pill info">Your plan</span>
         </div>
+
+        {/* The same counter as the dashboard, on the screen where the renewal
+            decision is actually made. */}
+        <PlanCountdown plan={current} />
 
         {/* The bill, itemised, before they commit to it. The server does the
             GST arithmetic - the same function the counter uses - so the
@@ -393,6 +422,65 @@ export function PortalPlans() {
       </section>
     )}
   </section>;
+}
+
+/**
+ * How long the plan has left, as a number rather than a sentence.
+ *
+ * "Runs to 16 Aug 2027" asks the customer to do date arithmetic to answer the
+ * only question they came with - is my internet about to stop. The count is
+ * the answer, so it is the biggest thing in the box, and the bar underneath
+ * puts it in proportion: 30 days left means something different on a monthly
+ * plan than on an annual one.
+ *
+ * Everything here comes off `start_date`, `end_date` and `days_left`, which
+ * the dashboard already returns - there is no new call behind this.
+ */
+export function PlanCountdown({ plan }) {
+  const days = plan?.days_left;
+  if (typeof days !== "number") {
+    return <p className="pt-hero-meta">Not active</p>;
+  }
+
+  const start = plan.start_date ? new Date(plan.start_date) : null;
+  const end = plan.end_date ? new Date(plan.end_date) : null;
+  const total = start && end
+    ? Math.max(1, Math.round((end - start) / 86_400_000))
+    : null;
+  // Clamped: a plan renewed early can report more days left than its own
+  // length, which would otherwise draw a negative-width bar.
+  const percent = total === null ? null
+    : Math.min(100, Math.max(0, Math.round(((total - days) / total) * 100)));
+
+  const expired = days <= 0;
+  const tone = expired ? "is-over"
+    : days <= 7 ? "is-soon"
+      : days <= 30 ? "is-warn" : "is-ok";
+
+  return (
+    <div className={`pt-countdown ${tone}`}>
+      <p className="pt-countdown-num">
+        <strong>{Math.abs(days)}</strong>
+        <span>{expired
+          ? `day${Math.abs(days) === 1 ? "" : "s"} ago`
+          : `day${days === 1 ? "" : "s"} left`}</span>
+      </p>
+
+      {percent !== null && (
+        <div className="pt-countdown-bar" role="progressbar" aria-valuenow={percent}
+             aria-valuemin={0} aria-valuemax={100}
+             aria-label="How much of your plan period has been used">
+          <i style={{ width: `${percent}%` }} />
+        </div>
+      )}
+
+      <p className="pt-countdown-note">
+        {expired
+          ? "Your plan has expired — renew to stay connected."
+          : `Runs to ${fmtDate(plan.end_date)}.`}
+      </p>
+    </div>
+  );
 }
 
 /** Plan price, GST and total — or just the price when no tax applies. */

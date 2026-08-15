@@ -778,3 +778,64 @@ body.portal-mode {
   .bill-sheet { border-radius: 16px; box-shadow: 0 24px 60px rgba(15, 23, 42, .32); }
   .bill-sheet-actions { grid-auto-flow: column; grid-auto-columns: 1fr; }
 }
+
+/* ---- Days remaining ------------------------------------------------------
+   The count is the answer to the only question a customer opens the portal
+   with, so it is the biggest thing in the box. The bar puts it in proportion:
+   30 days left reads very differently on a monthly plan than an annual one. */
+
+.portal-shell .pt-countdown { display: grid; gap: 8px; margin: 4px 0 2px; }
+
+.portal-shell .pt-countdown-num {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+}
+.portal-shell .pt-countdown-num strong {
+  font-size: 2.1rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+}
+.portal-shell .pt-countdown-num span {
+  font-size: .88rem;
+  font-weight: 650;
+  color: var(--pt-muted);
+}
+
+.portal-shell .pt-countdown-bar {
+  height: 8px;
+  border-radius: 99px;
+  background: #e8eef5;
+  overflow: hidden;
+}
+.portal-shell .pt-countdown-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: currentColor;
+  transition: width .3s ease;
+}
+
+.portal-shell .pt-countdown-note { margin: 0; font-size: .82rem; color: var(--pt-muted); }
+
+/* Colour carries the same message as the number, never on its own: the note
+   underneath always says it in words too. */
+.portal-shell .pt-countdown.is-ok { color: #0f7a4a; }
+.portal-shell .pt-countdown.is-warn { color: #b45309; }
+.portal-shell .pt-countdown.is-soon { color: #c2410c; }
+.portal-shell .pt-countdown.is-over { color: #b42318; }
+
+.portal-shell .pt-countdown.is-ok .pt-countdown-num strong { color: var(--pt-ink); }
+.portal-shell .pt-countdown.is-warn .pt-countdown-num strong,
+.portal-shell .pt-countdown.is-soon .pt-countdown-num strong,
+.portal-shell .pt-countdown.is-over .pt-countdown-num strong { color: currentColor; }
+
+.portal-shell .pt-countdown.is-over .pt-countdown-note,
+.portal-shell .pt-countdown.is-soon .pt-countdown-note { color: currentColor; font-weight: 600; }
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-shell .pt-countdown-bar i { transition: none; }
+}

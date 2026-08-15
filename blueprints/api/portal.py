@@ -817,6 +817,80 @@ def portal_pay_webhook():
     return ok({'status': order.status})
 
 
+@bp.post('/portal/invoices/<int:iid>/discard')
+@customer_required
+def portal_discard_invoice(iid):
+    """Undo a renewal the customer started and then backed out of.
+
+    Renewing raises the bill first so the checkout has something to charge
+    against. That is the right order - if the payment window dies the bill
+    still exists and can be settled another way - but it meant a customer who
+    opened the checkout and pressed Cancel was left owing money for a renewal
+    they had just declined, and the outstanding figure on their dashboard went
+    up because they changed their mind.
+
+    So the portal calls this when the checkout ends any way other than paid.
+    Every one of the guards below has to hold, and the last one asks Cashfree
+    directly rather than trusting the browser's account of what happened:
+
+      * the bill belongs to this customer
+      * it is a plan bill - never an addon or anything the office raised
+      * it was raised today (this cannot reach last month's invoice)
+      * no payment of any kind is recorded against it
+      * no payment order against it is paid, per Cashfree
+
+    Nothing else about a renewal is written before payment - the plan dates
+    are only extended when the money lands - so removing the bill undoes it
+    completely.
+    """
+    invoice = db.session.get(Invoice, iid)
+    if not invoice or invoice.customer_id != current_customer_id():
+        return fail('not_found', 404)
+
+    if (invoice.invoice_type or '') != 'plan':
+        return fail('not_discardable', 400,
+                    detail='Only a renewal bill can be withdrawn.')
+    if invoice.issue_date != date.today():
+        return fail('not_discardable', 400,
+                    detail='This bill was not raised today.')
+    if (invoice.status or '') not in ('draft', 'sent'):
+        return fail('not_discardable', 400,
+                    detail='This bill has already been processed.')
+
+    settled = sum(float(p.amount or 0) for p in (invoice.payments or [])
+                  if getattr(p, 'status', '') != 'rejected')
+    if settled > 0:
+        return fail('not_discardable', 400,
+                    detail='A payment has already been recorded against this bill.')
+
+    # The browser cannot be the authority on whether money moved. A customer
+    # who paid and then closed the tab before the confirmation landed must not
+    # have the bill they just paid deleted underneath them.
+    orders = OnlinePaymentOrder.query.filter_by(invoice_id=invoice.id).all()
+    for order in orders:
+        if order.status == 'paid':
+            return fail('not_discardable', 400,
+                        detail='That payment has gone through.')
+        try:
+            if cashfree.is_paid(cashfree.fetch_order(order.order_id)):
+                return fail('not_discardable', 400,
+                            detail='That payment has gone through.')
+        except Exception:
+            # Cannot reach Cashfree: refuse rather than guess. The bill stays,
+            # which is the recoverable direction to be wrong in.
+            return fail('discard_unavailable', 503,
+                        detail='We could not confirm the payment status just '
+                               'now, so the bill has been left in place.')
+
+    for order in orders:
+        order.status = 'cancelled'
+        order.invoice_id = None
+
+    db.session.delete(invoice)
+    db.session.commit()
+    return ok({'discarded': True, 'invoice_id': iid})
+
+
 @bp.get('/portal/pay/status/<order_id>')
 @customer_required
 def portal_pay_status(order_id):
