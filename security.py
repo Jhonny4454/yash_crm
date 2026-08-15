@@ -159,23 +159,43 @@ def _install_headers(app):
         # the Cashfree SDK from CDNs, so 'unsafe-inline' has to stay until
         # those are bundled; frame-ancestors and object-src are the parts
         # actually doing work here.
+        #
+        # Cashfree is THREE different hosts, and listing only the first is why
+        # the checkout opened as an empty box reading "This content is
+        # blocked":
+        #
+        #   sdk.cashfree.com        the JavaScript        -> script-src
+        #   api / sandbox           the REST API          -> connect-src
+        #   payments*.cashfree.com  the checkout iframe   -> frame-src
+        #
+        # frame-src named sdk.cashfree.com, which serves no HTML at all, so the
+        # browser refused the modal before Cashfree ever saw the request. The
+        # wildcard covers payments.cashfree.com, payments-test.cashfree.com and
+        # whatever else the hosted flow reaches for, in both environments.
+        cashfree = 'https://*.cashfree.com'
         response.headers.setdefault('Content-Security-Policy', '; '.join([
             "default-src 'self'",
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' "
             "https://cdnjs.cloudflare.com https://cdn.jsdelivr.net "
-            "https://sdk.cashfree.com https://code.jquery.com "
+            f"{cashfree} https://code.jquery.com "
             "https://stackpath.bootstrapcdn.com",
             "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com "
-            "https://cdn.jsdelivr.net https://fonts.googleapis.com "
+            f"https://cdn.jsdelivr.net https://fonts.googleapis.com {cashfree} "
             "https://stackpath.bootstrapcdn.com",
             "font-src 'self' data: https://cdnjs.cloudflare.com "
-            "https://fonts.gstatic.com",
+            f"https://fonts.gstatic.com {cashfree}",
             "img-src 'self' data: blob: https:",
-            "connect-src 'self' " + ' '.join(_origins(app)
-                                             + ['https://sdk.cashfree.com',
-                                                'https://api.cashfree.com']),
-            "frame-src 'self' https://sdk.cashfree.com",
+            "connect-src 'self' " + ' '.join(_origins(app) + [cashfree]),
+            f"frame-src 'self' {cashfree}",
+            # Where the checkout is allowed to POST. Netbanking and some UPI
+            # flows submit a form out to the bank; form-action does NOT fall
+            # back to default-src, so leaving it unset is permissive - but the
+            # moment a policy names it, anything missing is refused silently.
+            "form-action 'self' https:",
             "object-src 'none'",
+            # The directive that actually stops clickjacking, and it stays
+            # strict. Widening frame-src lets US embed Cashfree; it does not
+            # let anyone embed us.
             "frame-ancestors 'self'",
             "base-uri 'self'",
         ]))
