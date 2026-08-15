@@ -168,12 +168,22 @@ body {
   .app-footer .footer-credit { display: none; }
 
   /* Comfortable hit areas everywhere. 44px is the smallest target most people
-     hit first time on a phone. */
+     hit first time on a phone. A plain `.icon-btn` is a bare glyph with no
+     width of its own, so min-height alone left a 40px-tall sliver to aim at -
+     grid centring makes it a proper 40x40 target. */
   .btn, .icon-btn, .btn-icon-sm { min-height: 40px; }
+  .icon-btn, .btn-icon-sm { min-width: 40px; display: inline-grid; place-items: center; }
   .sidebar-toggle { width: 38px; height: 38px; flex: 0 0 38px; }
 
-  /* Never zoom on focus. */
-  .input, .select, input, select, textarea { font-size: 16px; }
+  /* Never zoom on focus - and actually win. Page rules like
+     `.field input { font-size: 0.9rem }` and `.login-field input { font-size:
+     0.95rem }` carry more specificity than the bare selectors this used to
+     use, so the override silently lost and iOS zoomed the field on every
+     focus. The page-scoped sizes are a desktop concern; on a phone every
+     tap-target should be 16px. */
+  .input, .select,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]),
+  select, textarea { font-size: 16px !important; }
 
   .page-header, .list-head { gap: .75rem; }
   .list-container { padding: 16px; }
@@ -203,6 +213,11 @@ body {
     max-height: 92vh;
     border-radius: 16px 16px 0 0;
     padding-bottom: env(safe-area-inset-bottom);
+    /* Boxes.css sets margin:auto to centre in the desktop grid, but that auto
+       margin also beats the scrim's flex-end alignment - so the sheet floated
+       mid-screen with the keyboard half over it. Zero margin lets the bottom
+       anchor actually anchor. */
+    margin: 0;
   }
   .modal-foot { position: sticky; bottom: 0; background: #fff; }
 

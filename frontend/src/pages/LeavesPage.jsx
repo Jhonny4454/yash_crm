@@ -37,18 +37,16 @@ export default function LeavesPage() {
   const [actionError, setActionError] = useState(null);
   const [editing, setEditing] = useState(null);
 
-  const { data, meta, loading, error, refetch } = useFetch("/hr/leaves", { status, page });
+  const { data, meta, extra, loading, error, refetch } = useFetch("/hr/leaves", { status, page });
   const { byValue: staffNames } = useLookup("/staff", { labelKey: "full_name" });
 
   const rows = Array.isArray(data) ? data : [];
 
-  const counts = useMemo(() => {
-    const out = { pending: 0, approved: 0, rejected: 0 };
-    for (const row of rows) {
-      if (out[row.status] !== undefined) out[row.status] += 1;
-    }
-    return out;
-  }, [rows]);
+  // Server-side counts over the WHOLE book (every page, every filter). The
+  // old version summed the current page, so chips drifted as you paged and
+  // read (0) whenever the list was already filtered to one status.
+  const counts = useMemo(() => extra?.summary || { pending: 0, approved: 0, rejected: 0 },
+                         [extra]);
 
   async function decide(leave, approved) {
     const who = staffNames.get(String(leave.user_id)) || `Staff #${leave.user_id}`;
@@ -111,7 +109,7 @@ export default function LeavesPage() {
             <button key={s} type="button" className={status === s ? "chip is-active" : "chip"}
                     onClick={() => { setStatus(s); setPage(1); }}>
               {s[0].toUpperCase() + s.slice(1)}
-              {counts[s] > 0 && status === "" && <em className="chip-count">{counts[s]}</em>}
+              {counts[s] > 0 && <em className="chip-count">{counts[s]}</em>}
             </button>
           ))}
         </div>

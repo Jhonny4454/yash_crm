@@ -138,6 +138,10 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
   const canMessage = can("messages.send");
 
   const zone = params.get("zone") || "";
+  // `on` pins the board to one date, from the dashboard's day chips. The
+  // ranges below then stop applying - "12 Aug (10)" must open the ten plans
+  // that end on 12 Aug, not whatever the 7-day default window says.
+  const on = params.get("on") || "";
   const page = Math.max(1, Number(params.get("page") || 1));
 
   const ranges = config.ranges;
@@ -184,7 +188,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
     setEdits({});
 
     get("/reports/plan-expiry", {
-      days, mode, zone: zone || undefined, page, per_page: PER_PAGE,
+      days, mode, zone: zone || undefined, on: on || undefined, page, per_page: PER_PAGE,
     })
       .then((payload) => {
         if (cancelled) return;
@@ -196,7 +200,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
       .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
-  }, [days, mode, zone, page, reloadKey]);
+  }, [days, mode, zone, on, page, reloadKey]);
 
   // A change of filter is a change of list, so the selection cannot survive it.
   // Paging deliberately does NOT clear it - ticking rows on page 1, going to
@@ -205,7 +209,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
   useEffect(() => {
     setPicked(new Set());
     setAllMatching(false);
-  }, [view, rangeKey, zone]);
+  }, [view, rangeKey, zone, on]);
 
   /* Follow a running send. Polling stops the moment the job reports a finish
    * time, so a completed send does not keep asking about itself forever. */
@@ -332,6 +336,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
     const query = new URLSearchParams({ days: String(days) });
     if (mode) query.set("mode", mode);
     if (zone) query.set("zone", zone);
+    if (on) query.set("on", on);
     return query.toString();
   }
 
@@ -446,7 +451,17 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
       </div>
 
       <div className="toolbar">
-        {ranges.length > 0 && (
+        {/* The exact-day view replaces the window chips: a day is already a
+            window of one. The chip says which day and clears it in one tap. */}
+        {on ? (
+          <div className="filter-chips" role="group" aria-label="Exact day">
+            <button type="button" className="chip is-active"
+                    title="Show this whole list again"
+                    onClick={() => patch({ on: "", range: "", page: "" })}>
+              On {fmtDate(on)}
+            </button>
+          </div>
+        ) : ranges.length > 0 && (
           <div className="filter-chips" role="group" aria-label="Window">
             {ranges.map((r) => (
               <button key={r.key} type="button"
@@ -458,7 +473,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
           </div>
         )}
         <select className="input" style={{ maxWidth: 200 }} value={zone}
-                onChange={(e) => patch({ zone: e.target.value, page: "" })}
+                onChange={(e) => patch({ zone: e.target.value, page: "", on: "" })}
                 aria-label="Filter by zone">
           <option value="">All zones</option>
           {zones.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}

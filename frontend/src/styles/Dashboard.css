@@ -434,6 +434,7 @@ table.data tr.rail-idle td:first-child { box-shadow: inset 3px 0 0 #cbd5e1; }
   gap: 12px;
   margin-bottom: 24px;
 }
+.dash-head h1,
 .dash-head h2 {
   font-size: 1.9rem;
   font-weight: 800;
@@ -641,6 +642,7 @@ table.data tr.rail-idle td:first-child { box-shadow: inset 3px 0 0 #cbd5e1; }
   .dash-head .stamp { text-align: left; }
   .flex-row > * { min-width: 100%; }
   .life-row .name { min-width: 100%; }
+  .dash-head h1,
   .dash-head h2 { font-size: 1.5rem; }
   .dash-head .stamp .d { font-size: 1.2rem; }
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { get, post } from "../api/client";
 import { useFetch } from "../api/useFetch";
@@ -18,7 +18,11 @@ export function PortalDashboard() {
   // about to stop, and do I owe anything. The money card comes first on a
   // phone because it is the only one that needs an action.
   const daysLeft = plan?.days_left;
-  const expiring = typeof daysLeft === "number" && daysLeft <= 7;
+  // A null days_left means the plan has no computed expiry on record - that is
+  // "no information", not "expired today". Only a real number (including 0)
+  // triggers the expiry messaging.
+  const hasExpiry = typeof daysLeft === "number";
+  const expiring = hasExpiry && daysLeft <= 7;
 
   return <section className="page">
     <div className="page-heading">
@@ -49,7 +53,7 @@ export function PortalDashboard() {
       <article className={`metric-card${expiring ? " is-expiring" : ""}`}>
         <span>Plan expiry</span>
         <strong>{plan?.end_date ? fmtDate(plan.end_date) : "—"}</strong>
-        <small>{daysLeft === undefined ? ""
+        <small>{!hasExpiry ? ""
           : daysLeft <= 0 ? "Expired — renew to stay connected"
             : `${daysLeft} day${daysLeft === 1 ? "" : "s"} remaining`}</small>
       </article>
@@ -82,12 +86,24 @@ export function PortalDashboard() {
 
 // Invoices moved to pages/PortalInvoices.jsx: that screen carries the
 // pay-now flow, which needs far more than a generic read-only table.
-export function PortalPayments() { return <PortalList endpoint="/portal/payments" title="Payments" columns={["receipt_no", "payment_date", "payment_mode", "amount", "status"]} />; }
+export function PortalPayments() {
+  return <PortalList endpoint="/portal/payments" title="Payments"
+                     columns={[
+                       ["book_receipt_no", "Receipt"],
+                       ["payment_date", "Date"],
+                       ["payment_mode", "Mode"],
+                       ["amount", "Amount"],
+                       ["status", "Status"],
+                     ]} />;
+}
 
 function PortalList({ endpoint, title, columns }) {
   const [page, setPage] = useState(1);
   const { data, meta, loading, error, refetch } = useFetch(endpoint, { page });
-  const label = (key) => key.replaceAll("_", " ");
+  // A column is either a bare key ("amount" -> "amount") or a [key, label]
+  // pair, so a machine key like book_receipt_no can be shown as "Receipt".
+  const normalize = (col) => (Array.isArray(col) ? col : [col, col.replaceAll("_", " ")]);
+  const resolved = columns.map(normalize);
 
   return <section className="page">
     <div className="page-heading">
@@ -103,13 +119,13 @@ function PortalList({ endpoint, title, columns }) {
             // cards-sm: one labelled card per row below 720px.
             <table className="data cards-sm">
               <thead>
-                <tr>{columns.map((key) => <th key={key}>{label(key)}</th>)}</tr>
+                <tr>{resolved.map(([key, label]) => <th key={key}>{label}</th>)}</tr>
               </thead>
               <tbody>
                 {data.map((row) => (
                   <tr key={row.id}>
-                    {columns.map((key) => (
-                      <td key={key} data-label={label(key)}>
+                    {resolved.map(([key, label]) => (
+                      <td key={key} data-label={label}>
                         {renderValue(key, row[key])}
                       </td>
                     ))}
@@ -156,6 +172,7 @@ export function PortalPlans() {
         + `${inr(invoice?.balance ?? invoice?.total_amount)} is ready — pay it from `
         + "your invoices and the change takes effect once it clears.");
       setChanging(false);
+      setChoice(""); // the choice has been acted on; an empty box is honest
       refetchQuote();
     } catch (err) {
       // The old version put the raw error message in the success slot, so a
@@ -387,6 +404,10 @@ export function PortalProfile() {
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  // `busy` only disables the button on the NEXT render; a fast double-tap
+  // would post twice (and raise the same invoice twice). A ref flips
+  // synchronously, like the sign-in form.
+  const submitting = useRef(false);
 
   // A curated list, so internal columns (ids, hashes, flags) never reach the
   // screen. The previous version rendered every key on the user object.
@@ -417,9 +438,11 @@ export function PortalProfile() {
 
   async function submit(event) {
     event.preventDefault();
+    if (submitting.current) return;
     setTouched({ old_password: true, new_password: true, confirm_password: true });
-    if (!isValid || busy) return;
+    if (!isValid) return;
 
+    submitting.current = true;
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -435,6 +458,7 @@ export function PortalProfile() {
     } catch (err) {
       setError(err);
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   }
@@ -492,5 +516,5 @@ export function PortalProfile() {
   </section>;
 }
 
-function Rows({ title, rows, empty }) { return <section className="panel"><h2>{title}</h2>{!rows?.length ? <Empty title="Nothing to show" hint={empty} /> : <div className="list-cards">{rows.map((row) => <article key={row.id}><div><strong>{row.invoice_no || row.receipt_no || row.payment_mode}</strong><p>{fmtDate(row.issue_date || row.payment_date)}</p></div><div><strong>{inr(row.total_amount ?? row.amount)}</strong><StatusPill value={row.status} /></div></article>)}</div>}</section>; }
+function Rows({ title, rows, empty }) { return <section className="panel"><h2>{title}</h2>{!rows?.length ? <Empty title="Nothing to show" hint={empty} /> : <div className="list-cards">{rows.map((row) => <article key={row.id}><div><strong>{row.invoice_no || row.book_receipt_no || row.payment_mode}</strong><p>{fmtDate(row.issue_date || row.payment_date)}</p></div><div><strong>{inr(row.total_amount ?? row.amount)}</strong><StatusPill value={row.status} /></div></article>)}</div>}</section>; }
 function renderValue(key, value) { if (key.includes("amount") || key === "balance") return inr(value); if (key.includes("date")) return fmtDate(value); if (key === "status") return <StatusPill value={value} />; return value || "—"; }

@@ -188,7 +188,7 @@ export default function AuthorisationReport() {
     const href = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = href;
-    link.download = `authorising-report-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `authorising-report-${new Date().toLocaleDateString("en-CA")}.csv`;
     link.click();
     URL.revokeObjectURL(href);
   }

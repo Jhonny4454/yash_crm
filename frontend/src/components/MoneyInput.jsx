@@ -18,34 +18,42 @@
  * number input discards silently - the operator sees their keystroke vanish
  * and has no idea why.
  *
- * So: a text field constrained to digits, with a numeric keypad on mobile.
- * The value it reports is the same string of digits every other form here
- * already expects.
+ *  So: a text field constrained to digits, with a numeric keypad on mobile.
+ *  The value it reports is the same string of digits every other form here
+ *  already expects.
  */
+
+/**
+ * Reduce a raw field value to a whole-number digit string.
+ *
+ * Stripping as we go means a pasted "₹3,050.86" becomes 305086 rather than
+ * being rejected outright with no explanation, and the operator can see what
+ * happened. `max` clamps the result the same way the browser would have with
+ * `max` on a number input.
+ */
+export function sanitizeDigits(raw, max) {
+  let next = String(raw ?? "").replace(/[^\d]/g, "");
+  next = next.replace(/^0+(?=\d)/, "");              // no leading zeros
+  if (max !== undefined && next !== "" && Number(next) > Number(max)) {
+    next = String(max);
+  }
+  return next;
+}
+
+/** Wrap any event-based handler so its value is digits-only before it fires. */
+export function digitsOnlyEvent(handler, max) {
+  if (!handler) return handler;
+  return (event) => {
+    event.target.value = sanitizeDigits(event.target.value, max);
+    handler(event);
+  };
+}
+
 export default function MoneyInput({
   value, onChange, id, className, placeholder, required, disabled,
   autoFocus, max, ...rest
 }) {
-  function handle(event) {
-    // Digits only. Not a regex on the whole value - stripping as we go means
-    // a pasted "₹3,050.86" becomes 305086 rather than being rejected outright
-    // with no explanation, and the operator can see what happened.
-    const digits = String(event.target.value || "").replace(/[^\d]/g, "");
-    let next = digits.replace(/^0+(?=\d)/, "");        // no leading zeros
-    if (max !== undefined && next !== "" && Number(next) > Number(max)) {
-      next = String(max);
-    }
-
-    /* Handed back as an EVENT, not a bare string.
-     *
-     * Every form in this app already has a `set("field")` helper that reads
-     * event.target.value. Emitting a plain string would mean rewriting every
-     * one of those call sites - more places to get wrong than there are
-     * inputs. Reusing the real event object keeps the name, the type and
-     * anything else a handler might read. */
-    event.target.value = next;
-    onChange(event);
-  }
+  const handle = digitsOnlyEvent(onChange, max);
 
   return (
     <input

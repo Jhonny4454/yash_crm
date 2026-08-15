@@ -96,15 +96,25 @@ function DownloadBill({ invoice }) {
 
   async function open() {
     setBusy(true);
+    // Open the tab NOW, inside the click gesture. Opening it after the
+    // `await` below trips the popup blocker - by then the user-gesture has
+    // expired - and on Android the bill is silently dropped with no error to
+    // show. We get the handle first, then point it at the downloaded PDF.
+    const win = window.open("", "_blank");
     try {
       // Token-protected, so fetch it with the auth header and hand the browser
       // a local blob rather than navigating to a URL that arrives signed out.
       const response = await api.get(`/portal/invoices/${invoice.id}/pdf`,
                                      { responseType: "blob" });
       const url = URL.createObjectURL(response.data);
-      window.open(url, "_blank", "noopener");
+      if (win) {
+        win.location.href = url;
+      } else {
+        window.open(url, "_blank", "noopener");
+      }
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch {
+      try { win?.close(); } catch { /* a window we cannot reach is not ours */ }
       toast.error("That bill could not be opened. Please try again shortly.");
     } finally {
       setBusy(false);

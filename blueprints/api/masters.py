@@ -22,7 +22,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from flask import Blueprint, request
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 
 from models import (Address, Area, Attendance, Building, DiscountReason,
@@ -158,7 +158,21 @@ def register(slug, model, search_fields=(), required=(), order_by=None,
         if hasattr(_model, col):
             query = query.order_by(getattr(_model, col))
         rows, meta = paginate(query)
-        return ok([_serialize(r) for r in rows], meta=meta)
+
+        # Per-status counts over the WHOLE book, not the page on screen.
+        # A list screen with status chips (e.g. Leave: pending/approved/
+        # rejected) used to count the rows it happened to be showing, so
+        # "Pending (2)" was only ever true for the current page - and when the
+        # list was already filtered to one status, every other chip read (0).
+        summary = None
+        if enum_values(_model, 'status'):
+            grouped = dict(db.session.query(_model.status,
+                                            func.count(_model.id))
+                           .group_by(_model.status).all())
+            summary = {value: int(grouped.get(value, 0))
+                       for value in enum_values(_model, 'status')}
+
+        return ok([_serialize(r) for r in rows], meta=meta, summary=summary)
 
     @bp.get('/' + slug + '/<int:rid>', endpoint=endpoint + '_get')
     @staff_required

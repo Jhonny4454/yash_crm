@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { post } from "../api/client";
 import { readableError } from "../components/ui";
@@ -45,6 +45,9 @@ export default function ForgotPassword({ audience = "customer" }) {
   const [notice, setNotice] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  // `busy` only disables the button on the NEXT render, so a fast double-tap
+  // fires two submits before React catches up. A ref flips synchronously.
+  const submitting = useRef(false);
 
   /* Same reason as the sign-in form: a password manager fills these by
    * assigning to input.value, which does not fire React's onChange, so the
@@ -58,9 +61,11 @@ export default function ForgotPassword({ audience = "customer" }) {
 
   async function requestCode(event) {
     event.preventDefault();
+    if (submitting.current) return;
     const enteredId = fieldValue(event, "identifier", identifier).trim();
     if (enteredId !== identifier) setIdentifier(enteredId);
     if (!enteredId) return setError("Enter your username or mobile number.");
+    submitting.current = true;
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -84,12 +89,14 @@ export default function ForgotPassword({ audience = "customer" }) {
     } catch (requestError) {
       setError(readableError(requestError));
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   }
 
   async function reset(event) {
     event.preventDefault();
+    if (submitting.current) return;
     const enteredOtp = fieldValue(event, "otp", otp).trim();
     const enteredPassword = fieldValue(event, "password", password);
     const enteredConfirm = fieldValue(event, "confirm", confirm);
@@ -103,6 +110,7 @@ export default function ForgotPassword({ audience = "customer" }) {
       return setError("The two passwords do not match.");
     }
 
+    submitting.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -111,6 +119,7 @@ export default function ForgotPassword({ audience = "customer" }) {
     } catch (resetError) {
       setError(resetError.detail || readableError(resetError));
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   }
@@ -136,7 +145,11 @@ export default function ForgotPassword({ audience = "customer" }) {
                      autoComplete="username"
                      onChange={(event) => setIdentifier(event.target.value)} />
             </div>
-            <button className="login-btn" disabled={busy || !identifier.trim()}>
+            {/* Enabled even when state says empty: a password manager fills the
+                box directly, which never reaches React state, so a state-based
+                disable would block a perfectly valid submit. Validation lives
+                in the handler. */}
+            <button className="login-btn" disabled={busy}>
               {busy ? "Sending…" : "Send code"}
             </button>
           </form>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { del, get, post, put, upload } from "../api/client";
 import { useDebounced } from "../api/useFetch";
+import { sanitizeDigits } from "../components/MoneyInput";
 import PlanPicker from "../components/customers/PlanPicker";
 import { ErrorNote, Loading } from "../components/ui";
 import { useToast } from "../context/ToastContext";
@@ -50,7 +51,7 @@ const KYC_SLOTS = [
 const ACCEPT = ".pdf,.jpg,.jpeg,.png,.webp,.gif";
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => new Date().toLocaleDateString("en-CA");
 
 const EMPTY = {
   title: "Mr.",
@@ -653,8 +654,17 @@ export default function CustomerForm() {
           <div className="field-grid">
             {/* Rupees only. A discount that was a percentage on one customer
                 and a flat amount on the next could not be totalled on any
-                screen, and the header chip showed two different units. */}
-            {field("discount_amount", "Discount (₹)", { type: "number", min: 0, step: "1" })}
+                screen, and the header chip showed two different units.
+                Whole rupees only - a text field with a numeric keypad, no
+                spinner arrows. */}
+            {field("discount_amount", "Discount (₹)", {
+              type: "text", inputMode: "numeric", pattern: "[0-9]*",
+              autoComplete: "off", maxLength: 7,
+              onChange: (event) => {
+                event.target.value = sanitizeDigits(event.target.value);
+                change(event);
+              },
+            })}
             {field("notes", "Internal notes", { as: "textarea", span: 2 })}
           </div>
         </fieldset>

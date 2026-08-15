@@ -123,8 +123,21 @@ const UPSTREAM_DOWN = new Set([502, 503, 504]);
  */
 let unreachableUntil = 0;
 
+/** Did the APP itself answer? A JSON body carrying `error`/`detail` means a
+ *  route ran and refused, whereas nginx/proxy 5xx bodies are HTML and mean
+ *  nobody is listening. The two must be told apart: a route that answers 503
+ *  on purpose (e.g. the payment gateway not being configured) is a business
+ *  condition with its own message, not an outage. */
+function hasAppPayload(response) {
+  const data = response?.data;
+  return Boolean(data && typeof data === "object"
+    && (data.error || data.detail));
+}
+
 function backendIsDown(error) {
-  return !error.response || UPSTREAM_DOWN.has(error.response.status);
+  if (!error.response) return true;
+  if (!UPSTREAM_DOWN.has(error.response.status)) return false;
+  return !hasAppPayload(error.response);
 }
 
 function errorFrom(error) {

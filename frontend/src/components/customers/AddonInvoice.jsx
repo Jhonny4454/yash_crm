@@ -20,7 +20,7 @@ const BLANK = {
   caption: "",
   discount_amount: "",
   discount_reason: "",
-  invoice_date: new Date().toISOString().slice(0, 10),
+  invoice_date: new Date().toLocaleDateString("en-CA"),
   remark: "",
 };
 

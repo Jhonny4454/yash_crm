@@ -228,6 +228,19 @@ input[type="email"], input[type="tel"], input[type="password"], input[type="sear
   border: 1.5px solid var(--box-line-soft);
 }
 
+/* No spinner arrows on ANY numeric field, and no invisible resize on the
+   wheel. Money and counts are typed, never nudged, so a number input that
+   survives anywhere in the app gets plain-boxed here as a safety net. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 .input:focus, .field input:focus, .field select:focus, .field textarea:focus,
 input:focus, select:focus, textarea:focus {
   border-color: var(--primary-color, #0073b7);
@@ -369,8 +382,7 @@ button.nav-link {
    also get clearance from the topbar rather than being centred blind, so a
    tall dialog starts below it instead of behind it.
    -------------------------------------------------------------------- */
-.modal-scrim,
-.confirm-scrim {
+.modal-scrim {
   z-index: 1100 !important;
 }
 

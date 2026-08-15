@@ -85,9 +85,10 @@ function CompanyForm({ company, readOnly, onSaved }) {
     setBusy(true); setError(null); setNotice(null);
     try {
       const res = isNew ? await post("/companies", form) : await put(`/companies/${form.id}`, form);
-      setForm(res.data);
+      const saved = res?.data ?? res;
+      setForm(saved);
       setNotice("Saved.");
-      onSaved(res.data);
+      onSaved(saved);
     } catch (err) { setError(err); }
     finally { setBusy(false); }
   }
@@ -113,7 +114,8 @@ function CompanyForm({ company, readOnly, onSaved }) {
       const fd = new FormData();
       fd.append("logo", file);
       const res = await upload(`/companies/${form.id}/logo`, fd);
-      const next = { ...form, logo_url: res.data.logo_url, company_logo: res.data.company_logo };
+      const logo = res?.data ?? res;
+      const next = { ...form, logo_url: logo.logo_url, company_logo: logo.company_logo };
       setForm(next);
       setNotice("Logo updated. It now appears on every bill and in the customer app.");
       onSaved(next);

@@ -206,9 +206,12 @@ def staff_type_list():
 EXPIRY_PAGE_SIZE = 100
 
 
-def _expiry_query(mode, days, unbounded, zone, today):
+def _expiry_query(mode, days, unbounded, zone, today, on=None):
     """The CustomerPlan query behind the expiry board, filtered in SQL.
 
+    ``on`` pins the window to ONE date - the dashboard's day chips lead here
+    with ``?on=YYYY-MM-DD`` so a chip saying "12 Aug (10)" opens the ten plans
+    that actually fall on 12 Aug, instead of the whole "next 7 days" window.
     The zone filter used to run in PYTHON, after every matching row had been
     fetched and its customer eager-loaded - so filtering to one zone cost
     exactly as much as not filtering at all, and there was no way to paginate
@@ -228,14 +231,18 @@ def _expiry_query(mode, days, unbounded, zone, today):
         # disagree with the dashboard chip that led the operator to it.
         query = query.filter(CustomerPlan.last_invoice_date.isnot(None),
                              CustomerPlan.last_invoice_date <= today)
-        if not unbounded:
+        if on:
+            query = query.filter(CustomerPlan.last_invoice_date == on)
+        elif not unbounded:
             window_start = today - timedelta(days=max(0, days - 1))
             query = query.filter(CustomerPlan.last_invoice_date >= window_start)
         return query.order_by(CustomerPlan.last_invoice_date.desc(),
                               CustomerPlan.id.desc())
 
     query = query.filter(CustomerPlan.status == 'active')
-    if unbounded:
+    if on:
+        query = query.filter(CustomerPlan.end_date == on)
+    elif unbounded:
         query = query.filter(CustomerPlan.end_date >= today)
     elif days >= 0:
         query = query.filter(CustomerPlan.end_date >= today,
@@ -247,8 +254,16 @@ def _expiry_query(mode, days, unbounded, zone, today):
     return query.order_by(CustomerPlan.end_date, CustomerPlan.id)
 
 
+def _parse_iso_date(value):
+    """YYYY-MM-DD -> date, or None when absent/garbage."""
+    try:
+        return datetime.strptime(str(value)[:10], '%Y-%m-%d').date()
+    except (TypeError, ValueError):
+        return None
+
+
 def _expiry_args():
-    """(mode, days, unbounded, zone, today) from the query string."""
+    """(mode, days, unbounded, zone, today, on) from the query string."""
     # `days=all` drops the far edge of the window: every plan still to expire,
     # or - in renewed mode - every renewal on record. The dashboard's "View
     # all" buttons use it, because the seven-day chips beside them are a view
@@ -263,7 +278,8 @@ def _expiry_args():
     mode = (request.args.get('mode') or 'expiry').strip().lower()
     if mode != 'renewed':
         mode = 'expiry'
-    return mode, days, unbounded, (request.args.get('zone') or '').strip(), today_local()
+    return (mode, days, unbounded, (request.args.get('zone') or '').strip(),
+            today_local(), _parse_iso_date(request.args.get('on')))
 
 
 @bp.get('/reports/plan-expiry')
@@ -283,8 +299,8 @@ def report_plan_expiry():
     """
     from sqlalchemy.orm import selectinload
 
-    mode, days, unbounded, zone, today = _expiry_args()
-    query = _expiry_query(mode, days, unbounded, zone, today)
+    mode, days, unbounded, zone, today, on = _expiry_args()
+    query = _expiry_query(mode, days, unbounded, zone, today, on)
 
     # The plan and the customer, and nothing else.
     #
@@ -406,7 +422,7 @@ def report_plan_expiry_renew():
         Generate Invoice for that.
     """
     data = body()
-    mode, days, unbounded, zone, today = _expiry_args()
+    mode, days, unbounded, zone, today, on = _expiry_args()
 
     end_date = data.get('end_date') or data.get('date')
     try:
@@ -415,7 +431,7 @@ def report_plan_expiry_renew():
         return fail('invalid_end_date', 400,
                     detail='Pick the date the plans should run to.')
 
-    query = _expiry_query(mode, days, unbounded, zone, today)
+    query = _expiry_query(mode, days, unbounded, zone, today, on)
     query, err = _selected_plans(query, data)
     if err:
         return err
@@ -476,15 +492,15 @@ def report_plan_expiry_notify():
         return fail('messaging_unavailable', 503)
 
     data = body()
-    mode, days, unbounded, zone, today = _expiry_args()
+    mode, days, unbounded, zone, today, on = _expiry_args()
     if mode == 'renewed':
         return fail('not_for_this_view', 400,
                     detail='Expiry notices can only be sent from the expired list.')
-    if days >= 0 and not unbounded:
+    if on or (days >= 0 and not unbounded):
         return fail('not_for_this_view', 400,
                     detail='Expiry notices can only be sent from the expired list.')
 
-    query = _expiry_query(mode, days, unbounded, zone, today)
+    query = _expiry_query(mode, days, unbounded, zone, today, on)
     query, err = _selected_plans(query, data)
     if err:
         return err

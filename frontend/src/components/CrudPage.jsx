@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { del, post, put } from "../api/client";
 import { useDebounced, useFetch } from "../api/useFetch";
 import { invalidateLookup, useLookup } from "../api/useLookup";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+import MoneyInput from "./MoneyInput";
 import {
   Empty, ErrorNote, Loading, Pager, TableSkeleton, fmtDate, inr, readableError,
 } from "./ui";
@@ -121,6 +122,14 @@ export default function CrudPage({
 
   const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
 
+  // A different search or a different page is a DIFFERENT list. The old code
+  // kept every tick forever, so a selection from page 3 silently survived onto
+  // page 1 - and the select-all checkbox, which decided "all" by comparing
+  // sizes, would clear three invisible rows when the page happened to hold
+  // three rows of its own. Clearing on a list change also means "Delete
+  // selected" can only ever touch rows the operator can see.
+  useEffect(() => { setSelected(new Set()); }, [q, page]);
+
   function toggleRow(id) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -131,8 +140,15 @@ export default function CrudPage({
   }
 
   function toggleAll() {
-    setSelected((prev) =>
-      prev.size === rows.length ? new Set() : new Set(rows.map((r) => r.id)));
+    // Decided against the CURRENT page, not against the size of the whole
+    // selection - which is what made the old version clear the wrong rows
+    // whenever a previous page's picks made the sizes match by accident.
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allSelected) rows.forEach((r) => next.delete(r.id));
+      else rows.forEach((r) => next.add(r.id));
+      return next;
+    });
   }
 
   async function removeSelected() {
@@ -536,13 +552,34 @@ function CrudDialog({ endpoint, singular, columns, value, onClose, onSaved }) {
                 );
               }
 
+              if (c.type === "money" || c.type === "number") {
+                return (
+                  <div className={`field${fieldError ? " has-error" : ""}`} key={c.key}>
+                    <label>{c.label}{c.required && " *"}</label>
+                    <MoneyInput
+                      className="input"
+                      value={form[c.key] ?? ""}
+                      max={c.max}
+                      placeholder={c.placeholder}
+                      required={c.required}
+                      onChange={set(c.key)}
+                      onBlur={blur(c.key)}
+                      aria-invalid={Boolean(fieldError)}
+                      autoFocus={c.key === "name"}
+                    />
+                    {fieldError
+                      ? <div className="field-error">{fieldError}</div>
+                      : c.suffix && <div className="hint">Enter a whole number. Suffix “{c.suffix}” is added automatically.</div>}
+                  </div>
+                );
+              }
+
               return (
                 <div className={`field${fieldError ? " has-error" : ""}`} key={c.key}>
                   <label>{c.label}{c.required && " *"}</label>
                   <input
                     className="input"
                     type={inputType(c.type)}
-                    step={c.type === "money" ? "0.01" : undefined}
                     inputMode={c.type === "tel" ? "numeric" : undefined}
                     value={form[c.key] ?? ""}
                     onChange={set(c.key)}
@@ -703,6 +740,6 @@ function LookupField({ column, value, onChange, onBlur, error, wide }) {
 }
 
 function inputType(type) {
-  if (["date", "email", "password", "tel", "number"].includes(type)) return type;
-  return type === "money" ? "number" : "text";
+  if (["date", "email", "password", "tel"].includes(type)) return type;
+  return "text";
 }

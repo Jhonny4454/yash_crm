@@ -20,12 +20,15 @@ import MoneyInput from "../components/MoneyInput";
  * two are missing and why - a shorter list is not an answer.
  */
 
-const today = () => new Date().toISOString().slice(0, 10);
+// "en-CA" yields YYYY-MM-DD in the browser's own timezone. toISOString()
+// would answer in UTC, which is yesterday for IST users before ~5:30am and
+// would make "runs out in the next 7 days" start a day early or late.
+const today = () => new Date().toLocaleDateString("en-CA");
 
 const inDays = (days) => {
   const date = new Date();
   date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
+  return date.toLocaleDateString("en-CA");
 };
 
 const EMPTY = {

@@ -385,7 +385,7 @@ function LifecycleRow({ name, days, total, allTotal, allRange, allLabel, tone,
           return (
             <Link key={day.date}
                   className={`chip-day${isToday ? " is-today" : ""}`}
-                  to={`/reports/${page}`}
+                  to={`/reports/${page}?on=${day.date}`}
                   title={`${day.count} ${unit}${day.count === 1 ? "" : "s"} on ${day.label}`
                     + (isToday ? " (today)" : "")}>
               <span className="day">{day.label}</span>
@@ -430,7 +430,7 @@ function MonthlySummary() {
                 // every drill-down on the row filters to the same window.
                 const [year, mon] = m.month.split("-").map(Number);
                 const from = `${m.month}-01`;
-                const to = new Date(year, mon, 0).toISOString().slice(0, 10);
+                const to = new Date(year, mon, 0).toLocaleDateString("en-CA");
                 const range = `from=${from}&to=${to}`;
 
                 return (
