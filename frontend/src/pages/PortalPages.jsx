@@ -1,8 +1,8 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { get, post } from "../api/client";
 import { useFetch } from "../api/useFetch";
-import { PayDuesPanel, usePayConfig } from "../components/PayNow";
+import { PayDuesPanel, usePayConfig, usePayNow } from "../components/PayNow";
 import { Empty, ErrorNote, fmtDate, inr, Loading, Pager, StatusPill } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import "../styles/PortalPay.css";
@@ -18,11 +18,7 @@ export function PortalDashboard() {
   // about to stop, and do I owe anything. The money card comes first on a
   // phone because it is the only one that needs an action.
   const daysLeft = plan?.days_left;
-  // A null days_left means the plan has no computed expiry on record - that is
-  // "no information", not "expired today". Only a real number (including 0)
-  // triggers the expiry messaging.
-  const hasExpiry = typeof daysLeft === "number";
-  const expiring = hasExpiry && daysLeft <= 7;
+  const expiring = typeof daysLeft === "number" && daysLeft <= 7;
 
   return <section className="page">
     <div className="page-heading">
@@ -53,7 +49,7 @@ export function PortalDashboard() {
       <article className={`metric-card${expiring ? " is-expiring" : ""}`}>
         <span>Plan expiry</span>
         <strong>{plan?.end_date ? fmtDate(plan.end_date) : "—"}</strong>
-        <small>{!hasExpiry ? ""
+        <small>{daysLeft === undefined ? ""
           : daysLeft <= 0 ? "Expired — renew to stay connected"
             : `${daysLeft} day${daysLeft === 1 ? "" : "s"} remaining`}</small>
       </article>
@@ -86,24 +82,12 @@ export function PortalDashboard() {
 
 // Invoices moved to pages/PortalInvoices.jsx: that screen carries the
 // pay-now flow, which needs far more than a generic read-only table.
-export function PortalPayments() {
-  return <PortalList endpoint="/portal/payments" title="Payments"
-                     columns={[
-                       ["book_receipt_no", "Receipt"],
-                       ["payment_date", "Date"],
-                       ["payment_mode", "Mode"],
-                       ["amount", "Amount"],
-                       ["status", "Status"],
-                     ]} />;
-}
+export function PortalPayments() { return <PortalList endpoint="/portal/payments" title="Payments" columns={["receipt_no", "payment_date", "payment_mode", "amount", "status"]} />; }
 
 function PortalList({ endpoint, title, columns }) {
   const [page, setPage] = useState(1);
   const { data, meta, loading, error, refetch } = useFetch(endpoint, { page });
-  // A column is either a bare key ("amount" -> "amount") or a [key, label]
-  // pair, so a machine key like book_receipt_no can be shown as "Receipt".
-  const normalize = (col) => (Array.isArray(col) ? col : [col, col.replaceAll("_", " ")]);
-  const resolved = columns.map(normalize);
+  const label = (key) => key.replaceAll("_", " ");
 
   return <section className="page">
     <div className="page-heading">
@@ -119,13 +103,13 @@ function PortalList({ endpoint, title, columns }) {
             // cards-sm: one labelled card per row below 720px.
             <table className="data cards-sm">
               <thead>
-                <tr>{resolved.map(([key, label]) => <th key={key}>{label}</th>)}</tr>
+                <tr>{columns.map((key) => <th key={key}>{label(key)}</th>)}</tr>
               </thead>
               <tbody>
                 {data.map((row) => (
                   <tr key={row.id}>
-                    {resolved.map(([key, label]) => (
-                      <td key={key} data-label={label}>
+                    {columns.map((key) => (
+                      <td key={key} data-label={label(key)}>
                         {renderValue(key, row[key])}
                       </td>
                     ))}
@@ -151,7 +135,7 @@ function PortalList({ endpoint, title, columns }) {
  */
 export function PortalPlans() {
   const { data, loading, error, refetch } = useFetch("/portal/plans");
-  const { data: account } = useFetch("/portal/dashboard");
+  const { data: account, refetch: refetchAccount } = useFetch("/portal/dashboard");
   const { data: quote, refetch: refetchQuote } = useFetch("/portal/renew/quote");
   const [choice, setChoice] = useState("");
   const [changing, setChanging] = useState(false);
@@ -159,28 +143,70 @@ export function PortalPlans() {
   const [message, setMessage] = useState(null);
   const [failure, setFailure] = useState(null);
 
+  const gateway = usePayConfig();
+  const { busy: paying, pay } = usePayNow({
+    gateway,
+    onPaid: async () => {
+      refetch();
+      refetchQuote();
+      refetchAccount();
+    },
+  });
+
   const current = account?.active_plan;
 
+  /**
+   * Raise the bill, then take the customer straight to the checkout.
+   *
+   * Renewing used to end at "your invoice is ready - pay it from your
+   * invoices": the customer pressed Renew having already decided to pay, and
+   * was handed a filing instruction and a second screen to find. Every step
+   * between deciding and paying is somewhere the payment can be abandoned, so
+   * the checkout now opens on the same click.
+   *
+   * The invoice is still raised first and independently. If the customer
+   * closes the checkout, or the card fails, or the gateway is switched off
+   * entirely, the bill exists and can be settled later by any route - nothing
+   * about the renewal depends on the payment window succeeding.
+   */
   async function act(endpoint, payload, key, describe) {
     setBusy(key);
     setMessage(null);
     setFailure(null);
+
+    let invoice;
     try {
       const response = await post(endpoint, payload);
-      const invoice = (response?.data ?? response)?.invoice;
-      setMessage(`${describe} Invoice ${invoice?.invoice_no || "created"} for `
-        + `${inr(invoice?.balance ?? invoice?.total_amount)} is ready — pay it from `
-        + "your invoices and the change takes effect once it clears.");
+      invoice = (response?.data ?? response)?.invoice;
       setChanging(false);
-      setChoice(""); // the choice has been acted on; an empty box is honest
-      refetchQuote();
     } catch (err) {
       // The old version put the raw error message in the success slot, so a
       // failed request looked like a confirmation.
       setFailure(err.detail || err.message || "That could not be done just now.");
+      return;
     } finally {
       setBusy(null);
     }
+
+    const due = Number(invoice?.balance ?? invoice?.total_amount ?? 0);
+    const reference = invoice?.invoice_no || "created";
+
+    if (gateway?.enabled && invoice?.id && due > 0) {
+      setMessage(`${describe} Invoice ${reference} for ${inr(due)} — opening `
+        + "payment…");
+      // pay() owns the rest: it reports success, failure and "not confirmed
+      // yet" itself, and refreshes this screen through onPaid.
+      await pay({ invoiceId: invoice.id, amount: due, describe: reference });
+      setMessage(null);
+      return;
+    }
+
+    setMessage(`${describe} Invoice ${reference} for ${inr(due)} is ready — `
+      + (gateway?.enabled
+        ? "pay it from your invoices and the change takes effect once it clears."
+        : "pay it by bank transfer or at the office, and the change takes "
+          + "effect once it clears."));
+    refetchQuote();
   }
 
   const plans = Array.isArray(data) ? data : [];
@@ -250,10 +276,23 @@ export function PortalPlans() {
           </p>
         )}
 
-        <button className="btn primary renew-card-go" disabled={busy === "renew"}
+        {/* The label says what the button does, in full. "Renew this plan"
+            gave no warning that a payment window was about to open, and a
+            checkout nobody expected is a checkout people close. */}
+        <button className="btn primary renew-card-go"
+                disabled={busy === "renew" || paying}
                 onClick={() => act("/portal/renew", {}, "renew",
                                    "Your renewal is booked.")}>
-          {busy === "renew" ? "Working…" : "Renew this plan"}
+          {busy === "renew" ? "Working…"
+            : gateway?.enabled
+              /* The charge is the OPEN invoice when there is one, because
+                 /portal/renew points at that bill instead of raising a second.
+                 Quoting the plan price on the button and then charging a
+                 different figure is the fastest way to lose someone's trust
+                 at the exact moment they are paying. */
+              ? `Renew & pay ${inr(quote?.open_invoice?.balance
+                                   ?? quote?.total ?? current.price)}`
+              : "Renew this plan"}
         </button>
       </section>
     )}
@@ -336,12 +375,14 @@ export function PortalPlans() {
 
               <div className="plan-choose-actions">
                 <button className="btn primary"
-                        disabled={!selected || isCurrentChoice || busy === "change"}
+                        disabled={!selected || isCurrentChoice || busy === "change" || paying}
                         onClick={() => act("/portal/change-plan", { plan_id: selected.id },
                                            "change", `Switching to ${selected.name}.`)}>
                   {busy === "change" ? "Creating invoice…"
-                    : selected ? `Change to this plan — ${inr(selected.total ?? selected.price_monthly)}`
-                      : "Change to this plan"}
+                    : !selected ? "Change to this plan"
+                      : gateway?.enabled
+                        ? `Change & pay ${inr(selected.total ?? selected.price_monthly)}`
+                        : `Change to this plan — ${inr(selected.total ?? selected.price_monthly)}`}
                 </button>
                 <button type="button" className="btn"
                         onClick={() => { setChanging(false); setChoice(""); }}>
@@ -404,10 +445,6 @@ export function PortalProfile() {
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
-  // `busy` only disables the button on the NEXT render; a fast double-tap
-  // would post twice (and raise the same invoice twice). A ref flips
-  // synchronously, like the sign-in form.
-  const submitting = useRef(false);
 
   // A curated list, so internal columns (ids, hashes, flags) never reach the
   // screen. The previous version rendered every key on the user object.
@@ -438,11 +475,9 @@ export function PortalProfile() {
 
   async function submit(event) {
     event.preventDefault();
-    if (submitting.current) return;
     setTouched({ old_password: true, new_password: true, confirm_password: true });
-    if (!isValid) return;
+    if (!isValid || busy) return;
 
-    submitting.current = true;
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -458,7 +493,6 @@ export function PortalProfile() {
     } catch (err) {
       setError(err);
     } finally {
-      submitting.current = false;
       setBusy(false);
     }
   }
@@ -516,5 +550,5 @@ export function PortalProfile() {
   </section>;
 }
 
-function Rows({ title, rows, empty }) { return <section className="panel"><h2>{title}</h2>{!rows?.length ? <Empty title="Nothing to show" hint={empty} /> : <div className="list-cards">{rows.map((row) => <article key={row.id}><div><strong>{row.invoice_no || row.book_receipt_no || row.payment_mode}</strong><p>{fmtDate(row.issue_date || row.payment_date)}</p></div><div><strong>{inr(row.total_amount ?? row.amount)}</strong><StatusPill value={row.status} /></div></article>)}</div>}</section>; }
+function Rows({ title, rows, empty }) { return <section className="panel"><h2>{title}</h2>{!rows?.length ? <Empty title="Nothing to show" hint={empty} /> : <div className="list-cards">{rows.map((row) => <article key={row.id}><div><strong>{row.invoice_no || row.receipt_no || row.payment_mode}</strong><p>{fmtDate(row.issue_date || row.payment_date)}</p></div><div><strong>{inr(row.total_amount ?? row.amount)}</strong><StatusPill value={row.status} /></div></article>)}</div>}</section>; }
 function renderValue(key, value) { if (key.includes("amount") || key === "balance") return inr(value); if (key.includes("date")) return fmtDate(value); if (key === "status") return <StatusPill value={value} />; return value || "—"; }

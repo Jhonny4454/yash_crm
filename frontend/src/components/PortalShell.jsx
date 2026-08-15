@@ -67,18 +67,6 @@ export default function PortalShell() {
   const title = TITLES[pathname] || "My account";
   const name = user?.full_name || user?.username || user?.mobile || "Customer";
 
-  /* The avatar was showing "M" for what looked like every customer on the
-     system. It was taking the first character of `full_name`, and full_name is
-     stored WITH the title - "Mr. Sumedh Chabukswar" - so it was rendering the
-     honorific, not the person. Strip those before taking the letter. */
-  const initial = String(name)
-    .replace(/^\s*(m\/s|mr|mrs|ms|miss|dr|smt|shri|sri)\.?\s+/i, "")
-    .trim()
-    .charAt(0)
-    .toUpperCase() || "C";
-
-  const logo = company?.logo_url || "";
-
   const tabLink = ({ to, label, icon, end }) => (
     <NavLink
       key={to}
@@ -132,19 +120,21 @@ export default function PortalShell() {
           </NavLink>
 
           <div className="pt-account">
-            {/* The company logo, and nothing else. The letter is only the
-                fallback for a company that has not uploaded one. */}
-            <button type="button" className={`pt-avatar${logo ? " has-logo" : ""}`}
+            {/* A plain user icon, drawn inline.
+                Not <img>, which needs a file that may not exist - a company
+                with no logo uploaded got a broken-image glyph. Not a Font
+                Awesome <i> either: the icon font is fetched from a CDN with
+                media="print" so it never blocks paint, which also means it may
+                arrive late or not at all, and this is the one control in the
+                bar with no text label to fall back on. Inline SVG is part of
+                the document and always draws. */}
+            <button type="button" className="pt-avatar"
                     onClick={() => setMenuOpen((v) => !v)}
                     aria-haspopup="menu" aria-expanded={menuOpen} aria-label="Account menu">
-              {logo
-                ? <img src={logo} alt="" />
-                : <img src={logoImage} alt="" onError={(event) => {
-                    // No company logo and the bundled one failed: a letter is
-                    // better than a broken-image icon.
-                    event.currentTarget.replaceWith(
-                      document.createTextNode(initial));
-                  }} />}
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 21v-1a8 8 0 0 1 16 0v1z" />
+              </svg>
             </button>
             {menuOpen && (
               <>

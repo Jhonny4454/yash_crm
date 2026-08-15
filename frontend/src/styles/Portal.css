@@ -119,14 +119,15 @@ body.portal-mode {
   font-size: .95rem;
   cursor: pointer;
 }
-.portal-shell .pt-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  /* `contain`, not `cover`: a wordmark cropped to a circle is unreadable, and
-     the logo here is the company's, not a face. */
-  padding: 3px;
+.portal-shell .pt-avatar svg {
+  width: 22px;
+  height: 22px;
+  /* `currentColor` so the glyph follows the button's colour rather than
+     needing its own, and fill-only so there is no stroke to go missing. */
+  fill: currentColor;
 }
+.portal-shell .pt-avatar:hover,
+.portal-shell .pt-avatar:focus-visible { background: #eef4fb; }
 
 .portal-shell .pt-menu-scrim { position: fixed; inset: 0; z-index: 40; }
 
