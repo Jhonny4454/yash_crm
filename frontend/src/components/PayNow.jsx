@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { get, post } from "../api/client";
 import { useToast } from "../context/ToastContext";
-import MoneyInput from "./MoneyInput";
 import { inr, readableError } from "./ui";
 
 /**
@@ -181,23 +180,20 @@ export function PayButton({ invoice, gateway, onPaid }) {
 }
 
 /**
- * Settle the account total, or part of it.
+ * Settle the account total. One button, for the whole figure.
  *
- * The amount is editable because a customer who can only pay half this week
- * will otherwise pay nothing at all - and a part payment recorded against the
- * oldest bill is worth considerably more to the business than a customer who
- * closed the tab.
+ * The amount used to be editable, on the reasoning that somebody who can only
+ * pay half this week would otherwise pay nothing. In practice it handed the
+ * customer a text box at the exact moment money moves - an invitation to a
+ * typo, and a piece of arithmetic the server had already done and shown them
+ * two lines above. Part payments are a conversation with the office, which is
+ * a conversation the business wants to have anyway.
  */
 export function PayDuesPanel({ outstanding, invoiceCount, gateway, onPaid }) {
   const due = Number(outstanding || 0);
-  const [amount, setAmount] = useState("");
   const { stage, busy, pay } = usePayNow({ gateway, onPaid });
 
   if (due <= 0) return null;
-
-  const entered = amount === "" ? due : Number(amount);
-  const valid = Number.isFinite(entered) && entered > 0 && entered <= due + 0.01;
-  const part = valid && entered < due - 0.01;
 
   return (
     <section className="panel pay-dues">
@@ -248,36 +244,18 @@ export function PayDuesPanel({ outstanding, invoiceCount, gateway, onPaid }) {
           </p>
         </div>
       ) : (
+        /* One button, for the whole amount. The customer does not type a
+           figure: an editable box invites a typo at the exact moment money
+           moves, and it made the customer responsible for arithmetic the
+           server had already done. Somebody who genuinely can only pay part
+           of it rings the office, which is a conversation the business wants
+           to have anyway. */
         <div className="pay-dues-row">
-          <label htmlFor="pay-amount">Amount to pay</label>
-          <div className="pay-dues-input">
-            <span aria-hidden="true">₹</span>
-            {/* Whole rupees, no spinner: the bills are whole rupees, and a
-                number field here would let the mouse wheel change the amount
-                being paid while the customer scrolls the page. */}
-            <MoneyInput id="pay-amount" className="input"
-                        value={amount} placeholder={String(Math.round(due))}
-                        disabled={busy}
-                        onChange={(event) => setAmount(event.target.value)} />
-          </div>
-          <button type="button" className="btn primary" disabled={busy || !valid}
-                  onClick={() => pay({ amount: entered, describe: "your account" })}>
-            {STAGE_LABEL[stage] || `Pay ${inr(entered)}`}
+          <button type="button" className="btn primary" disabled={busy}
+                  onClick={() => pay({ amount: due, describe: "your account" })}>
+            {STAGE_LABEL[stage] || `Pay ${inr(due)}`}
           </button>
         </div>
-      )}
-
-      {gateway?.enabled && !valid && (
-        <p className="pay-dues-warn" role="alert">
-          Enter an amount between ₹1 and {inr(due)} — that is everything owed
-          on the account today.
-        </p>
-      )}
-      {gateway?.enabled && part && (
-        <p className="pay-dues-note">
-          A part payment. {inr(due - entered)} will still be outstanding
-          afterwards.
-        </p>
       )}
     </section>
   );

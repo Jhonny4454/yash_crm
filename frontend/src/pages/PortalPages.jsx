@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { get, post } from "../api/client";
 import { useFetch } from "../api/useFetch";
-import { billRowProps, useOpenBill } from "../components/BillLink";
+import { BillActions, billRowProps, useBillActions } from "../components/BillLink";
 import { PayDuesPanel, usePayConfig, usePayNow } from "../components/PayNow";
 import { Empty, ErrorNote, fmtDate, inr, Loading, Pager, StatusPill } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
@@ -29,31 +29,38 @@ export function PortalDashboard() {
       </div>
     </div>
 
-    <div className="metric-grid">
-      <Link className={`metric-card${outstanding > 0 ? " is-due" : ""}`}
-            to="/customer/invoices">
-        <span>Outstanding</span>
-        <strong>{inr(outstanding)}</strong>
-        <small>{outstanding > 0
-          ? "Pay below, or see it bill by bill"
-          : "Nothing to pay right now"}</small>
-      </Link>
+    {/* The two things a customer opens this screen for, side by side: what
+        keeps the connection running, and what it costs. Two boxes on a desktop
+        or a tablet, stacked on a phone with the money first - on a small
+        screen the one that needs an action should not be below the fold. */}
+    <div className="pt-hero">
+      <section className="panel pt-hero-box">
+        <h2>Renew your plan</h2>
+        <p className="pt-hero-sub">
+          {plan?.plan_name || "No active plan"}
+          {plan?.speed_mbps ? ` · ${plan.speed_mbps} Mbps` : ""}
+        </p>
+        <p className={`pt-hero-meta${expiring ? " is-expiring" : ""}`}>
+          {plan?.end_date ? `Runs to ${fmtDate(plan.end_date)}` : "Not active"}
+          {daysLeft === undefined ? ""
+            : daysLeft <= 0 ? " · expired"
+              : ` · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left`}
+        </p>
+        <Link className="btn primary pt-hero-go" to="/customer/plans">
+          Renew plan
+        </Link>
+      </section>
 
-      <article className="metric-card">
-        <span>Current plan</span>
-        <strong>{plan?.plan_name || "No active plan"}</strong>
-        <small>{plan?.speed_mbps
-          ? `${plan.speed_mbps} Mbps`
-          : "Contact support to activate"}</small>
-      </article>
-
-      <article className={`metric-card${expiring ? " is-expiring" : ""}`}>
-        <span>Plan expiry</span>
-        <strong>{plan?.end_date ? fmtDate(plan.end_date) : "—"}</strong>
-        <small>{daysLeft === undefined ? ""
-          : daysLeft <= 0 ? "Expired — renew to stay connected"
-            : `${daysLeft} day${daysLeft === 1 ? "" : "s"} remaining`}</small>
-      </article>
+      <section className={`panel pt-hero-box pt-hero-due${outstanding > 0 ? " is-due" : ""}`}>
+        <h2>Total amount due</h2>
+        <p className="pt-hero-sub">Total amount due till date</p>
+        <strong className="pt-hero-amount">{inr(outstanding)}</strong>
+        {outstanding > 0
+          ? <Link className="btn primary pt-hero-go" to="/customer/invoices">
+              See the bills
+            </Link>
+          : <p className="pt-hero-meta">Nothing to pay right now.</p>}
+      </section>
     </div>
 
     {/* The dashboard is where the customer meets the number, so it is where
@@ -61,16 +68,6 @@ export function PortalDashboard() {
         invoice list to work out which bills that one figure is made of. */}
     <PayDuesPanel outstanding={outstanding} invoiceCount={data?.due_invoice_count}
                   gateway={gateway} onPaid={refetch} />
-
-    {expiring && (
-      <Link className="portal-cta" to="/customer/plans">
-        <div>
-          <strong>{daysLeft <= 0 ? "Your plan has expired" : "Your plan ends soon"}</strong>
-          <p>Renew now and your connection carries on without a break.</p>
-        </div>
-        <span className="btn primary">Renew</span>
-      </Link>
-    )}
 
     <div className="grid-two">
       <Rows title="Recent invoices" rows={data?.recent_invoices}
@@ -557,7 +554,7 @@ export function PortalProfile() {
  * clickable and is not is worse than one that plainly is not.
  */
 function Rows({ title, rows, empty }) {
-  const { openingId, openBill } = useOpenBill();
+  const bill = useBillActions();
 
   return (
     <section className="panel">
@@ -568,7 +565,7 @@ function Rows({ title, rows, empty }) {
             const isBill = Boolean(row.invoice_no);
             return (
               <article key={row.id}
-                       {...(isBill ? billRowProps(row, openBill, openingId) : {})}>
+                       {...(isBill ? billRowProps(row, bill.ask) : {})}>
                 <div>
                   <strong>{row.invoice_no || row.receipt_no || row.payment_mode}</strong>
                   <p>{fmtDate(row.issue_date || row.payment_date)}</p>
@@ -582,6 +579,7 @@ function Rows({ title, rows, empty }) {
           })}
         </div>
       )}
+      <BillActions {...bill} />
     </section>
   );
 }

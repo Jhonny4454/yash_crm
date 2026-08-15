@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useFetch } from "../api/useFetch";
-import { billRowProps, useOpenBill } from "../components/BillLink";
+import { BillActions, billRowProps, useBillActions } from "../components/BillLink";
 import { PayButton, PayDuesPanel, usePayConfig } from "../components/PayNow";
 import {
   Empty, ErrorNote, fmtDate, inr, Loading, Pager, StatusPill,
@@ -23,7 +23,7 @@ export default function PortalInvoices() {
   const [page, setPage] = useState(1);
   const { data, meta, loading, error, refetch } = useFetch("/portal/invoices", { page });
   const gateway = usePayConfig();
-  const { openingId, openBill } = useOpenBill();
+  const bill = useBillActions();
 
   const rows = Array.isArray(data) ? data : [];
   const outstanding = Number(meta?.outstanding || 0);
@@ -61,7 +61,7 @@ export default function PortalInvoices() {
                 <tbody>
                   {rows.map((invoice) => (
                     <tr key={invoice.id}
-                        {...billRowProps(invoice, openBill, openingId)}>
+                        {...billRowProps(invoice, bill.ask)}>
                       <td className="mono" data-label="Invoice">{invoice.invoice_no}</td>
                       <td data-label="Raised">{fmtDate(invoice.issue_date)}</td>
                       <td data-label="Due by">{fmtDate(invoice.due_date)}</td>
@@ -74,9 +74,8 @@ export default function PortalInvoices() {
                       <td data-label="Status"><StatusPill value={invoice.status} /></td>
                       <td className="row-actions" data-label="">
                         <button type="button" className="btn sm"
-                                disabled={openingId === invoice.id}
-                                onClick={() => openBill(invoice)}>
-                          {openingId === invoice.id ? "…" : "View / print"}
+                                onClick={() => bill.ask(invoice)}>
+                          Print / download
                         </button>
                         {Number(invoice.balance) > 0 && gateway?.enabled && (
                           <PayButton invoice={invoice} gateway={gateway}
@@ -91,6 +90,8 @@ export default function PortalInvoices() {
       </section>
 
       <Pager meta={meta} onPage={setPage} />
+
+      <BillActions {...bill} />
     </section>
   );
 }

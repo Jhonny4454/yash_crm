@@ -703,3 +703,78 @@ body.portal-mode {
 @media (prefers-reduced-motion: reduce) {
   .portal-shell .list-cards article.is-billrow { transition: none; }
 }
+
+/* ---- Dashboard hero: plan on the left, money on the right ---------------- */
+
+.portal-shell .pt-hero {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.portal-shell .pt-hero-box { display: grid; align-content: start; gap: 6px; }
+.portal-shell .pt-hero-box h2 { margin: 0; font-size: 1.05rem; }
+.portal-shell .pt-hero-sub { margin: 0; font-size: .84rem; color: var(--pt-muted); }
+.portal-shell .pt-hero-meta { margin: 0; font-size: .82rem; color: var(--pt-muted); }
+.portal-shell .pt-hero-meta.is-expiring { color: #b45309; font-weight: 600; }
+
+.portal-shell .pt-hero-amount {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -.02em;
+}
+.portal-shell .pt-hero-due.is-due { border-color: #fecaca; }
+.portal-shell .pt-hero-due.is-due .pt-hero-amount { color: #b42318; }
+
+.portal-shell .pt-hero-go {
+  justify-self: start;
+  margin-top: 8px;
+  text-decoration: none;
+}
+
+/* Money first on a phone: the box that needs an action should not sit below
+   the fold behind one that is only information. */
+.portal-shell .pt-hero-due { order: -1; }
+
+@media (min-width: 760px) {
+  .portal-shell .pt-hero { grid-template-columns: 1fr 1fr; }
+  /* Side by side, the reading order goes back to plan-then-money. */
+  .portal-shell .pt-hero-due { order: 0; }
+}
+
+/* ---- Print / download sheet --------------------------------------------- */
+
+.bill-sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: end center;
+  padding: 0;
+  background: rgba(15, 23, 42, .5);
+}
+
+.bill-sheet {
+  width: 100%;
+  max-width: 460px;
+  display: grid;
+  gap: 6px;
+  padding: 20px 18px calc(18px + env(safe-area-inset-bottom));
+  background: #fff;
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -8px 40px rgba(15, 23, 42, .3);
+}
+.bill-sheet h2 { margin: 0; font-size: 1.05rem; }
+.bill-sheet p { margin: 0 0 6px; font-size: .86rem; color: #64748b; }
+
+.bill-sheet-actions { display: grid; gap: 10px; }
+.bill-sheet .btn { width: 100%; min-height: 46px; justify-content: center; }
+.bill-sheet-cancel { color: #64748b; }
+
+/* On a wider screen it is a centred dialog rather than a bottom sheet. */
+@media (min-width: 700px) {
+  .bill-sheet-scrim { place-items: center; padding: 16px; }
+  .bill-sheet { border-radius: 16px; box-shadow: 0 24px 60px rgba(15, 23, 42, .32); }
+  .bill-sheet-actions { grid-auto-flow: column; grid-auto-columns: 1fr; }
+}
