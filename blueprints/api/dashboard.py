@@ -162,10 +162,23 @@ def dashboard_summary():
             (and_(CustomerPlan.last_invoice_date.isnot(None),
                   CustomerPlan.last_invoice_date <= today),
              CustomerPlan.customer_id)))), 0),
+        # Renewals THIS WEEK, as distinct customers.
+        #
+        # Computed here rather than by adding up the seven daily chips. Each
+        # chip is already a distinct-customer count for its own day, so summing
+        # them counts anybody who renewed on two different days twice - and the
+        # week's figure then came out ABOVE the all-time figure beside it. The
+        # dashboard read "Customer renewed (3) ... View all 2", which is not a
+        # rounding disagreement: three is more than everyone.
+        func.coalesce(func.count(func.distinct(case(
+            (and_(CustomerPlan.last_invoice_date >= today - timedelta(days=6),
+                  CustomerPlan.last_invoice_date <= today),
+             CustomerPlan.customer_id)))), 0),
     ).one()
     expiring_all = int(totals[0] or 0)
     expired_all = int(totals[1] or 0)
     renewed_all = int(totals[2] or 0)
+    renewed_week = int(totals[3] or 0)
 
     # ---- one GROUP BY for the lifecycle chips ----------------------------
     #
@@ -196,12 +209,24 @@ def dashboard_summary():
     past_start = today - timedelta(days=LIFECYCLE_DAYS - 1)
     future_end = today + timedelta(days=LIFECYCLE_DAYS - 1)
 
-    # One query spans both windows; the two rows read different slices of it.
+    # The Expired row stops YESTERDAY, and that is not an off-by-one.
+    #
+    # A plan whose end_date is today has not expired: `days_left` is 0, the
+    # expiry board lists it under "expiring" (end_date >= today), and
+    # `expired_all` counts only end_date < today. Including today in the
+    # Expired row therefore counted a connection that is still up, and put the
+    # row's own count ABOVE the total sitting next to it - the dashboard read
+    # "Expired (1) ... View all 0", which is not a rounding disagreement, it is
+    # the panel contradicting itself in the space of four words.
+    expired_start = today - timedelta(days=LIFECYCLE_DAYS)
+    expired_end = today - timedelta(days=1)
+
+    # One query spans every window below; each row reads its own slice of it.
     expiry_query = db.session.query(
         literal('expiry').label('kind'), CustomerPlan.end_date.label('day'),
         func.count(CustomerPlan.id).label('count')).filter(
         CustomerPlan.status == 'active',
-        CustomerPlan.end_date >= past_start,
+        CustomerPlan.end_date >= expired_start,
         CustomerPlan.end_date <= future_end
     ).group_by(CustomerPlan.end_date)
 
@@ -263,8 +288,8 @@ def dashboard_summary():
     # Connections that ran out on that day and have not come back. A renewal
     # moves end_date forward, so a customer who renewed drops out of this
     # window on their own - the row does not need a second query to exclude
-    # them.
-    recently_expired = chips(past_start, expiry_counts)
+    # them. Ends yesterday: see `expired_start` above.
+    recently_expired = chips(expired_start, expiry_counts)
 
     # Renewals recorded on that day, as distinct customers: somebody with two
     # connections renewed in one visit is one customer renewing, not two.
@@ -372,7 +397,8 @@ def dashboard_summary():
             # sums and no customer is counted twice.
             'expiring_total': sum(day['count'] for day in expiring),
             'expired_total': sum(day['count'] for day in recently_expired),
-            'renewed_total': sum(day['count'] for day in renewed),
+            # NOT the sum of the daily chips - see `renewed_week` above.
+            'renewed_total': renewed_week,
             # Everything on the books, so "View all" can say what it will show.
             'expiring_all': expiring_all,
             'expired_all': expired_all,

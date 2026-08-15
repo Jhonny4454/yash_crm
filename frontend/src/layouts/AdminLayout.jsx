@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
-import DashboardHeader from "../components/dashboard/DashboardHeader"; // ✅ Correct path
+import DashboardHeader from "../components/dashboard/DashboardHeader";
 import { useAuth } from "../context/AuthContext";
 import { TITLES } from "../components/menu";
 import Breadcrumbs from "../components/Breadcrumbs";
 import "../styles/Dashboard.css";
+
+const MOBILE_MAX = 991;
 
 export default function AdminLayout() {
   const { user, company, signOut } = useAuth();
@@ -16,14 +18,62 @@ export default function AdminLayout() {
     () => localStorage.getItem("unicrm.sidebar") === "1"
   );
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const searchRef = useRef(null);
 
   useEffect(() => {
     document.body.classList.toggle("sidebar-collapsed", collapsed);
     localStorage.setItem("unicrm.sidebar", collapsed ? "1" : "0");
   }, [collapsed]);
 
-  useEffect(() => setMobileOpen(false), [pathname]);
+  useEffect(() => {
+    setMobileOpen(false);
+    setSearchOpen(false);
+  }, [pathname]);
+
+  /* Stop the page behind the drawer from scrolling under your thumb. Android
+     Chrome in particular will happily scroll the document while you are
+     dragging a fixed overlay, which makes the menu feel broken. */
+  useEffect(() => {
+    if (!mobileOpen) return undefined;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previous; };
+  }, [mobileOpen]);
+
+  /* Escape closes the drawer, same as tapping the scrim. */
+  useEffect(() => {
+    if (!mobileOpen) return undefined;
+    const onKey = (event) => { if (event.key === "Escape") setMobileOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [mobileOpen]);
+
+  /* Growing past the mobile breakpoint has to close the drawer, or the app
+     locks up: the scrim and the drawer's close button are both styled only
+     inside `@media (max-width: 991px)`, so on a tablet rotated to landscape
+     the scrim becomes an invisible static div nobody can click while
+     `document.body.style.overflow` stays "hidden" - a staff portal that
+     looks completely normal and will not scroll. */
+  useEffect(() => {
+    if (!mobileOpen) return undefined;
+    const onResize = () => {
+      if (window.innerWidth > MOBILE_MAX) setMobileOpen(false);
+    };
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
+  }, [mobileOpen]);
+
+  useEffect(() => {
+    if (searchOpen && searchRef.current) searchRef.current.focus();
+  }, [searchOpen]);
+
+  const closeMobile = useCallback(() => setMobileOpen(false), []);
 
   const title =
     TITLES[pathname] ||
@@ -31,10 +81,12 @@ export default function AdminLayout() {
     (pathname.startsWith("/invoices/") && "Invoice") ||
     "Dashboard";
 
-  function submitSearch(e) {
-    e.preventDefault();
+  function submitSearch(event) {
+    event.preventDefault();
     const q = search.trim();
-    if (q) navigate(`/customers?q=${encodeURIComponent(q)}`);
+    if (!q) return;
+    setSearchOpen(false);
+    navigate(`/customers?q=${encodeURIComponent(q)}`);
   }
 
   function handleSignOut() {
@@ -42,27 +94,30 @@ export default function AdminLayout() {
     navigate("/login", { replace: true });
   }
 
+  function toggleNav() {
+    if (window.innerWidth <= MOBILE_MAX) setMobileOpen((v) => !v);
+    else setCollapsed((v) => !v);
+  }
+
   return (
     <>
-      {mobileOpen && <div className="scrim" onClick={() => setMobileOpen(false)} />}
+      {mobileOpen && <div className="scrim" onClick={closeMobile} aria-hidden="true" />}
 
-      {/* ✅ Now passing the 'collapsed' prop so the sidebar logo resizes automatically */}
       <Sidebar
         company={company}
         mobileOpen={mobileOpen}
         collapsed={collapsed}
         onSignOut={handleSignOut}
+        onCloseMobile={closeMobile}
       />
 
-      <header className="top-bar">
+      <header className={`top-bar${searchOpen ? " search-open" : ""}`}>
         <div className="top-bar-left">
           <button
             className="sidebar-toggle"
-            onClick={() => {
-              if (window.innerWidth <= 991) setMobileOpen((v) => !v);
-              else setCollapsed((v) => !v);
-            }}
-            aria-label="Toggle sidebar"
+            onClick={toggleNav}
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileOpen}
           >
             <i className="fas fa-bars" />
           </button>
@@ -70,13 +125,28 @@ export default function AdminLayout() {
         </div>
 
         <div className="top-bar-right">
-          <form className="search-form" onSubmit={submitSearch}>
+          {/* On a phone the search box used to be hidden outright, which took
+              the one thing staff use most - find a customer - off the screen.
+              It is a button that opens a full-width row instead. */}
+          <button
+            type="button"
+            className="sidebar-toggle search-trigger"
+            onClick={() => setSearchOpen((v) => !v)}
+            aria-label="Search customers"
+            aria-expanded={searchOpen}
+          >
+            <i className={`fas fa-${searchOpen ? "times" : "search"}`} />
+          </button>
+
+          <form className="search-form" onSubmit={submitSearch} role="search">
             <input
+              ref={searchRef}
               type="search"
               placeholder="Search customers…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               aria-label="Search customers"
+              enterKeyHint="search"
             />
             <button type="submit" aria-label="Search">
               <i className="fas fa-search" />
@@ -84,11 +154,11 @@ export default function AdminLayout() {
           </form>
 
           <div className="user-greeting">
-            <span>
+            <span className="who">
               <i className="fas fa-user-circle" style={{ marginRight: 6 }} />
-              {user?.full_name || user?.username}
+              <span className="who-name">{user?.full_name || user?.username}</span>
             </span>
-            <button onClick={handleSignOut} title="Sign out">
+            <button onClick={handleSignOut} title="Sign out" aria-label="Sign out">
               <i className="fas fa-sign-out-alt" />
             </button>
           </div>
@@ -97,7 +167,6 @@ export default function AdminLayout() {
 
       <div className="main-content">
         <div className="content-wrapper">
-          
           {/* The greeting header belongs to the dashboard, not every page. */}
           {pathname === "/" ? <DashboardHeader collapsed={collapsed} /> : <Breadcrumbs />}
 
@@ -109,7 +178,7 @@ export default function AdminLayout() {
         <span>
           &copy; {new Date().getFullYear()} {company?.name || "YASH Internet Services"}
         </span>
-        <span>Developed by Sumedh Developer</span>
+        <span className="footer-credit">Developed by Sumedh Developer</span>
       </footer>
     </>
   );

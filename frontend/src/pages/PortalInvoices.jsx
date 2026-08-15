@@ -47,7 +47,10 @@ export default function PortalInvoices() {
           : !rows.length ? <Empty title="No invoices yet"
                                   hint="Bills raised on your account will appear here." />
             : (
-              <table className="data portal-invoices">
+              /* `cards-sm` plus a data-label on every cell: below 720px each
+                 row stacks into its own labelled card. Seven columns of bill
+                 on a 360px screen is a sideways scroll nobody performs. */
+              <table className="data portal-invoices cards-sm">
                 <thead>
                   <tr>
                     <th>Invoice</th><th>Date</th><th>Due</th>
@@ -58,17 +61,17 @@ export default function PortalInvoices() {
                 <tbody>
                   {rows.map((invoice) => (
                     <tr key={invoice.id}>
-                      <td className="mono">{invoice.invoice_no}</td>
-                      <td>{fmtDate(invoice.issue_date)}</td>
-                      <td>{fmtDate(invoice.due_date)}</td>
-                      <td className="num">{inr(invoice.total_amount)}</td>
-                      <td className="num">
+                      <td className="mono" data-label="Invoice">{invoice.invoice_no}</td>
+                      <td data-label="Raised">{fmtDate(invoice.issue_date)}</td>
+                      <td data-label="Due by">{fmtDate(invoice.due_date)}</td>
+                      <td className="num" data-label="Amount">{inr(invoice.total_amount)}</td>
+                      <td className="num" data-label="To pay">
                         {Number(invoice.balance) > 0
                           ? <strong className="due">{inr(invoice.balance)}</strong>
                           : "—"}
                       </td>
-                      <td><StatusPill value={invoice.status} /></td>
-                      <td className="row-actions">
+                      <td data-label="Status"><StatusPill value={invoice.status} /></td>
+                      <td className="row-actions" data-label="">
                         <DownloadBill invoice={invoice} />
                         {Number(invoice.balance) > 0 && gateway?.enabled && (
                           <PayButton invoice={invoice} gateway={gateway}

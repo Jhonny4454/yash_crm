@@ -124,69 +124,19 @@ body.sidebar-collapsed .sidebar { width: var(--sidebar-w-collapsed); }
 .sidebar .submenu .nav-link { font-size: .88rem; padding-left: 2.2rem; }
 .sidebar .submenu .submenu .nav-link { padding-left: 3.1rem; }
 
-/* ─── Collapsed sidebar original hiding rules ─── */
-body.sidebar-collapsed .sidebar .nav-label,
-body.sidebar-collapsed .sidebar .caret,
-body.sidebar-collapsed .sidebar .submenu,
-body.sidebar-collapsed .sidebar .brand h5 { display: none; }
-body.sidebar-collapsed .sidebar .nav-link { justify-content: center; padding: .62rem; }
+/* ─── Collapsed sidebar ───────────────────────────────────────────────────
+   Moved to styles/Sidebar.css.
 
-/* ─── COLLAPSED SIDEBAR OVERRIDES (Fly-out / Overlay Dropdowns) ─── */
-
-/* Keep button alignment left when collapsed */
-body.sidebar-collapsed .sidebar .nav-link {
-  position: relative !important; /* Anchor for the fly-out */
-  justify-content: flex-start !important;
-  padding-left: 1.1rem !important;
-}
-
-/* Keep the brand name hidden on the main collapsed bar */
-body.sidebar-collapsed .sidebar .brand h5 {
-  display: none !important;
-}
-
-/* Base Fly-out Submenu */
-body.sidebar-collapsed .sidebar .submenu {
-  position: absolute !important;
-  left: 100% !important;
-  top: 0 !important;
-  width: 230px !important;
-  background: var(--sidebar-bg) !important;
-  box-shadow: 4px 4px 16px rgba(0, 0, 0, 0.4) !important;
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0 !important;
-  padding: 8px 0 !important;
-  z-index: 1050 !important; /* Floats over page content */
-  display: block !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  margin: 0 !important;
-  border-left: 3px solid var(--primary-color) !important;
-}
-
-/* Nested (3rd level) Fly-out Submenu */
-body.sidebar-collapsed .sidebar .submenu .submenu {
-  left: 100% !important;
-  top: 0 !important;
-  width: 230px !important;
-}
-
-/* Style links inside fly-out submenus */
-body.sidebar-collapsed .sidebar .submenu .nav-link {
-  white-space: nowrap !important;
-  padding: 0.62rem 1.1rem !important;
-  justify-content: flex-start !important;
-  width: 100% !important;
-  border-left: none !important;
-  margin: 0 !important;
-}
-
-/* ✅ FIX: Make text and arrows visible ONLY inside the fly-out menu */
-body.sidebar-collapsed .sidebar .submenu .nav-label,
-body.sidebar-collapsed .sidebar .submenu .caret {
-  display: block !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-}
+   What used to be here was a CSS-only fly-out: `position: absolute; left: 100%`
+   on `.submenu`, hoisted with !important. It could not have worked. `.sidebar`
+   has `overflow-x: hidden` (it needs `overflow-y: auto` for the long menu, and
+   the two share one clipping box), so the panel was clipped out of existence;
+   and the submenu's nearest positioned ancestor was the rail itself, so
+   `top: 0` meant "the top of the screen" for every group rather than "beside
+   the icon being hovered". The replacement renders the panel through a portal
+   into <body> at fixed coordinates measured from the trigger, which no
+   ancestor can clip.
+   ───────────────────────────────────────────────────────────────────────── */
 
 /* ============================================================= TOPBAR ==== */
 

@@ -398,7 +398,8 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
       message: (allMatching
         ? `Every expired customer the current filter matches${zone ? ` in ${zone}` : ""} `
         : "The selected plans ")
-        + `will run to ${fmtDate(renewTo)} and go back to active. `
+        + `will run to ${fmtDate(renewTo)} and go back to active, each on the `
+        + "plan they are already on — nobody is moved to a different package. "
         + "No invoice is raised — bill them from Generate Invoice.",
       confirmLabel: "Renew now",
     });

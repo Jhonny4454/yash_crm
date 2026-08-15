@@ -14,8 +14,9 @@ Because step 4 writes into the same ``payments`` table the counter staff use,
 an app payment shows up in the admin panel automatically - no extra sync.
 """
 from datetime import date, datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
-from flask import Blueprint, Response, current_app, request
+from flask import Blueprint, Response, current_app, g, request
 
 from models import (Customer, CustomerPlan, Invoice, OnlinePaymentOrder,
                     Payment, Plan, db)
@@ -31,13 +32,26 @@ bp = Blueprint('api_portal', __name__)
 
 
 def _setting_value(key):
-    """One settings row, without importing the whole messaging module."""
+    """One settings row, without importing the whole messaging module.
+
+    Memoised for the life of the request. `/portal/plans` prices every plan,
+    and each price reads the tax treatment and the GST rate, so an ISP with 30
+    packages was issuing ~120 extra SELECTs against `settings` every time a
+    customer opened the plans screen on their phone.
+    """
+    cache = getattr(g, '_portal_settings', None)
+    if cache is None:
+        cache = g._portal_settings = {}
+    if key in cache:
+        return cache[key]
     try:
         from models_ext import Setting
         row = Setting.query.filter_by(key=key).first()
-        return row.value if row else ''
+        value = row.value if row else ''
     except Exception:
-        return ''
+        value = ''
+    cache[key] = value
+    return value
 
 
 def _open_invoices(customer_id):
@@ -153,16 +167,170 @@ def portal_payments():
 @bp.get('/portal/plans')
 @customer_required
 def portal_plans():
-    """Plans a customer may switch to."""
+    """Plans a customer may switch to, each with what it would actually cost.
+
+    The price on the plan master is not the number that lands on the bill once
+    GST is applied, so every row carries its own breakdown. Choosing a plan and
+    then being invoiced a different figure is the single fastest way to get a
+    phone call.
+    """
     rows = Plan.query.filter_by(is_active=True).order_by(Plan.price_monthly).all()
-    return ok([plan_dict(p) for p in rows])
+    active = CustomerPlan.query.filter_by(customer_id=current_customer_id(),
+                                          status='active').first()
+    return ok([{**plan_dict(p), **_price_breakdown(p, active),
+                'is_current': bool(active and active.plan_id == p.id)}
+               for p in rows])
+
+
+@bp.get('/portal/renew/quote')
+@customer_required
+def portal_renew_quote():
+    """What renewing the CURRENT plan would cost, before committing to it.
+
+    The Renew button renews the plan the customer is already on - it does not
+    open a plan list, because "renew" and "change to something else" are two
+    different decisions and merging them made the common one harder. This is
+    the figure that button is allowed to show.
+    """
+    customer = db.session.get(Customer, current_customer_id())
+    active = CustomerPlan.query.filter_by(customer_id=customer.id,
+                                          status='active').first()
+    if not active or not active.plan:
+        return ok({'active_plan': None, 'can_renew': False,
+                   'reason': 'There is no active plan on this account.'})
+
+    plan = active.plan
+    validity = int(plan.validity_days or 30)
+    # The later of today and the current expiry, so renewing a week early does
+    # not throw away the week already paid for.
+    extends_from = max(active.end_date, date.today())
+    open_invoice = next(iter(_open_invoices(customer.id)), None)
+
+    return ok({
+        'can_renew': True,
+        'active_plan': {
+            'plan_id': plan.id,
+            'plan_name': plan.name,
+            'speed_mbps': plan.speed_mbps,
+            'validity_days': validity,
+            'end_date': iso(active.end_date),
+            'days_left': (active.end_date - date.today()).days,
+        },
+        **_price_breakdown(plan, active),
+        'extends_from': iso(extends_from),
+        'new_end_date': iso(extends_from + timedelta(days=validity)),
+        # A renewal reuses an unpaid bill rather than stacking a second one on
+        # top, so say so up front instead of surprising them afterwards.
+        'open_invoice': ({'invoice_no': open_invoice.invoice_no,
+                          'balance': money(open_invoice.balance)}
+                         if open_invoice else None),
+    })
 
 
 # --------------------------------------------------------------------------- #
 #  Renewal / plan change
 # --------------------------------------------------------------------------- #
+def _dec(value, default='0'):
+    try:
+        return Decimal(str(value if value not in (None, '') else default))
+    except (InvalidOperation, TypeError):
+        return Decimal(default)
+
+
+def _gst_percent():
+    """The company's GST rate, from Settings. 0 disables tax entirely."""
+    try:
+        return _dec(_setting_value('gst_percent') or 18, '18')
+    except (InvalidOperation, TypeError):
+        return Decimal('18')
+
+
+def _tax_mode():
+    """How the plan price relates to tax, from the `tax_type` setting.
+
+    Deliberately NOT something the customer chooses. Whether a bill carries
+    GST is a property of the business, not a preference of the person paying
+    it, and a portal that let a customer tick "non-taxable" would quietly
+    produce invoices that do not match the ones the office raises for the
+    same renewal. Staff still get the full three-way choice on the admin
+    renewal dialog.
+    """
+    value = (_setting_value('tax_type') or '').strip().lower()
+    if _gst_percent() <= 0:
+        return 'notax'
+    if value.startswith('inc'):
+        return 'include'
+    if value.startswith('exc'):
+        return 'exclude'
+    return 'notax'
+
+
+def _rupees(value):
+    """Whole rupees, half up - the only precision this business bills in."""
+    return _dec(value).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+
+
+def _apply_tax(amount, mode=None):
+    """(grand_total, tax_amount) for include / exclude / notax.
+
+    Rounded to whole rupees, unlike the counter's version in
+    blueprints/api/renewals.py, and deliberately so: `utils.money()` rounds
+    every figure this API returns to whole rupees on the way out, so a total
+    stored with paise is a total the customer is quoted one number for and
+    charged another. On a 849 plan at 18% GST the quote said "You pay 1,002"
+    and the payment order took 1,001.82.
+
+    The tax is then derived from the rounded total rather than rounded
+    separately, so price + GST always adds up to exactly the total on screen.
+    """
+    amount = _dec(amount)
+    rate = _gst_percent()
+    mode = (mode or _tax_mode()).strip().lower()
+
+    if amount <= 0 or rate <= 0 or mode == 'notax':
+        return _rupees(amount), Decimal('0')
+    if mode == 'exclude':
+        total = _rupees(amount * (Decimal('1') + rate / Decimal('100')))
+        return total, total - _rupees(amount)
+    # include: the price already contains the tax, so work backwards.
+    total = _rupees(amount)
+    base = _rupees(total / (Decimal('1') + rate / Decimal('100')))
+    return total, total - base
+
+
+def _plan_price(plan, customer_plan=None):
+    """What this customer pays for this plan - their agreed price if it is the
+    plan they are already on, otherwise the master price."""
+    return _dec(
+        customer_plan.effective_price
+        if customer_plan is not None and customer_plan.plan_id == plan.id
+        else plan.price_monthly
+    )
+
+
+def _price_breakdown(plan, customer_plan=None):
+    """Price, tax and total for one plan, ready to show before committing."""
+    price = _plan_price(plan, customer_plan)
+    mode = _tax_mode()
+    total, tax = _apply_tax(price, mode)
+    return {
+        'price': money(price),
+        'tax_mode': mode,
+        'tax_percent': money(_gst_percent()) if mode != 'notax' else money(0),
+        'tax_amount': money(tax),
+        'total': money(total),
+    }
+
+
 def _raise_invoice(customer, plan, caption, customer_plan=None):
-    """Create an unpaid invoice for a renewal or plan change."""
+    """Create an unpaid invoice for a renewal or plan change.
+
+    `total_amount` is the tax-inclusive figure and `tax_amount` is the tax
+    inside it, matching how the counter writes a renewal invoice. Before this,
+    the portal hard-coded `tax_amount=0.00` and billed the bare plan price, so
+    a customer who renewed themselves was invoiced less than the same renewal
+    done at the office - and the GST on it was never recorded.
+    """
     seq = (db.session.query(db.func.count(Invoice.id)).scalar() or 0) + 1
     invoice_no = f"INV-{date.today().strftime('%y%m')}-{seq:05d}"
     while Invoice.query.filter_by(invoice_no=invoice_no).first():
@@ -170,19 +338,17 @@ def _raise_invoice(customer, plan, caption, customer_plan=None):
         invoice_no = f"INV-{date.today().strftime('%y%m')}-{seq:05d}"
 
     due_days = int(current_app.config.get('INVOICE_DUE_DAYS', 15) or 15)
-    unit_price = (
-        customer_plan.effective_price
-        if customer_plan is not None and customer_plan.plan_id == plan.id
-        else plan.price_monthly
-    )
+    unit_price = _plan_price(plan, customer_plan)
+    grand_total, tax_amount = _apply_tax(unit_price)
+
     invoice = Invoice(
         customer_id=customer.id,
         customer_plan_id=customer_plan.id if customer_plan else None,
         invoice_no=invoice_no,
         issue_date=date.today(),
         due_date=date.today() + timedelta(days=due_days),
-        total_amount=unit_price,
-        tax_amount=0.00,
+        total_amount=grand_total,
+        tax_amount=tax_amount,
         caption=caption,
         invoice_type='plan',
         status='sent',
@@ -195,46 +361,66 @@ def _raise_invoice(customer, plan, caption, customer_plan=None):
 @bp.post('/portal/renew')
 @customer_required
 def portal_renew():
+    """Renew the plan the customer is already on.
+
+    No plan_id is read here, deliberately: this endpoint is what the Renew
+    button calls, and Renew means "the same again". Moving to a different
+    package goes through /portal/change-plan, which is a different decision
+    with a different price.
+    """
     customer = db.session.get(Customer, current_customer_id())
     active = CustomerPlan.query.filter_by(customer_id=customer.id,
                                           status='active').first()
     if not active or not active.plan:
-        return fail('no_plan_to_renew', 400)
+        return fail('no_plan_to_renew', 400,
+                    detail='There is no active plan on this account to renew. '
+                           'Choose a plan instead, or contact the office.')
 
-    # Reuse an open invoice if there already is one
-    open_invoice = next(
-        (i for i in Invoice.query.filter(
-            Invoice.customer_id == customer.id,
-            Invoice.status.in_(('draft', 'sent', 'overdue'))).all()
-         if i.balance > 0), None)
+    # Reuse an open invoice if there already is one, rather than stacking a
+    # second bill on an account that has not settled the first.
+    open_invoice = next(iter(_open_invoices(customer.id)), None)
+    reused = open_invoice is not None
 
     invoice = open_invoice or _raise_invoice(
         customer, active.plan, 'Renewal - ' + active.plan.name,
         customer_plan=active)
 
-    return ok({'invoice': invoice_dict(invoice, detail=True)})
+    return ok({'invoice': invoice_dict(invoice, detail=True),
+               'plan': plan_dict(active.plan),
+               'reused_open_invoice': reused,
+               **_price_breakdown(active.plan, active)})
 
 
 @bp.post('/portal/change-plan')
 @customer_required
 def portal_change_plan():
+    """Move to a different package. Raises the bill for the plan chosen."""
     data = body()
     plan_id = data.get('plan_id')
     if not plan_id:
-        return fail('plan_id_required', 400)
+        return fail('plan_id_required', 400,
+                    detail='Choose a plan first.')
 
     plan = db.session.get(Plan, int(plan_id))
     if not plan or not plan.is_active:
         return fail('plan_not_found', 404)
 
     customer = db.session.get(Customer, current_customer_id())
+    active = CustomerPlan.query.filter_by(customer_id=customer.id,
+                                          status='active').first()
+    # Asking to "change" to the plan already held is a renewal, and billing it
+    # as a change would close the current plan record for no reason.
+    if active and active.plan_id == plan.id:
+        return portal_renew()
+
     invoice = _raise_invoice(customer, plan, 'Plan change - ' + plan.name)
     # Remember the target plan so the webhook can apply it after payment.
     invoice.remarks = f'PLAN_CHANGE:{plan.id}'
     db.session.commit()
 
     return ok({'invoice': invoice_dict(invoice, detail=True),
-               'plan': plan_dict(plan)})
+               'plan': plan_dict(plan),
+               **_price_breakdown(plan)})
 
 
 # --------------------------------------------------------------------------- #

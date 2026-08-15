@@ -503,6 +503,26 @@ def _gst_percent():
         return Decimal('18')
 
 
+def _configured_tax_mode():
+    """The company's tax treatment, from the `tax_type` setting.
+
+    The renewal dialog used to open on "Non-taxable" whatever the company was
+    configured to do, so unless the operator remembered to change it every
+    counter renewal went out without GST - while the customer portal, which
+    reads this setting, charged it. Same plan, two prices, depending on which
+    door the customer came through. This is the default the form opens on; the
+    operator can still override it per invoice.
+    """
+    value = (_setting('tax_type', '') or '').strip().lower()
+    if _gst_percent() <= 0:
+        return 'notax'
+    if value.startswith('inc'):
+        return 'include'
+    if value.startswith('exc'):
+        return 'exclude'
+    return 'notax'
+
+
 def _setting(key, default=None):
     try:
         from models_ext import Setting
@@ -622,6 +642,9 @@ def renew_quote(cid):
         'payment_modes': list(PAYMENT_MODES),
         'referenced_modes': sorted(REFERENCED_MODES),
         'gst_percent': money(_gst_percent()),
+        # What the Tax dropdown should open on, so the counter and the
+        # customer portal bill the same plan the same way by default.
+        'tax_default': _configured_tax_mode(),
         'due_days': _due_days(),
         'today': iso(date.today()),
     })

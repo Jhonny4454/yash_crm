@@ -392,6 +392,13 @@ export function RenewPlanDialog({ customer, plan, onClose, onDone }) {
   const [quote, setQuote] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState({});
+  /* Renew means "the same plan again". The package list stays out of the way
+     until somebody asks for it: this dialog opened on a dropdown of every
+     plan in the master, so the ordinary monthly renewal - by far the most
+     common thing done here - started with a decision nobody wanted to make,
+     and picking the wrong line silently turned a renewal into a plan change
+     that closes the customer's current plan record. */
+  const [picking, setPicking] = useState(false);
   const [form, setForm] = useState({
     plan_id: "", periods: 1, start_date: "", end_date: "",
     amount: "", tax_applicable: "notax", remarks: "",
@@ -412,6 +419,11 @@ export function RenewPlanDialog({ customer, plan, onClose, onDone }) {
           start_date: q?.suggested?.start_date || "",
           end_date: q?.suggested?.end_date || "",
           amount: rupees(current?.price),
+          // Open on whatever the company is configured to do, not a hard-coded
+          // "Non-taxable". The customer portal bills from the same setting, so
+          // a default of notax here meant the same renewal cost less at the
+          // counter than it did online.
+          tax_applicable: q?.tax_default || "notax",
           reactivate: q?.customer?.is_active === false,
         }));
       })
@@ -424,6 +436,10 @@ export function RenewPlanDialog({ customer, plan, onClose, onDone }) {
   const chosen = plans.find((p) => String(p.id) === String(form.plan_id));
   const isChange = Boolean(quote?.active_plan
     && String(quote.active_plan.plan_id) !== String(form.plan_id));
+  // With no active plan there is nothing to renew, so the list is the only
+  // way forward and hiding it would leave a dead dialog.
+  const mustPick = !quote?.active_plan;
+  const showPlanList = picking || mustPick;
 
   // Keep the dates and price in step with the plan and cycle count, so the
   // operator is never quoting from a figure that no longer applies.
@@ -432,10 +448,19 @@ export function RenewPlanDialog({ customer, plan, onClose, onDone }) {
     const from = new Date(quote.suggested.extends_from);
     from.setDate(from.getDate()
       + (chosen.validity_days || 30) * Number(form.periods || 1));
+    /* Renewing the plan they are already on charges the price agreed with
+       THIS customer, not the master price - which is what the server does
+       when no amount is sent, and what the locked plan card above shows. A
+       customer on a 1000 plan at an agreed 800 was being shown "₹800 ·
+       renewing the same plan" over a button that billed ₹1,000. */
+    const samePlan = String(chosen.id) === String(quote.active_plan?.plan_id);
+    const unit = samePlan
+      ? Number(quote.active_plan.price ?? chosen.price_monthly ?? 0)
+      : Number(chosen.price_monthly || 0);
     setForm((f) => ({
       ...f,
       end_date: from.toISOString().slice(0, 10),
-      amount: rupees(Number(chosen.price_monthly || 0) * Number(form.periods || 1)),
+      amount: rupees(unit * Number(form.periods || 1)),
     }));
   }, [form.plan_id, form.periods, chosen, quote]);
 
@@ -494,18 +519,40 @@ export function RenewPlanDialog({ customer, plan, onClose, onDone }) {
         <fieldset className="renew-block">
           <legend>Plan</legend>
           <div className="renew-grid">
-            <label>
-              <span>Package</span>
-              <select value={form.plan_id} onChange={set("plan_id")}>
-                <option value="">-Select-</option>
-                {plans.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} — {inr(p.price_monthly)} / {p.validity_days}d
-                  </option>
-                ))}
-              </select>
-              {errors.plan_id && <small className="field-error">{errors.plan_id}</small>}
-            </label>
+            {showPlanList ? (
+              <label>
+                <span>Package</span>
+                <select value={form.plan_id} onChange={set("plan_id")} autoFocus>
+                  <option value="">-Select-</option>
+                  {plans.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} — {inr(p.price_monthly)} / {p.validity_days}d
+                      {String(p.id) === String(quote?.active_plan?.plan_id)
+                        ? "  (current plan)" : ""}
+                    </option>
+                  ))}
+                </select>
+                {errors.plan_id && <small className="field-error">{errors.plan_id}</small>}
+                {!mustPick && (
+                  <button type="button" className="link-btn" onClick={() => {
+                    setPicking(false);
+                    setForm((f) => ({ ...f, plan_id: String(quote.active_plan.plan_id) }));
+                  }}>Keep the current plan instead</button>
+                )}
+              </label>
+            ) : (
+              <label>
+                <span>Package</span>
+                <div className="renew-locked">
+                  <strong>{quote.active_plan.plan_name}</strong>
+                  <span>{inr(quote.active_plan.price)} · renewing the same plan</span>
+                </div>
+                <button type="button" className="link-btn"
+                        onClick={() => setPicking(true)}>
+                  Change to a different plan
+                </button>
+              </label>
+            )}
             <label>
               <span>Cycles</span>
               <MoneyInput min="1" max="36" value={form.periods} onChange={set("periods")} />
@@ -583,7 +630,8 @@ export function RenewPlanDialog({ customer, plan, onClose, onDone }) {
         </label>
 
         <DialogButtons busy={busy} onClose={onClose}
-                       label={`Renew and bill ${inr(grandTotal)}`} />
+                       label={`${isChange ? "Change plan" : "Renew"} and bill `
+                              + `${inr(grandTotal)}`} />
       </form>
     </Modal>
   );

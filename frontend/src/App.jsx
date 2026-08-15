@@ -4,7 +4,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import IdleWarning from "./components/IdleWarning";
 import OfflineBanner from "./components/OfflineBanner";
 import RouteProgress from "./components/RouteProgress";
-import AppShell from "./components/AppShell";
+import PortalShell from "./components/PortalShell";
 import AdminLayout from "./layouts/AdminLayout";
 import { PageSkeleton, ProtectedRoute } from "./components/ui";
 import { AuthProvider } from "./context/AuthContext";
@@ -108,7 +108,10 @@ function Prefetcher() {
   return null;
 }
 function StaffLayout() { return <ProtectedRoute audience="staff"><AdminLayout /></ProtectedRoute>; }
-function CustomerLayout() { return <ProtectedRoute audience="customer"><AppShell audience="customer" /></ProtectedRoute>; }
+/* PortalShell, not the old AppShell: a customer is on a phone, and the shared
+   shell's answer to a narrow screen was a sideways-scrolling strip of links
+   above the content. */
+function CustomerLayout() { return <ProtectedRoute audience="customer"><PortalShell /></ProtectedRoute>; }
 
 const resource = (name) => <Page><ResourcePage resource={name} /></Page>;
 const report = (endpoint, title) => <Page><ReportsPage endpoint={endpoint} title={title} /></Page>;

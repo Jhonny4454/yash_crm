@@ -370,10 +370,12 @@ a.kpi .big, a.kpi .lbl { text-decoration: none; }
 }
 
 /* Expired and Renewed carry no day chips - only Expiring does, because only
-   there is the date the thing you act on. Without a chip grid to fill the
-   width these two are just a label, a count and a link, so they get a tighter
-   row and their "View all" is pushed to the right edge to line up with the
-   chip strip below them rather than floating mid-row. */
-.life-row.is-summary { padding-top: 0.45rem; padding-bottom: 0.45rem; }
+   there is the date the thing you act on.
 
-.life-row.is-summary .life-all { margin-left: auto; }
+   Their controls stay grouped at the LEFT, exactly like the Expiring row's:
+   name, count, "View all", in that order and touching. `margin-left: auto` was
+   tried on the link, to pin it under the right-hand end of the chip strip, and
+   it read as a different kind of row - the count sat alone on the left with
+   the link marooned a screen-width away, and the eye stopped connecting the
+   two. Three rows that begin the same way scan as one panel. */
+.life-row.is-summary { padding-top: 0.45rem; padding-bottom: 0.45rem; }

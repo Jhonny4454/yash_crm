@@ -1,3 +1,11 @@
+// First, because it is the token sheet: --brand, --muted, --line, --surface,
+// --ink and friends are declared here and used by Pages.css, Panels.css,
+// Shared.css and Boxes.css. It reached the bundle by accident until now -
+// through components/AppShell.jsx - and the customer portal no longer renders
+// that component, so an unreferenced module would have taken every one of
+// those variables out of the build with it.
+import "./styles/AppShell.css";
+
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
@@ -10,6 +18,14 @@ import "./styles/Surfaces.css";
 // panel is bounded and guarantees nothing escapes one, so it has to win
 // against the per-screen stylesheets above it.
 import "./styles/Boxes.css";
+// Two shells, two stylesheets, both loaded after everything else on purpose.
+// Sidebar.css owns the collapsed rail and its fly-out menus, and has to beat
+// the older copies of those rules still sitting in index.css and Dashboard.css.
+// Portal.css owns the customer portal, and is scoped under .portal-shell so it
+// cannot leak into the staff screens.
+import "./styles/Sidebar.css";
+import "./styles/AdminResponsive.css";
+import "./styles/Portal.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode><App /></React.StrictMode>

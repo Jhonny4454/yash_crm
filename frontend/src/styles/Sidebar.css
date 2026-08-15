@@ -1,0 +1,306 @@
+/* ==========================================================================
+   Navigation rail — collapsed fly-outs, mobile drawer, touch sizing.
+
+   Loaded LAST from main.jsx, after index.css and Boxes.css, because this file
+   is the single owner of how the rail behaves when it is collapsed. The base
+   look (colours, spacing, the expanded accordion) still lives in index.css;
+   everything that changes with `body.sidebar-collapsed` lives here so there is
+   one place to look when the menu misbehaves.
+   ========================================================================== */
+
+:root {
+  --rail-icon: 44px;              /* the square an icon-only item occupies */
+  --flyout-bg: #2d323e;
+  --flyout-hover: #383e4d;
+}
+
+/* ------------------------------------------------------------------- brand */
+
+.sidebar .brand { position: relative; }
+
+.sidebar .brand img.brand-logo {
+  height: 68px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  flex-shrink: 0;
+  transition: height .18s ease;
+}
+body.sidebar-collapsed .sidebar .brand img.brand-logo { height: 34px; }
+
+/* Only ever on screen while the drawer is. On desktop the rail has no close
+   button because it has a toggle in the top bar. */
+.sidebar .drawer-close {
+  display: none;
+  position: absolute;
+  top: 0;
+  right: .4rem;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .08);
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.sidebar .drawer-close:active { background: rgba(255, 255, 255, .18); }
+
+/* ------------------------------------------------------- the collapsed rail */
+
+body.sidebar-collapsed .sidebar .nav-label,
+body.sidebar-collapsed .sidebar .caret,
+body.sidebar-collapsed .sidebar .brand h5 { display: none; }
+
+/* The old rule that broke everything. The fly-out is a portal now, so the
+   in-tree submenu simply must not exist while collapsed. */
+body.sidebar-collapsed .sidebar .submenu { display: none; }
+
+/* The dot marker on group items is positioned against the row. */
+.sidebar .nav-link { position: relative; }
+
+body.sidebar-collapsed .sidebar .nav-link {
+  justify-content: center;
+  padding: 0;
+  height: var(--rail-icon);
+  width: var(--rail-icon);
+  margin: .12rem auto;
+  border-left: 0;
+  border-radius: 10px;
+}
+body.sidebar-collapsed .sidebar .nav-link .link-label { gap: 0; }
+body.sidebar-collapsed .sidebar .nav-link i { width: auto; flex: none; font-size: 1.05rem; }
+
+/* Collapsed, a left border on a centred square looks like a rendering fault.
+   The active item gets a filled tile instead. */
+body.sidebar-collapsed .sidebar .nav-link.active {
+  background: var(--primary-color);
+  color: #fff;
+}
+body.sidebar-collapsed .sidebar .nav-link.branch-open,
+body.sidebar-collapsed .sidebar .nav-link.flyout-open {
+  background: var(--sidebar-hover);
+  color: #fff;
+}
+body.sidebar-collapsed .sidebar .nav-link.flyout-open {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14);
+}
+
+/* A group with children gets a dot, so an icon that opens a menu is
+   distinguishable from one that navigates. */
+body.sidebar-collapsed .sidebar .nav-group > .nav-link::after {
+  content: "";
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: .55;
+}
+
+body.sidebar-collapsed .sidebar .sidebar-foot { padding-bottom: .6rem; }
+
+/* ------------------------------------------------------------- the fly-out */
+
+.nav-flyout {
+  position: fixed;
+  z-index: 1100;
+  min-width: 236px;
+  max-width: 300px;
+  max-height: min(74vh, 620px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--flyout-bg);
+  border-radius: 12px;
+  border-left: 3px solid var(--primary-color);
+  box-shadow: 0 20px 44px rgba(0, 0, 0, .45), 0 2px 6px rgba(0, 0, 0, .3);
+  padding: 6px;
+  color: var(--text-light);
+  font-size: .89rem;
+  animation: flyout-in .12s ease-out;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, .2) transparent;
+}
+.nav-flyout::-webkit-scrollbar { width: 6px; }
+.nav-flyout::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .2); border-radius: 3px; }
+
+@keyframes flyout-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* An invisible bridge across the gap between the icon and the panel, so the
+   pointer never crosses "nothing" on the way over and closes the menu. */
+.nav-flyout::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -12px;
+  width: 12px;
+}
+
+.nav-flyout-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, .09);
+  color: #fff;
+  font-weight: 700;
+  font-size: .82rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.nav-flyout-head i { font-size: .95rem; color: var(--primary-color); }
+
+.nav-flyout-body { display: flex; flex-direction: column; }
+
+.nav-flyout .flyout-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-light);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.nav-flyout .flyout-link:hover,
+.nav-flyout .flyout-link:focus-visible {
+  background: var(--flyout-hover);
+  color: #fff;
+  text-decoration: none;
+}
+.nav-flyout .flyout-link.active {
+  background: var(--primary-color);
+  color: #fff;
+  font-weight: 600;
+}
+.nav-flyout .flyout-branch i { font-size: .68rem; opacity: .65; }
+.nav-flyout .flyout-group.is-open > .flyout-branch { color: #fff; }
+
+.nav-flyout .flyout-sub {
+  position: relative;
+  margin: 2px 0 4px;
+  padding-left: 12px;
+}
+.nav-flyout .flyout-sub::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  bottom: 2px;
+  width: 1px;
+  background: rgba(255, 255, 255, .13);
+}
+.nav-flyout .flyout-sub .flyout-link { font-size: .85rem; padding: 8px 12px; }
+
+/* Leaf items on the rail get the same panel with only its title in it, which
+   is the label the collapsed rail cannot show. */
+.nav-flyout.is-tip {
+  min-width: 0;
+  padding: 0;
+  border-radius: 8px;
+}
+.nav-flyout.is-tip .nav-flyout-head {
+  margin: 0;
+  border-bottom: 0;
+  padding: 8px 12px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: .84rem;
+}
+
+/* ----------------------------------------------------------- mobile drawer */
+
+@media (max-width: 991px) {
+  .sidebar {
+    width: min(84vw, 300px);
+    transform: translateX(-100%);
+    padding-top: max(.75rem, env(safe-area-inset-top));
+    padding-bottom: env(safe-area-inset-bottom);
+    /* The drawer is a full menu on a phone whether or not the desktop rail
+       happens to be collapsed. */
+    box-shadow: none;
+  }
+  body.sidebar-collapsed .sidebar { width: min(84vw, 300px); }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+    box-shadow: 0 0 44px rgba(0, 0, 0, .45);
+  }
+
+  .sidebar .drawer-close { display: grid; place-items: center; }
+
+  /* Everything the collapsed desktop rail hides comes back in the drawer. */
+  body.sidebar-collapsed .sidebar .nav-label,
+  body.sidebar-collapsed .sidebar .caret,
+  body.sidebar-collapsed .sidebar .brand h5 { display: revert; }
+  body.sidebar-collapsed .sidebar .submenu { display: block; }
+  body.sidebar-collapsed .sidebar .brand-logo { height: 56px; }
+  body.sidebar-collapsed .sidebar .nav-group > .nav-link::after { content: none; }
+
+  body.sidebar-collapsed .sidebar .nav-link,
+  .sidebar .nav-link {
+    height: auto;
+    width: calc(100% - 1.1rem);
+    margin: .12rem .55rem;
+    justify-content: space-between;
+    /* A 44px row is the smallest thing a thumb hits reliably. */
+    min-height: 46px;
+    padding: .6rem 1rem;
+    border-left: 3px solid transparent;
+    border-radius: var(--radius-sm);
+    font-size: .95rem;
+  }
+  body.sidebar-collapsed .sidebar .nav-link.active,
+  .sidebar .nav-link.active {
+    background: var(--sidebar-hover);
+    border-left-color: var(--primary-color);
+    color: #fff;
+  }
+  body.sidebar-collapsed .sidebar .nav-link .link-label { gap: 12px; }
+  body.sidebar-collapsed .sidebar .nav-link i { width: 22px; flex: 0 0 22px; }
+
+  .sidebar .submenu .nav-link { min-height: 42px; font-size: .9rem; }
+
+  /* The scrim has to sit under the drawer and over everything else. */
+  .scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, .55);
+    z-index: 1035;
+    -webkit-backdrop-filter: blur(1px);
+    backdrop-filter: blur(1px);
+  }
+
+  /* No fly-outs on a touch drawer - they would open off-screen. */
+  .nav-flyout { display: none; }
+}
+
+/* Someone driving with a keyboard should see where they are on the rail. */
+.sidebar .nav-link:focus-visible,
+.nav-flyout .flyout-link:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-flyout { animation: none; }
+}
+
+@media print {
+  .nav-flyout { display: none !important; }
+}

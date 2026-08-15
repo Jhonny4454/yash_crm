@@ -1,0 +1,230 @@
+/* ==========================================================================
+   Staff portal — small screens and touch.
+
+   The admin shell was built for a desktop browser and then given one media
+   query. This file is the rest of it: a top bar that still does its job on a
+   phone, tables that stop being 900px wide, controls big enough to hit with a
+   thumb, and safe-area padding so nothing hides under an Android gesture bar
+   or an iPhone notch.
+   ========================================================================== */
+
+/* ------------------------------------------------------------ safe areas */
+
+/* env() is 0 wherever there is no cutout, so these are no-ops on a desktop.
+   index.html sets viewport-fit=cover, which is what makes them non-zero on a
+   notched phone. */
+body {
+  padding-top: calc(var(--topbar-h) + env(safe-area-inset-top));
+  padding-bottom: calc(var(--footer-h) + env(safe-area-inset-bottom));
+}
+.top-bar {
+  height: calc(var(--topbar-h) + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
+  padding-left: max(1.25rem, env(safe-area-inset-left));
+  padding-right: max(1.25rem, env(safe-area-inset-right));
+}
+.app-footer {
+  height: calc(var(--footer-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* --------------------------------------------------------------- top bar */
+
+.top-bar .search-trigger { display: none; }
+
+/* ------------------------------------------------------------ data tables */
+
+/* Wide tables still scroll sideways on a tablet, so say so: a soft edge that
+   appears only while there is more table to the right. */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+.table-wrap::-webkit-scrollbar { height: 8px; }
+.table-wrap::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+/* No sticky column headings here on purpose. `.table-wrap` sets
+   `overflow-x: auto`, which per spec computes `overflow-y` to `auto` as well,
+   so the wrapper - not the document - becomes the sticky containing block. It
+   has no fixed height, so `position: sticky; top: 0` on a `th` either does
+   nothing or, if the wrapper is ever given a height, parks the headings under
+   the fixed top bar. Worth revisiting only with an explicit max-height. */
+
+/* The sign-in screens are unaffected by the body padding above: Login.jsx sets
+   a `body.auth-screen` class that zeroes it (Login.css), and that selector
+   outranks the bare `body` rule whatever the load order. Nothing to add here -
+   noted because it is the obvious thing to worry about when body padding
+   grows by the height of a notch. */
+
+/* ---------------------------------------------------- tables become cards */
+
+/* Any table marked `cards-sm` whose cells carry data-label turns into a stack
+   of labelled cards below 720px. A seven-column master table is unreadable on
+   a 360px screen however much you let it scroll. */
+@media (max-width: 720px) {
+  table.data.cards-sm,
+  table.data.cards-sm tbody,
+  table.data.cards-sm tr,
+  table.data.cards-sm td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  table.data.cards-sm thead { display: none; }
+
+  table.data.cards-sm tr {
+    background: #fff;
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    padding: 6px 14px 10px;
+    margin: 0 0 12px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+  }
+  table.data.cards-sm tr:hover { background: #fff; }
+  table.data.cards-sm tr.is-selected {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 1px var(--primary-color);
+  }
+
+  table.data.cards-sm td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 0;
+    border: 0;
+    border-bottom: 1px dashed #eef2f7;
+    text-align: right;
+  }
+  table.data.cards-sm td:last-child { border-bottom: 0; }
+  table.data.cards-sm td::before {
+    content: attr(data-label);
+    flex: 0 0 40%;
+    text-align: left;
+    color: var(--text-muted);
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  table.data.cards-sm td:empty { display: none; }
+  table.data.cards-sm td.select-col,
+  table.data.cards-sm td.actions-cell {
+    justify-content: flex-start;
+    text-align: left;
+  }
+  table.data.cards-sm td.select-col::before { flex: 0 0 auto; }
+  table.data.cards-sm td.row-actions,
+  table.data.cards-sm td:last-child > div {
+    justify-content: flex-start !important;
+  }
+  table.data.cards-sm tr td:first-child { border-bottom-style: solid; }
+}
+
+/* ----------------------------------------------------------------- ≤991px */
+
+@media (max-width: 991px) {
+  .content-wrapper {
+    padding: 1rem max(1rem, env(safe-area-inset-left)) 1.75rem
+             max(1rem, env(safe-area-inset-right));
+  }
+
+  .top-bar { gap: .4rem; }
+  .top-bar h1 { font-size: 1.02rem; }
+  .top-bar-right { gap: .45rem; }
+  .top-bar .search-trigger { display: inline-flex; }
+
+  /* The search box drops out of the bar and becomes a row under it, opened by
+     the magnifier. It used to be `display: none` on mobile, full stop. */
+  .top-bar .search-form {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    padding: .55rem .8rem calc(.55rem + env(safe-area-inset-bottom, 0px));
+    border-radius: 0 0 14px 14px;
+    background: var(--sidebar-bg);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, .28);
+  }
+  .top-bar.search-open .search-form { display: flex; }
+  .top-bar .search-form input {
+    flex: 1;
+    width: auto;
+    /* 16px or the browser zooms the whole page on focus. */
+    font-size: 16px;
+    padding: .45rem 0;
+  }
+  .top-bar .search-form button { width: 34px; height: 34px; }
+
+  .user-greeting .who-name { display: none; }
+  .user-greeting button { padding: 6px; font-size: 1.05rem; }
+
+  .app-footer .footer-credit { display: none; }
+
+  /* Comfortable hit areas everywhere. 44px is the smallest target most people
+     hit first time on a phone. */
+  .btn, .icon-btn, .btn-icon-sm { min-height: 40px; }
+  .sidebar-toggle { width: 38px; height: 38px; flex: 0 0 38px; }
+
+  /* Never zoom on focus. */
+  .input, .select, input, select, textarea { font-size: 16px; }
+
+  .page-header, .list-head { gap: .75rem; }
+  .list-container { padding: 16px; }
+  .search-wrapper input { width: 100%; }
+  .list-actions { width: 100%; }
+  .list-actions > * { flex: 1 1 auto; }
+}
+
+/* ----------------------------------------------------------------- ≤640px */
+
+@media (max-width: 640px) {
+  .card, .list-container { border-radius: 12px; }
+  .card-body { padding: 1rem; }
+  .card-head { padding: .9rem 1rem; }
+
+  .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; }
+
+  .toolbar { flex-direction: column; align-items: stretch; }
+  .toolbar > * { width: 100%; }
+  .toolbar .grow { min-width: 0; }
+
+  /* A dialog on a phone is a sheet: full width, anchored to the bottom, with
+     its own scroll. Centring a 90vh card leaves it half under the keyboard. */
+  .modal-scrim { padding: 0; align-items: flex-end; }
+  .modal-card {
+    max-width: none;
+    max-height: 92vh;
+    border-radius: 16px 16px 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .modal-foot { position: sticky; bottom: 0; background: #fff; }
+
+  .pager { justify-content: center; }
+  .page-header h1 { font-size: 1.2rem; }
+
+  /* Action buttons in a row wrap instead of forcing a sideways scroll. */
+  .row-actions, .quick-actions { flex-wrap: wrap; }
+}
+
+/* A pointer that cannot hover gets everything a little larger, on any width -
+   this is the Windows-tablet and Android-tablet case that width alone misses. */
+@media (pointer: coarse) {
+  .btn { min-height: 40px; }
+  .btn.sm { min-height: 34px; }
+  table.data td, table.data th { padding-top: .85rem; padding-bottom: .85rem; }
+  .check-row input[type="checkbox"], .select-col input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+@media print {
+  .top-bar .search-form, .scrim { display: none !important; }
+}

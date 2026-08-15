@@ -524,6 +524,36 @@
 
 .renew-grid label { display: grid; gap: 0.22rem; }
 
+/* Renew keeps the plan the customer is on, so the package is shown rather
+   than offered: a dropdown here invites a plan CHANGE, which closes the
+   current plan record and is a different decision entirely. */
+.renew-locked {
+  display: grid;
+  gap: 1px;
+  padding: 0.42rem 0.55rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #f8fafc;
+  min-height: 34px;
+}
+.renew-locked strong { font-size: 0.88rem; }
+.renew-locked span { font-size: 0.74rem; color: #64748b; }
+
+.link-btn {
+  justify-self: start;
+  margin-top: 0.15rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary-color, #0073b7);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.link-btn:hover { color: var(--primary-hover, #005f9e); }
+
 .renew-grid label > span {
   font-size: 0.75rem;
   font-weight: 600;

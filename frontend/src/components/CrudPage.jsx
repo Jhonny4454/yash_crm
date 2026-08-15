@@ -251,7 +251,11 @@ export default function CrudPage({
               )}
             />
           ) : (
-            <table className="data">
+            /* `cards-sm` + the data-label on every cell is what lets this
+               turn into a stack of labelled cards below 720px. A master table
+               with seven columns cannot be read on a phone however far you
+               let it scroll sideways. */
+            <table className="data cards-sm">
               <thead>
                 <tr>
                   <th className="select-col">
@@ -285,7 +289,7 @@ export default function CrudPage({
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.id} className={selected.has(row.id) ? "is-selected" : undefined}>
-                    <td className="select-col">
+                    <td className="select-col" data-label="Select">
                       <input
                         type="checkbox"
                         checked={selected.has(row.id)}
@@ -296,6 +300,7 @@ export default function CrudPage({
                     {tableCols.map((c) => (
                       <td
                         key={c.key}
+                        data-label={c.label}
                         className={c.type === "number" || c.type === "money" ? "right num" : ""}
                       >
                         {c.type === "lookup"
@@ -303,7 +308,7 @@ export default function CrudPage({
                           : renderCell(row[c.key], c)}
                       </td>
                     ))}
-                    <td className="right">
+                    <td className="right row-actions" data-label="Actions">
                       <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                         <button className="btn sm" onClick={() => setEditing({ ...row })}>
                           Edit

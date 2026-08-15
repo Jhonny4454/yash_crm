@@ -121,11 +121,9 @@ body.sidebar-collapsed .sidebar { width: var(--sidebar-w-collapsed); }
 .sidebar .submenu .nav-link { font-size: .88rem; padding-left: 2.2rem; }
 .sidebar .submenu .submenu .nav-link { padding-left: 3.1rem; }
 
-body.sidebar-collapsed .sidebar .nav-label,
-body.sidebar-collapsed .sidebar .caret,
-body.sidebar-collapsed .sidebar .submenu,
-body.sidebar-collapsed .sidebar .brand h5 { display: none; }
-body.sidebar-collapsed .sidebar .nav-link { justify-content: center; padding: .62rem; }
+/* Everything that changes when the rail collapses - including the fly-out
+   menus - now lives in styles/Sidebar.css, which loads last. Keeping a second
+   copy of these rules here is how the two ended up fighting each other. */
 
 /* Sign out sits at the FOOT of the rail, not after the last menu item.
    `margin-top: auto` inside the sidebar's flex column pushes it down, so on a

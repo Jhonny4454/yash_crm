@@ -1,0 +1,634 @@
+/* ==========================================================================
+   Customer portal.
+
+   Mobile-first, and scoped: every rule below is either on `body.portal-mode`
+   or inside `.portal-shell`, so none of it can reach the staff screens. The
+   phone layout is the default and the desktop rail is the media query, which
+   is the right way round for a screen a customer opens on their phone.
+   ========================================================================== */
+
+body.portal-mode {
+  /* index.css pads <body> to clear the staff top bar and footer. The portal
+     has its own chrome, so that padding would be dead space at both ends. */
+  padding-top: 0;
+  padding-bottom: 0;
+  background: #f1f5f9;
+  overscroll-behavior-y: none;
+}
+
+.portal-shell {
+  --pt-brand: #0073b7;
+  --pt-brand-dark: #005f9e;
+  --pt-ink: #0f172a;
+  --pt-muted: #64748b;
+  --pt-line: #e2e8f0;
+  --pt-surface: #fff;
+  --pt-rail-w: 248px;
+  --pt-topbar-h: 58px;
+  --pt-tabbar-h: 62px;
+  --pt-radius: 16px;
+
+  min-height: 100vh;
+  min-height: 100dvh;
+  color: var(--pt-ink);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ============================================================== top bar === */
+
+.portal-shell .pt-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: calc(var(--pt-topbar-h) + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) max(14px, env(safe-area-inset-right)) 0
+           max(14px, env(safe-area-inset-left));
+  background: linear-gradient(135deg, #0073b7 0%, #0b8fd6 100%);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(2, 32, 71, .18);
+}
+
+.portal-shell .pt-topbar-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+.portal-shell .pt-topbar-logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  object-fit: cover;
+  background: #fff;
+  flex: 0 0 34px;
+}
+
+.portal-shell .pt-eyebrow {
+  display: block;
+  font-size: .66rem;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  opacity: .82;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.portal-shell .pt-topbar-title strong {
+  display: block;
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.portal-shell .pt-topbar-actions { display: flex; align-items: center; gap: 8px; }
+
+.portal-shell .pt-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, .16);
+  color: #fff;
+  font-size: 1rem;
+  text-decoration: none;
+}
+.portal-shell .pt-icon-btn:hover,
+.portal-shell .pt-icon-btn:active { background: rgba(255, 255, 255, .3); color: #fff; }
+
+.portal-shell .pt-account { position: relative; }
+
+.portal-shell .pt-avatar {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--pt-brand-dark);
+  font-weight: 800;
+  font-size: .95rem;
+  cursor: pointer;
+}
+
+.portal-shell .pt-menu-scrim { position: fixed; inset: 0; z-index: 40; }
+
+.portal-shell .pt-menu {
+  position: absolute;
+  z-index: 41;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 230px;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--pt-surface);
+  color: var(--pt-ink);
+  border: 1px solid var(--pt-line);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, .22);
+}
+.portal-shell .pt-menu-head {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--pt-line);
+  margin-bottom: 4px;
+}
+.portal-shell .pt-menu-head strong { display: block; font-size: .92rem; }
+.portal-shell .pt-menu-head span { font-size: .78rem; color: var(--pt-muted); }
+
+.portal-shell .pt-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.portal-shell .pt-menu-item i { width: 18px; text-align: center; color: var(--pt-muted); }
+.portal-shell .pt-menu-item:hover { background: #f1f5f9; text-decoration: none; }
+.portal-shell .pt-menu-item.danger { color: #b42318; }
+.portal-shell .pt-menu-item.danger i { color: #b42318; }
+
+/* =============================================================== pages === */
+
+.portal-shell .pt-main {
+  padding: 18px max(14px, env(safe-area-inset-left)) 0 max(14px, env(safe-area-inset-right));
+  /* Clear the tab bar, plus the gesture area under it. */
+  padding-bottom: calc(var(--pt-tabbar-h) + env(safe-area-inset-bottom) + 22px);
+}
+
+.portal-shell .pt-foot {
+  margin: 26px 0 0;
+  text-align: center;
+  font-size: .74rem;
+  color: #94a3b8;
+}
+
+.portal-shell .page { display: grid; gap: 16px; }
+
+.portal-shell .page-heading { display: block; }
+.portal-shell .page-heading h1 { font-size: 1.32rem; margin: 0 0 4px; letter-spacing: -.01em; }
+.portal-shell .page-heading p { font-size: .88rem; color: var(--pt-muted); }
+
+.portal-shell .panel,
+.portal-shell .card {
+  background: var(--pt-surface);
+  border: 1px solid var(--pt-line);
+  border-radius: var(--pt-radius);
+  padding: 16px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+}
+.portal-shell .panel h2 { margin: 0 0 12px; font-size: .98rem; font-weight: 650; }
+
+/* ------------------------------------------------------------ key numbers */
+
+.portal-shell .metric-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.portal-shell .metric-card {
+  display: grid;
+  gap: 4px;
+  padding: 16px;
+  border: 1px solid var(--pt-line);
+  border-radius: var(--pt-radius);
+  background: var(--pt-surface);
+  text-decoration: none;
+  color: inherit;
+}
+.portal-shell .metric-card:hover { transform: none; box-shadow: 0 6px 18px rgba(16, 24, 40, .07); }
+.portal-shell .metric-card span,
+.portal-shell .metric-card small { color: var(--pt-muted); font-size: .8rem; }
+.portal-shell .metric-card span {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-weight: 650;
+}
+.portal-shell .metric-card strong { font-size: 1.5rem; line-height: 1.15; }
+
+/* The one that costs money reads like it. */
+.portal-shell .metric-card.is-due {
+  background: linear-gradient(140deg, #fff5f5, #fff);
+  border-color: #fecaca;
+}
+.portal-shell .metric-card.is-due strong { color: #b42318; }
+.portal-shell .metric-card.is-due::after {
+  content: "View bills →";
+  font-size: .78rem;
+  font-weight: 650;
+  color: #b42318;
+}
+
+.portal-shell .metric-card.is-expiring {
+  background: linear-gradient(140deg, #fffbeb, #fff);
+  border-color: #fde68a;
+}
+.portal-shell .metric-card.is-expiring small { color: #b45309; font-weight: 600; }
+
+/* The one thing a customer whose plan is about to lapse should be able to do
+   from the home screen without hunting for it. */
+.portal-shell .portal-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 16px;
+  border-radius: var(--pt-radius);
+  border: 1px solid #bae6fd;
+  background: linear-gradient(135deg, #eff6ff, #f8fbff);
+  color: inherit;
+  text-decoration: none;
+}
+.portal-shell .portal-cta:hover { text-decoration: none; border-color: var(--pt-brand); }
+.portal-shell .portal-cta strong { display: block; font-size: .98rem; }
+.portal-shell .portal-cta p { margin: 3px 0 0; font-size: .84rem; color: var(--pt-muted); }
+.portal-shell .portal-cta .btn { flex: 1 1 100%; }
+
+@media (min-width: 560px) {
+  .portal-shell .portal-cta .btn { flex: 0 0 auto; }
+}
+
+/* ------------------------------------------------------------- list rows */
+
+/* Boxes.css draws every `.list-cards > article` as its own bordered card and
+   does it with !important, so the portal follows that rather than fighting it
+   - it only sets the spacing and type inside. */
+.portal-shell .list-cards { display: grid; gap: 10px; }
+.portal-shell .list-cards article {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px 14px;
+}
+.portal-shell .list-cards strong { font-size: .93rem; }
+.portal-shell .list-cards p { margin: 3px 0 0; font-size: .82rem; color: var(--pt-muted); }
+.portal-shell .list-cards article > div:last-child { display: grid; justify-items: end; gap: 6px; }
+
+.portal-shell .detail-grid { grid-template-columns: 1fr; gap: 12px; }
+.portal-shell .detail-grid > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--pt-line);
+}
+.portal-shell .detail-grid > div:last-child { border-bottom: 0; padding-bottom: 0; }
+.portal-shell .detail-grid span {
+  font-size: .78rem;
+  color: var(--pt-muted);
+  text-transform: none;
+  flex: 0 0 40%;
+}
+.portal-shell .detail-grid strong { text-align: right; font-size: .9rem; }
+
+.portal-shell .grid-two { grid-template-columns: 1fr; gap: 16px; }
+
+/* ------------------------------------------------------------- controls */
+
+.portal-shell .btn {
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 11px;
+  font-weight: 650;
+  justify-content: center;
+}
+.portal-shell .btn.primary {
+  background: var(--pt-brand);
+  border-color: var(--pt-brand);
+  color: #fff;
+}
+.portal-shell .btn.primary:hover { background: var(--pt-brand-dark); border-color: var(--pt-brand-dark); }
+.portal-shell .btn.sm { min-height: 38px; padding: 8px 12px; font-size: .84rem; }
+
+.portal-shell input,
+.portal-shell select,
+.portal-shell textarea,
+.portal-shell .input {
+  /* 16px, or the browser zooms the page the moment the field is focused. */
+  font-size: 16px;
+  min-height: 44px;
+  border-radius: 11px;
+}
+
+.portal-shell .stack label { font-size: .85rem; }
+.portal-shell .field-error { color: #b42318; font-size: .78rem; }
+
+.portal-shell .pill { padding: 4px 10px; font-size: .72rem; }
+
+.portal-shell .alert { border-radius: 12px; padding: 12px 14px; font-size: .87rem; }
+
+.portal-shell .pager {
+  padding: 12px 2px 0;
+  border-top: 0;
+  font-size: .82rem;
+}
+
+/* ------------------------------------------- bills, as cards on a phone */
+
+/* `table.data.cards-sm` (see AdminResponsive.css) does the stacking; these
+   rules give the portal's version its own spacing and put the amount and the
+   pay button where a thumb expects them. */
+.portal-shell .table-wrap { padding: 0; }
+
+@media (max-width: 720px) {
+  .portal-shell table.data.cards-sm tr {
+    border-radius: 14px;
+    padding: 8px 14px 12px;
+  }
+  .portal-shell table.data.cards-sm td.row-actions {
+    padding-top: 12px;
+    gap: 10px;
+  }
+  .portal-shell table.data.cards-sm td.row-actions::before { content: none; }
+  .portal-shell table.data.cards-sm td.row-actions .btn { flex: 1 1 auto; }
+  .portal-shell .portal-invoices .row-actions { flex-direction: row; }
+}
+
+/* ------------------------------------------------------------ pay panel */
+
+.portal-shell .pay-dues { border-radius: var(--pt-radius); padding: 16px; }
+.portal-shell .pay-dues-total { font-size: 1.5rem; }
+.portal-shell .pay-dues-row .btn { width: 100%; }
+
+.portal-shell .current-plan { border-radius: var(--pt-radius); }
+.portal-shell .section-title { margin-top: 4px; }
+
+/* ------------------------------------------------------ renew / change */
+
+.portal-shell .renew-card { display: grid; gap: 14px; }
+
+.portal-shell .renew-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.portal-shell .renew-card-head h2 { margin: 0 0 3px; font-size: 1.08rem; }
+.portal-shell .renew-card-head p { margin: 0; font-size: .84rem; color: var(--pt-muted); }
+
+/* The bill, itemised. Plan price, GST, total - so the number on the button is
+   never the first time the customer sees what it costs. */
+.portal-shell .renew-price {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid var(--pt-line);
+}
+.portal-shell .renew-price > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+.portal-shell .renew-price dt { font-size: .84rem; color: var(--pt-muted); }
+.portal-shell .renew-price dd { margin: 0; font-size: .9rem; font-weight: 600; }
+.portal-shell .renew-price .is-total {
+  padding-top: 8px;
+  border-top: 1px solid var(--pt-line);
+}
+.portal-shell .renew-price .is-total dt { color: var(--pt-ink); font-weight: 650; }
+.portal-shell .renew-price .is-total dd { font-size: 1.15rem; font-weight: 800; }
+
+.portal-shell .renew-card-note { margin: 0; font-size: .82rem; color: var(--pt-muted); }
+.portal-shell .renew-card-go { width: 100%; }
+
+.portal-shell .plan-change-open { width: 100%; justify-content: center; }
+
+.portal-shell .plan-choose-detail dl { gap: 10px 18px; }
+.portal-shell .plan-choose-actions { flex-direction: column; align-items: stretch; }
+
+@media (min-width: 640px) {
+  .portal-shell .renew-card-go,
+  .portal-shell .plan-change-open { width: auto; justify-self: start; }
+  .portal-shell .plan-choose-actions { flex-direction: row; align-items: center; }
+}
+
+/* =============================== rail + desktop, from 900px up =========== */
+
+.portal-shell .pt-rail { display: none; }
+
+@media (min-width: 900px) {
+  .portal-shell { display: block; }
+
+  .portal-shell .pt-rail {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 35;
+    width: var(--pt-rail-w);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 18px 12px calc(14px + env(safe-area-inset-bottom));
+    background: #10243a;
+    color: #cbd9e8;
+    overflow-y: auto;
+  }
+
+  .portal-shell .pt-brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 6px 10px 20px;
+    color: #fff;
+    font-weight: 800;
+    text-decoration: none;
+    line-height: 1.2;
+  }
+  .portal-shell .pt-brand img {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    object-fit: cover;
+    background: #fff;
+    flex: 0 0 38px;
+  }
+
+  .portal-shell .pt-rail-nav { display: grid; gap: 3px; }
+
+  .portal-shell .pt-rail .pt-tab {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 13px;
+    min-height: 46px;
+    padding: 11px 13px;
+    border-radius: 10px;
+    color: #b9cade;
+    font-size: .93rem;
+    font-weight: 500;
+    text-decoration: none;
+  }
+  .portal-shell .pt-rail .pt-tab i { font-size: 1rem; width: 20px; text-align: center; }
+  .portal-shell .pt-rail .pt-tab span { font-size: .93rem; letter-spacing: 0; }
+  .portal-shell .pt-rail .pt-tab:hover { background: #1b3a5c; color: #fff; }
+  .portal-shell .pt-rail .pt-tab.active { background: var(--pt-brand); color: #fff; }
+  .portal-shell .pt-rail .pt-tab.active::before { content: none; }
+
+  .portal-shell .pt-rail-signout {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    margin-top: auto;
+    min-height: 46px;
+    padding: 11px 13px;
+    border: 0;
+    border-radius: 10px;
+    background: none;
+    color: #fca5a5;
+    font: inherit;
+    cursor: pointer;
+    text-align: left;
+  }
+  .portal-shell .pt-rail-signout i { width: 20px; text-align: center; }
+  .portal-shell .pt-rail-signout:hover { background: rgba(220, 38, 38, .2); color: #fff; }
+
+  .portal-shell .pt-topbar {
+    margin-left: var(--pt-rail-w);
+    padding-left: 26px;
+    padding-right: 26px;
+  }
+  .portal-shell .pt-topbar-logo { display: none; }
+
+  .portal-shell .pt-main {
+    margin-left: var(--pt-rail-w);
+    width: auto;
+    max-width: 1120px;
+    padding: 28px 26px 40px;
+  }
+  /* The rail replaces the tab bar - see the end of this file, where the tab
+     bar is hidden. It has to be stated after the tab bar's own `display: grid`
+     or the later rule wins at equal specificity. */
+
+  .portal-shell .page { gap: 20px; }
+  .portal-shell .page-heading h1 { font-size: 1.6rem; }
+  .portal-shell .panel, .portal-shell .card { padding: 20px; }
+  .portal-shell .metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .portal-shell .grid-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .portal-shell .detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .portal-shell .detail-grid > div { display: grid; gap: 4px; border-bottom: 0; padding-bottom: 0; }
+  .portal-shell .detail-grid span { flex: none; }
+  .portal-shell .detail-grid strong { text-align: left; }
+  .portal-shell .btn { width: auto; }
+  .portal-shell .pay-dues-row .btn { width: auto; }
+  .portal-shell input, .portal-shell select,
+  .portal-shell textarea, .portal-shell .input { font-size: .93rem; }
+}
+
+@media (min-width: 1180px) {
+  .portal-shell .metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* ========================================================= bottom tabs === */
+
+.portal-shell .pt-tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 36;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  height: calc(var(--pt-tabbar-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: rgba(255, 255, 255, .96);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  backdrop-filter: saturate(180%) blur(12px);
+  border-top: 1px solid var(--pt-line);
+  box-shadow: 0 -2px 14px rgba(15, 23, 42, .07);
+}
+
+.portal-shell .pt-tab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 6px 2px;
+  color: #7c8ba1;
+  font-size: .68rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.portal-shell .pt-tab i { font-size: 1.12rem; }
+.portal-shell .pt-tab span {
+  letter-spacing: .01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.portal-shell .pt-tab:hover { text-decoration: none; color: var(--pt-brand); }
+.portal-shell .pt-tab.active { color: var(--pt-brand); }
+
+/* A short bar over the active tab, the way a native app marks the section. */
+.portal-shell .pt-tabbar .pt-tab.active::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 26px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--pt-brand);
+}
+
+.portal-shell .pt-tab:active { background: rgba(0, 115, 183, .07); }
+
+/* From 900px the left rail is the navigation, so the tab bar goes away.
+   Stated here rather than up in the rail block because it has to come after
+   `.portal-shell .pt-tabbar { display: grid }` - same specificity, and the
+   later rule wins. */
+@media (min-width: 900px) {
+  .portal-shell .pt-tabbar { display: none; }
+}
+
+/* ============================================================ trimmings === */
+
+@media (max-width: 380px) {
+  .portal-shell .pt-tab span { font-size: .63rem; }
+  .portal-shell .metric-card strong { font-size: 1.35rem; }
+  .portal-shell .pt-topbar-title strong { font-size: .93rem; }
+}
+
+/* Windows tablets and desktops in tablet mode: no hover, plenty of width. */
+@media (pointer: coarse) and (min-width: 900px) {
+  .portal-shell .pt-rail .pt-tab { min-height: 50px; }
+  .portal-shell .btn { min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-shell * { transition: none !important; }
+}
+
+@media print {
+  .portal-shell .pt-rail,
+  .portal-shell .pt-tabbar,
+  .portal-shell .pt-topbar { display: none !important; }
+  .portal-shell .pt-main { margin: 0; padding: 0; max-width: none; }
+  body.portal-mode { background: #fff; }
+}
