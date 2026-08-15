@@ -157,20 +157,23 @@ export function PortalPlans() {
   const current = account?.active_plan;
 
   /**
-   * Raise the bill, then take the customer straight to the checkout.
+   * Raise the bill and go straight to the checkout. One click, no interstitial.
    *
-   * Renewing used to end at "your invoice is ready - pay it from your
-   * invoices": the customer pressed Renew having already decided to pay, and
-   * was handed a filing instruction and a second screen to find. Every step
-   * between deciding and paying is somewhere the payment can be abandoned, so
-   * the checkout now opens on the same click.
+   * This used to stop and announce "Your renewal is booked" before doing
+   * anything else. "Booked" is not a state a customer recognises and not one
+   * the business has either - nothing is renewed until the money arrives - so
+   * the sentence sat between the decision and the payment describing a
+   * halfway house that only existed on this screen. Every step in that gap is
+   * somewhere a payment gets abandoned.
    *
    * The invoice is still raised first and independently. If the customer
-   * closes the checkout, or the card fails, or the gateway is switched off
-   * entirely, the bill exists and can be settled later by any route - nothing
-   * about the renewal depends on the payment window succeeding.
+   * closes the checkout, the card fails, or the gateway is off entirely, the
+   * bill exists and can be settled later by any route - nothing about the
+   * renewal depends on the payment window succeeding. pay() reports its own
+   * outcome and refreshes this screen through onPaid, so there is nothing to
+   * say here on the way in.
    */
-  async function act(endpoint, payload, key, describe) {
+  async function act(endpoint, payload, key, what) {
     setBusy(key);
     setMessage(null);
     setFailure(null);
@@ -190,23 +193,18 @@ export function PortalPlans() {
     }
 
     const due = Number(invoice?.balance ?? invoice?.total_amount ?? 0);
-    const reference = invoice?.invoice_no || "created";
+    const reference = invoice?.invoice_no || "";
 
     if (gateway?.enabled && invoice?.id && due > 0) {
-      setMessage(`${describe} Invoice ${reference} for ${inr(due)} — opening `
-        + "payment…");
-      // pay() owns the rest: it reports success, failure and "not confirmed
-      // yet" itself, and refreshes this screen through onPaid.
-      await pay({ invoiceId: invoice.id, amount: due, describe: reference });
-      setMessage(null);
+      await pay({ invoiceId: invoice.id, amount: due, describe: reference || what });
       return;
     }
 
-    setMessage(`${describe} Invoice ${reference} for ${inr(due)} is ready — `
-      + (gateway?.enabled
-        ? "pay it from your invoices and the change takes effect once it clears."
-        : "pay it by bank transfer or at the office, and the change takes "
-          + "effect once it clears."));
+    // Only when there is no checkout to send them to. Then the bill IS the
+    // deliverable, and where to pay it is the useful thing to say.
+    setMessage(`Invoice ${reference || "created"} for ${inr(due)} is ready — `
+      + `pay it by bank transfer or at the office, and your ${what} takes `
+      + "effect once it clears.");
     refetchQuote();
   }
 
@@ -282,9 +280,8 @@ export function PortalPlans() {
             checkout nobody expected is a checkout people close. */}
         <button className="btn primary renew-card-go"
                 disabled={busy === "renew" || paying}
-                onClick={() => act("/portal/renew", {}, "renew",
-                                   "Your renewal is booked.")}>
-          {busy === "renew" ? "Working…"
+                onClick={() => act("/portal/renew", {}, "renew", "renewal")}>
+          {busy === "renew" ? (gateway?.enabled ? "Opening payment…" : "Working…")
             : gateway?.enabled
               /* The charge is the OPEN invoice when there is one, because
                  /portal/renew points at that bill instead of raising a second.
@@ -378,8 +375,8 @@ export function PortalPlans() {
                 <button className="btn primary"
                         disabled={!selected || isCurrentChoice || busy === "change" || paying}
                         onClick={() => act("/portal/change-plan", { plan_id: selected.id },
-                                           "change", `Switching to ${selected.name}.`)}>
-                  {busy === "change" ? "Creating invoice…"
+                                           "change", "plan change")}>
+                  {busy === "change" ? (gateway?.enabled ? "Opening payment…" : "Working…")
                     : !selected ? "Change to this plan"
                       : gateway?.enabled
                         ? `Change & pay ${inr(selected.total ?? selected.price_monthly)}`
