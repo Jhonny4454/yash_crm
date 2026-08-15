@@ -51,7 +51,7 @@ def settings_list():
     then refuses is the classic way this table ends up holding something the
     rest of the application cannot read.
     """
-    from .settings_schema import GROUPS, describe, is_secret
+    from .settings_schema import FIELDS, GROUPS, describe, is_secret
 
     try:
         from blueprints.settings_bp import seed_settings
@@ -81,6 +81,27 @@ def settings_list():
             entry['has_value'] = stored != ''
         out.append(entry)
 
+    # A setting the schema declares but the table has never held still has to
+    # appear, blank, or it can never be filled in.
+    #
+    # `seed_settings()` writes SETTING_DEFAULTS, which is 32 keys; the schema
+    # declares 47. The 15 in the gap - every cashfree_* and wa_* key - had no
+    # row, so they were absent from this list AND rejected by the save below
+    # as "not a setting this system has". The WhatsApp ones were saved by
+    # their own endpoint, which created the rows and hid the problem; the
+    # Cashfree App ID and secret key had no such back door, so there was no
+    # order of operations that could get them into the database.
+    present = {r.key for r in rows}
+    for key in FIELDS:
+        if key in present:
+            continue
+        entry = describe(key, 'str')
+        entry['value_type'] = 'str'
+        entry['updated_at'] = None
+        entry['value'] = ''
+        entry['has_value'] = False
+        out.append(entry)
+
     out.sort(key=lambda e: (e['group_order'], e['order'], e['key']))
     return ok(out, groups=[{'key': k, 'label': label, 'hint': hint}
                            for k, label, hint in GROUPS])
@@ -97,7 +118,7 @@ def settings_update():
     {"status": "saved"}, so a rejected setting looked saved until the page was
     reloaded.
     """
-    from .settings_schema import coerce, is_secret
+    from .settings_schema import FIELDS, coerce, is_secret
 
     data = body()
     items = data.get('settings')
@@ -106,7 +127,14 @@ def settings_update():
 
     rows = {r.key: r for r in Setting.query.all()}
     types = {k: t for k, _v, t in SETTING_DEFAULTS}
-    known = set(types) | set(rows)
+    # FIELDS as well as the seeded defaults and whatever is already stored.
+    # Without it, "known" was only what the table already held, so a setting
+    # could never be created through this endpoint - it had to exist before it
+    # was allowed to exist. cashfree_app_id and cashfree_secret_key are
+    # declared in the schema but not in SETTING_DEFAULTS, so every attempt to
+    # save them came back 400 "Not a setting this system has", and online
+    # payment could not be configured at all.
+    known = set(types) | set(rows) | set(FIELDS)
 
     errors, unknown, staged, skipped = [], [], {}, []
 
