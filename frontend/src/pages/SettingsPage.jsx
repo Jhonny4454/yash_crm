@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { put } from "../api/client";
+import { post, put } from "../api/client";
 import { useFetch } from "../api/useFetch";
 import MoneyInput from "../components/MoneyInput";
 import { Empty, ErrorNote, Loading, readableError } from "../components/ui";
@@ -217,6 +217,10 @@ export default function SettingsPage() {
                                 onChange={(next) => set(field.key, next)} />
                   ))}
               </div>
+              {/* The customer portal will not tell a customer why online
+                  payment is off, so the office has to be able to see it
+                  somewhere. This is that somewhere. */}
+              {group.key === "payment" && <CashfreeStatus saveCount={saveCount} />}
             </section>
           ))}
 
@@ -252,6 +256,86 @@ export default function SettingsPage() {
           is exactly how a setting appears to revert. */}
       <WhatsAppTester key={saveCount} />
     </section>
+  );
+}
+
+/**
+ * Whether the customer portal can actually take a card payment, and if not,
+ * why.
+ *
+ * Cashfree answers every credential fault with the words "authentication
+ * Failed" and nothing else, and the portal deliberately shows a customer the
+ * bank details rather than an API problem they cannot act on. Between the two,
+ * "no keys saved", "keys are for the other environment" and "key was
+ * regenerated in the dashboard" all looked identical from every screen anyone
+ * was actually looking at.
+ */
+function CashfreeStatus({ saveCount }) {
+  const { data, loading, refetch } = useFetch("/settings/cashfree/status", { saveCount });
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState(null);
+
+  async function test() {
+    setTesting(true);
+    setResult(null);
+    try {
+      const response = await post("/settings/cashfree/test", {});
+      setResult((response?.data ?? response) || null);
+    } catch (err) {
+      setResult({ ok: false, detail: readableError(err) });
+    } finally {
+      setTesting(false);
+      refetch();
+    }
+  }
+
+  if (loading || !data) return null;
+
+  const mismatch = data.credential_environment
+    && data.credential_environment !== data.environment;
+
+  return (
+    <div className={`set-status${data.ready ? " is-ok" : " is-blocked"}`}>
+      <p className="set-status-head">
+        <strong>
+          {data.ready
+            ? "Online payment is on."
+            : "Online payment is OFF in the customer portal."}
+        </strong>
+        {" "}Environment: {data.environment}
+        {data.has_app_id && <> · App ID {data.app_id_hint}</>}
+      </p>
+
+      {!data.ready && data.blocking.map((line) => (
+        <p key={line} className="set-status-line">{line}</p>
+      ))}
+
+      {mismatch && (
+        <p className="set-status-line">
+          The keys look like <strong>{data.credential_environment}</strong> keys.
+          Sandbox and production credentials are not interchangeable — each host
+          rejects the other with the same “authentication Failed”.
+        </p>
+      )}
+
+      {!data.ready && (
+        <p className="set-status-line set-status-quiet">
+          Customers currently see: “{data.portal_message}” with your bank
+          details and phone number, so they can still pay.
+        </p>
+      )}
+
+      <div className="set-status-actions">
+        <button type="button" className="btn sm" onClick={test} disabled={testing}>
+          {testing ? "Checking…" : "Test connection"}
+        </button>
+        {result && (
+          <span className={result.ok ? "set-status-ok" : "set-status-bad"}>
+            {result.detail}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
 

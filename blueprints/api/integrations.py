@@ -269,6 +269,69 @@ def _template_health():
     }
 
 
+@bp.get('/settings/cashfree/status')
+@staff_required
+def cashfree_status():
+    """Whether the customer portal can actually take a card payment.
+
+    The portal deliberately tells a customer nothing about why online payment
+    is off - "your provider has the wrong API keys" is not theirs to solve, so
+    they get the bank details instead. That left the office with no way to see
+    the difference between "no keys saved", "keys are for the other
+    environment" and "keys were regenerated in the Cashfree dashboard", all of
+    which look identical from the customer's side. This is that difference.
+    """
+    from services import cashfree
+
+    problem = ''
+    try:
+        problem = cashfree.config_problem()
+    except Exception as exc:
+        problem = f'Could not read the payment settings: {exc}'
+
+    app = ''
+    try:
+        app = cashfree.app_id() or ''
+    except Exception:
+        app = ''
+
+    return ok({
+        'has_app_id': bool(app),
+        'has_secret': bool(_safe(cashfree.secret_key)),
+        # Redacted, but the prefix survives - and the prefix IS the diagnosis
+        # here, because it says which environment the key belongs to.
+        'app_id_hint': _redact_key(app),
+        'environment': _safe(cashfree.environment) or 'sandbox',
+        'credential_environment': _safe(cashfree.credential_env),
+        'ready': not problem,
+        'blocking': [problem] if problem else [],
+        # What the customer is being shown right now, so the office can see
+        # the portal exactly as the customer does.
+        'portal_message': '' if not problem else
+                          'Card and UPI payment is not switched on yet. You '
+                          'can still pay by bank transfer or at the office.',
+    })
+
+
+def _safe(fn, default=''):
+    try:
+        return fn() or default
+    except Exception:
+        return default
+
+
+@bp.post('/settings/cashfree/test')
+@admin_required
+def cashfree_test():
+    """Ask Cashfree whether these credentials work. Takes no money."""
+    from services import cashfree
+    try:
+        return ok(cashfree.check_credentials())
+    except Exception as exc:
+        return ok({'ok': False, 'environment': _safe(cashfree.environment),
+                   'detail': f'The check itself failed: {exc}'})
+
+
 @bp.get('/settings/whatsapp/status')
 @staff_required
 def whatsapp_status():

@@ -154,3 +154,36 @@
   .set-savebar { flex-direction: column; align-items: stretch; }
   .set-savebar-actions { justify-content: flex-end; }
 }
+
+/* ---- Gateway status ------------------------------------------------------
+   Sits under the Payment Gateway fields and answers the one question the
+   customer portal deliberately will not: why online payment is off. */
+
+.set-status {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-size: 0.86rem;
+}
+.set-status.is-ok { border-color: #a3cfbb; background: #f0fdf6; }
+.set-status.is-blocked { border-color: #f1aeb5; background: #fff7f7; }
+
+.set-status p { margin: 0 0 0.4rem; }
+.set-status-head strong { font-size: 0.9rem; }
+.set-status.is-blocked .set-status-head strong { color: #b42318; }
+.set-status.is-ok .set-status-head strong { color: #0f5132; }
+
+.set-status-line { line-height: 1.5; color: #334155; }
+.set-status-quiet { color: #64748b; font-size: 0.82rem; }
+
+.set-status-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  margin-top: 0.6rem;
+}
+.set-status-ok { color: #0f5132; font-weight: 600; }
+.set-status-bad { color: #b42318; font-weight: 600; }
