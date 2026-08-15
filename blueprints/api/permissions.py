@@ -47,6 +47,11 @@ CAPABILITIES = [
     # --- customers ---
     {'key': 'customers.view', 'group': 'Customers', 'label': 'View customers'},
     {'key': 'customers.edit', 'group': 'Customers', 'label': 'Add and edit customers'},
+    # Separate from `edit` on purpose. Removing a customer is not a heavier
+    # kind of editing - it is the one customer action that cannot be undone
+    # from the screen that did it, so it is its own tick box and nobody gets
+    # it by implication.
+    {'key': 'customers.delete', 'group': 'Customers', 'label': 'Delete customers'},
     {'key': 'plans.renew', 'group': 'Customers', 'label': 'Renew and extend plans'},
 
     # --- money ---
@@ -226,6 +231,10 @@ RULES = [
     (r'^/companies', WRITE_METHODS, 'masters.manage'),
 
     # Customers last, because several rules above are sub-paths of it.
+    # Deleting comes first of the three: it is a DELETE on the bare customer
+    # path, which the generic write rule below would otherwise wave through on
+    # `customers.edit`.
+    (r'^/customers/\d+$', ('DELETE',), 'customers.delete'),
     (r'^/customers', WRITE_METHODS, 'customers.edit'),
     (r'^/customers', ('GET',), 'customers.view'),
 ]

@@ -839,3 +839,45 @@ body.portal-mode {
 @media (prefers-reduced-motion: reduce) {
   .portal-shell .pt-countdown-bar i { transition: none; }
 }
+
+/* ---- Account status ------------------------------------------------------
+   Shown only when something is wrong. A disabled customer can sign in now, so
+   the portal has to say why their line is dead - otherwise "Active plan, 200
+   days left" sits beside an internet connection that does not work. */
+
+.portal-shell .pt-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 13px 15px;
+  border-radius: var(--pt-radius);
+  border: 1px solid var(--pt-line);
+  background: var(--pt-surface);
+}
+.portal-shell .pt-status p { margin: 0; font-size: .87rem; flex: 1 1 240px; }
+
+.portal-shell .pt-status-tag {
+  flex: 0 0 auto;
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.portal-shell .pt-status.is-danger { background: #fff5f5; border-color: #fecaca; }
+.portal-shell .pt-status.is-danger .pt-status-tag { background: #b42318; color: #fff; }
+.portal-shell .pt-status.is-danger p { color: #7a271a; }
+
+.portal-shell .pt-status.is-warn { background: #fffbeb; border-color: #fde68a; }
+.portal-shell .pt-status.is-warn .pt-status-tag { background: #b45309; color: #fff; }
+.portal-shell .pt-status.is-warn p { color: #7c2d12; }
+
+.portal-shell .pt-status.is-idle { background: #f8fafc; }
+.portal-shell .pt-status.is-idle .pt-status-tag { background: #475467; color: #fff; }
+.portal-shell .pt-status.is-idle p { color: var(--pt-muted); }
+
+.portal-shell .pt-status.is-ok { background: #f0fdf6; border-color: #a3cfbb; }
+.portal-shell .pt-status.is-ok .pt-status-tag { background: #0f7a4a; color: #fff; }

@@ -114,7 +114,23 @@ def _active_account(claims):
         current_app.logger.exception('Unable to validate API token owner')
         return None, fail('authentication_unavailable', 503)
 
-    if account is None or not account.is_active:
+    if account is None:
+        return None, fail('account_inactive', 403)
+
+    # `is_active` bars a STAFF account and only a staff account.
+    #
+    # Applying it to customers too was the check that actually locked people
+    # out: the login could be as permissive as it liked, but every screen in
+    # the portal passes through here, so a customer whose line had been cut
+    # got a 403 on the dashboard, the invoice list and the payment endpoint -
+    # the three things they needed in order to become a paying customer
+    # again.
+    #
+    # A disabled customer keeps read access to their own billing history and
+    # the ability to settle it. Nothing here grants service: is_active governs
+    # the connection, renewals only take effect once the money lands, and the
+    # portal has no endpoint that reconnects anyone.
+    if claims.get('kind') == 'staff' and not account.is_active:
         return None, fail('account_inactive', 403)
     return account, None
 

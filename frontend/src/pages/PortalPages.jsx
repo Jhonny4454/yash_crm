@@ -29,6 +29,8 @@ export function PortalDashboard() {
       </div>
     </div>
 
+    <AccountStatus status={data?.account_status} />
+
     {/* The two things a customer opens this screen for, side by side: what
         keeps the connection running, and what it costs. Two boxes on a desktop
         or a tablet, stacked on a phone with the money first - on a small
@@ -149,21 +151,35 @@ export function PortalPlans() {
   const current = account?.active_plan;
 
   /**
-   * Raise the bill and go straight to the checkout. One click, no interstitial.
+   * Pay first, bill afterwards - when there is a gateway to pay through.
    *
-   * This used to stop and announce "Your renewal is booked" before doing
-   * anything else. "Booked" is not a state a customer recognises and not one
-   * the business has either - nothing is renewed until the money arrives - so
-   * the sentence sat between the decision and the payment describing a
-   * halfway house that only existed on this screen. Every step in that gap is
-   * somewhere a payment gets abandoned.
+   * `intent` tells the server what the money is FOR ("renew", or
+   * "change:<planId>"). The invoice is written when the payment lands, so a
+   * customer who opens the checkout and closes it leaves nothing behind: no
+   * bill in their list, no due on their dashboard, and no spent invoice
+   * number. Raising it up front and deleting it afterwards was a narrower
+   * version of the same idea with more ways to go wrong.
    *
-   * The invoice is still raised first and independently. If the customer
-   * closes the checkout, the card fails, or the gateway is off entirely, the
-   * bill exists and can be settled later by any route - nothing about the
-   * renewal depends on the payment window succeeding. pay() reports its own
-   * outcome and refreshes this screen through onPaid, so there is nothing to
-   * say here on the way in.
+   * With no gateway there is nothing to pay through, so the old path stands:
+   * raise the bill and tell them where to settle it.
+   */
+  async function payFor(intent, key, what) {
+    setBusy(key);
+    setMessage(null);
+    setFailure(null);
+    try {
+      await pay({ intent, describe: what });
+      setChanging(false);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /**
+   * The no-gateway path: raise the bill, then say where to settle it.
+   *
+   * Only reachable when online payment is switched off. With a gateway the
+   * screen uses payFor() above, and no invoice exists until the money does.
    */
   async function act(endpoint, payload, key, what) {
     setBusy(key);
@@ -306,7 +322,9 @@ export function PortalPlans() {
             checkout nobody expected is a checkout people close. */}
         <button className="btn primary renew-card-go"
                 disabled={busy === "renew" || paying}
-                onClick={() => act("/portal/renew", {}, "renew", "renewal")}>
+                onClick={() => (gateway?.enabled
+                  ? payFor("renew", "renew", "your renewal")
+                  : act("/portal/renew", {}, "renew", "renewal"))}>
           {busy === "renew" ? (gateway?.enabled ? "Opening payment…" : "Working…")
             : gateway?.enabled
               /* The charge is the OPEN invoice when there is one, because
@@ -400,8 +418,11 @@ export function PortalPlans() {
               <div className="plan-choose-actions">
                 <button className="btn primary"
                         disabled={!selected || isCurrentChoice || busy === "change" || paying}
-                        onClick={() => act("/portal/change-plan", { plan_id: selected.id },
-                                           "change", "plan change")}>
+                        onClick={() => (gateway?.enabled
+                          ? payFor(`change:${selected.id}`, "change",
+                                   `your move to ${selected.name}`)
+                          : act("/portal/change-plan", { plan_id: selected.id },
+                                "change", "plan change"))}>
                   {busy === "change" ? (gateway?.enabled ? "Opening payment…" : "Working…")
                     : !selected ? "Change to this plan"
                       : gateway?.enabled
@@ -422,6 +443,32 @@ export function PortalPlans() {
       </section>
     )}
   </section>;
+}
+
+/**
+ * The state of the connection, said plainly.
+ *
+ * A disabled customer can now sign in, which is the right call - they need to
+ * see what they owe and pay it - but it means somebody can arrive at a working
+ * portal while their internet is dead. Without this they would read "Active
+ * plan, 200 days left" beside a connection that does not work and conclude the
+ * portal is lying to them.
+ *
+ * The state and its explanation both come from the server, so the portal and
+ * the office never describe the same account differently.
+ */
+export function AccountStatus({ status }) {
+  if (!status?.code) return null;
+  // Nothing worth a banner when everything is fine; the plan card already
+  // says so, and a green bar on every visit is a green bar nobody reads.
+  if (status.code === "active") return null;
+
+  return (
+    <section className={`pt-status is-${status.tone || "idle"}`} role="status">
+      <span className="pt-status-tag">{status.label}</span>
+      <p>{status.detail}</p>
+    </section>
+  );
 }
 
 /**
@@ -523,6 +570,10 @@ export function PortalNotifications() {
 
 export function PortalProfile() {
   const { user, refreshProfile } = useAuth();
+  // The same verdict as the dashboard, from the same place. A customer who
+  // came here to check their details should not have to go back to the home
+  // screen to find out whether their line is on.
+  const { data: account } = useFetch("/portal/dashboard");
   const [form, setForm] = useState({ old_password: "", new_password: "", confirm_password: "" });
   const [touched, setTouched] = useState({});
   const [message, setMessage] = useState(null);
@@ -540,6 +591,7 @@ export function PortalProfile() {
     ["Connection", user?.connection_type],
     ["Zone", user?.zone],
     ["Address", user?.primary_address || user?.billing_address],
+    ["Status", account?.account_status?.label],
   ].filter(([, value]) => value !== null && value !== undefined && value !== "");
 
   const errors = {};

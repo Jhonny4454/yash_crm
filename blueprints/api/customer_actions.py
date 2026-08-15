@@ -486,3 +486,91 @@ def _notify_renewal(customer, customer_plan, plan, invoice, send=True):
     return {'status': 'failed',
             'detail': getattr(result, 'detail', '')
             or 'The gateway rejected the renewal message.'}
+
+
+# --------------------------------------------------------------------------- #
+#  Removing a customer
+# --------------------------------------------------------------------------- #
+def _customer_history(customer):
+    """What is attached to this customer that the business has to keep."""
+    from models import Payment
+
+    invoices = Invoice.query.filter_by(customer_id=customer.id).count()
+    payments = Payment.query.filter_by(customer_id=customer.id).count()
+    return invoices, payments
+
+
+@bp.delete('/customers/<int:cid>')
+@admin_required
+def customer_delete(cid):
+    """Remove a customer record entirely.
+
+    Deliberately narrow: this deletes ONLY a customer with no invoices and no
+    payments. That is the case it exists for - the duplicate, the typo, the
+    row created during a demo - and it is the only case where deleting is
+    honest.
+
+    A customer who has been invoiced cannot be deleted, and the answer is a
+    400 explaining why rather than a cascade. Two reasons:
+
+      * Those invoices are GST records. India requires them kept for years
+        after the financial year they belong to, and a delete that quietly
+        took the bills with it would remove evidence the business is required
+        to be able to produce.
+      * The totals on every report are built from invoices and payments.
+        Deleting them silently changes last month's collection figure, which
+        somebody has already reconciled.
+
+    Deactivating is the operation for a customer who has left: the line stops,
+    the history stays, and the account can be brought back. That is offered in
+    the refusal so the operator is not left with a dead end.
+    """
+    customer, missing = _customer_or_404(cid)
+    if missing:
+        return missing
+
+    invoices, payments = _customer_history(customer)
+    if invoices or payments:
+        parts = []
+        if invoices:
+            parts.append(f'{invoices} invoice' + ('s' if invoices != 1 else ''))
+        if payments:
+            parts.append(f'{payments} payment' + ('s' if payments != 1 else ''))
+        return fail('customer_has_history', 400,
+                    detail=f'{customer.full_name} has {" and ".join(parts)} on '
+                           f'file, which are accounting records the business '
+                           f'has to keep. Deactivate this customer instead - '
+                           f'the connection stops and the history stays.',
+                    invoices=invoices, payments=payments,
+                    can_deactivate=bool(customer.is_active))
+
+    name = customer.full_name
+    try:
+        # Rows that belong to the customer and carry no accounting weight. Each
+        # is deleted explicitly rather than left to a cascade, because the
+        # cascade rules differ per table and a missing one would abort the
+        # whole delete with a foreign-key error and no explanation.
+        CustomerPlan.query.filter_by(customer_id=cid).delete(
+            synchronize_session=False)
+        for model_name in ('WalletEntry', 'CustomerDocument', 'ServiceRequest',
+                           'OnlinePaymentOrder', 'MessageLog', 'Notification'):
+            try:
+                model = getattr(__import__('models', fromlist=[model_name]),
+                                model_name, None)
+                if model is not None and hasattr(model, 'customer_id'):
+                    model.query.filter_by(customer_id=cid).delete(
+                        synchronize_session=False)
+            except Exception:
+                # A table this build does not have is not a reason to stop.
+                continue
+
+        db.session.delete(customer)
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        return fail('delete_failed', 500,
+                    detail=f'{name} could not be removed, so nothing was '
+                           f'changed. {str(exc)[:160]}')
+
+    _audit('Delete Customer', f'{name} (id {cid}) removed - no billing history')
+    return ok({'deleted': True, 'id': cid, 'name': name})

@@ -141,8 +141,19 @@ def customer_login():
     if not customer or not customer.password_hash \
             or not customer.check_password(password):
         return fail('invalid_credentials', 401)
-    if not customer.is_active:
-        return fail('account_disabled', 403)
+
+    # A disabled, terminated or expired customer CAN still sign in.
+    #
+    # This used to answer 403 account_disabled, which locked people out of the
+    # portal at the exact moment they needed it: somebody whose line was cut
+    # for non-payment could no longer see what they owed, download the bill,
+    # or pay it - so the one route back to being a paying customer was closed
+    # by the same event that made them stop paying. They rang the office
+    # instead, which is the outcome the portal exists to avoid.
+    #
+    # is_active governs the CONNECTION, not the login. Nothing in the portal
+    # grants service: every screen is their own billing history, and renewing
+    # raises an invoice that only takes effect once it is paid.
 
     active = next((cp for cp in customer.plans if cp.status == 'active'), None)
 
@@ -198,8 +209,12 @@ def customer_forgot_password():
         return fail('identifier_required', 400)
 
     from blueprints.portal_bp import _find_customer, _issue_otp
+    # Deliberately not filtered by is_active. A disabled customer can still
+    # sign in (see customer_login), so they must still be able to recover a
+    # forgotten password - otherwise the account they can reach is one they
+    # cannot get back into.
     customer = _find_customer(identifier)
-    if customer and customer.is_active:
+    if customer:
         _issue_otp(customer, 'reset_password')
 
     # Always return the same response to prevent account enumeration.
@@ -413,9 +428,13 @@ def refresh():
             return fail('account_disabled', 403)
         access = make_token(user.id, 'staff', user.role, token_type='access')
     elif kind == 'customer':
+        # No is_active check, matching the login above: a customer whose line
+        # is cut keeps their portal session. Refusing here would have signed
+        # them out the moment their access token expired, which is a slower
+        # and more confusing version of the lockout the login no longer does.
         customer = db.session.get(Customer, subject_id)
-        if not customer or not customer.is_active:
-            return fail('account_disabled', 403)
+        if not customer:
+            return fail('token_invalid', 401)
         access = make_token(customer.id, 'customer', token_type='access')
     else:
         return fail('token_invalid', 401)

@@ -88,7 +88,7 @@ export function usePayNow({ gateway, onPaid }) {
    * `invoiceId` may be omitted, which means "pay whatever is outstanding" -
    * the server spreads it across the open bills, oldest first.
    */
-  const pay = useCallback(async ({ invoiceId, amount, describe }) => {
+  const pay = useCallback(async ({ invoiceId, intent, amount, describe }) => {
     if (stage !== "idle") return;
     setStage("starting");
 
@@ -96,7 +96,12 @@ export function usePayNow({ gateway, onPaid }) {
     try {
       const response = await post("/portal/pay/order", {
         ...(invoiceId ? { invoice_id: invoiceId } : {}),
-        amount: Number(amount),
+        // A renewal has no bill yet - `intent` says what the money is for and
+        // the server prices it. Sending an amount from the browser for
+        // something that does not exist yet would let the page name its own
+        // price.
+        ...(intent ? { intent } : {}),
+        ...(amount !== undefined ? { amount: Number(amount) } : {}),
         return_url: window.location.href,
       });
       order = response?.data ?? response;

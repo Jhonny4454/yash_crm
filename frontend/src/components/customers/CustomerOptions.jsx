@@ -137,6 +137,11 @@ export function OptionsMenu({ customer, isAdmin, outstanding, onPick }) {
       title: customer.is_active ? undefined : "This customer is already disabled.",
     },
     { key: "terminate", label: "Terminate Customer", admin: true, danger: true },
+    // Last, below Terminate, and the only irreversible entry in the list.
+    // The server refuses it once there is any billing history, so for most
+    // real customers this fails with an explanation rather than deleting
+    // anything - it exists for the duplicate and the typo.
+    { key: "delete", label: "Delete Customer", admin: true, danger: true },
   ];
 
   return (
@@ -346,7 +351,7 @@ export function ResetMacDialog({ customer, onClose, onDone }) {
 export function AssignPlanDialog({ customer, current, onClose, onDone }) {
   const { busy, run } = useSubmit({ onDone, onClose });
   const [planId, setPlanId] = useState(current?.plan_id ? String(current.plan_id) : "");
-  const [startDate, setStartDate] = useState(new Date().toLocaleDateString("en-CA"));
+  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
 
   return (
     <Modal title={current ? "Change plan" : "Assign plan"} onClose={onClose} width="720px">
@@ -459,7 +464,7 @@ export function RenewPlanDialog({ customer, plan, onClose, onDone }) {
       : Number(chosen.price_monthly || 0);
     setForm((f) => ({
       ...f,
-      end_date: from.toLocaleDateString("en-CA"),
+      end_date: from.toISOString().slice(0, 10),
       amount: rupees(unit * Number(form.periods || 1)),
     }));
   }, [form.plan_id, form.periods, chosen, quote]);

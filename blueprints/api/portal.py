@@ -56,6 +56,51 @@ def _setting_value(key):
     return value
 
 
+def _account_status(customer, active_plan):
+    """The state of the connection, in one word plus a line of explanation.
+
+    Ordered by what stops service soonest, because only one of these can be
+    shown and the customer needs the reason their internet is actually off -
+    a terminated account whose plan also expired is terminated, not expired.
+    """
+    if not customer.is_active:
+        # `terminated` closes the service and cancels the plan; `disabled`
+        # only cuts the line. Both leave is_active false, so the plan is what
+        # tells them apart.
+        terminated = not active_plan or (active_plan.status or '') != 'active'
+        if terminated:
+            return {
+                'code': 'terminated', 'label': 'Terminated', 'tone': 'danger',
+                'detail': 'This connection has been closed. Please contact the '
+                          'office to start a new one.',
+            }
+        return {
+            'code': 'disabled', 'label': 'Disabled', 'tone': 'danger',
+            'detail': 'Your connection is switched off. Clearing what is owed '
+                      'and contacting the office will restore it.',
+        }
+
+    if not active_plan:
+        return {
+            'code': 'inactive', 'label': 'Inactive', 'tone': 'idle',
+            'detail': 'There is no active plan on this account. Choose a plan '
+                      'to get connected.',
+        }
+
+    days_left = (active_plan.end_date - date.today()).days \
+        if active_plan.end_date else None
+    if days_left is not None and days_left < 0:
+        return {
+            'code': 'expired', 'label': 'Expired', 'tone': 'warn',
+            'detail': 'Your plan has ended. Renew to stay connected.',
+        }
+
+    return {
+        'code': 'active', 'label': 'Active', 'tone': 'ok',
+        'detail': 'Your connection is active.',
+    }
+
+
 def _open_invoices(customer_id):
     """This customer's unsettled bills, oldest first.
 
@@ -112,6 +157,12 @@ def portal_dashboard():
     return ok({
         'customer': customer_dict(customer, detail=True),
         'active_plan': customer_plan_dict(active),
+        # One word for the state of the connection, worked out here so the
+        # portal does not have to infer it from three separate fields and
+        # reach a different answer from the office. It matters more now that a
+        # disabled customer can sign in: they arrive at a working portal with
+        # a dead line, and this is what tells them why.
+        'account_status': _account_status(customer, active),
         'outstanding': outstanding,
         'due_invoice_count': len(due),
         'oldest_due_invoice': invoice_dict(due[0]) if due else None,
@@ -570,6 +621,29 @@ def portal_pay_order():
     data = body()
     invoice_id = data.get('invoice_id')
 
+    # A renewal is paid for BEFORE its bill exists. `intent` says what the
+    # money is for; the invoice is written when the payment lands, by
+    # _materialise_intent below. Nothing is billed for a checkout the customer
+    # closes, because there was never anything to bill.
+    intent = (data.get('intent') or '').strip()
+    if intent and not invoice_id:
+        plan, quoted, error = _intent_quote(intent)
+        if error:
+            return error
+        customer = db.session.get(Customer, current_customer_id())
+        order = OnlinePaymentOrder(
+            order_id=cashfree.new_order_id(),
+            customer_id=customer.id,
+            invoice_id=None,
+            gateway='cashfree',
+            amount=quoted,
+            status='created',
+            note=f'{_INTENT_TAG}{intent} - {plan.name}'[:255],
+        )
+        db.session.add(order)
+        db.session.commit()
+        return _start_checkout(order, customer, quoted)
+
     # No invoice_id means "pay what I owe". The customer sees one number on
     # their dashboard - the account total - and asking them to work out which
     # of four bills to settle first is our filing problem, not theirs.
@@ -612,13 +686,24 @@ def portal_pay_order():
     db.session.add(order)
     db.session.commit()
 
-    return_url = (data.get('return_url')
+    return _start_checkout(order, customer, amount,
+                           return_url=data.get('return_url'))
+
+
+def _start_checkout(order, customer, amount, return_url=None):
+    """Hand a saved order to Cashfree and return what the SDK needs.
+
+    Shared by the two ways an order gets here - settling a bill, and paying
+    for a renewal whose bill does not exist yet - so the gateway call, the
+    failure handling and the response shape stay in one place.
+    """
+    return_url = (return_url
                   or current_app.config.get('CASHFREE_RETURN_URL')
                   or '')
 
     try:
         payload = cashfree.create_order(
-            order_id=order_id,
+            order_id=order.order_id,
             amount=amount,
             customer_id=customer.id,
             customer_phone=customer.mobile,
@@ -646,6 +731,86 @@ def portal_pay_order():
         'environment': cashfree.environment(),
         'sdk_url': cashfree.sdk_url(),
     })
+
+
+_INTENT_TAG = 'INTENT:'
+
+
+def _intent_quote(intent):
+    """(plan, amount, error) for a renewal intent - 'renew' or 'change:<id>'."""
+    customer = db.session.get(Customer, current_customer_id())
+    active = CustomerPlan.query.filter_by(customer_id=customer.id,
+                                          status='active').first()
+
+    if intent == 'renew':
+        if not active or not active.plan:
+            return None, None, fail('no_plan_to_renew', 400,
+                                    detail='There is no active plan to renew.')
+        plan, held = active.plan, active
+    elif intent.startswith('change:'):
+        try:
+            plan = db.session.get(Plan, int(intent.split(':', 1)[1]))
+        except (ValueError, IndexError):
+            plan = None
+        if not plan or not plan.is_active:
+            return None, None, fail('plan_not_found', 404)
+        held = active if (active and active.plan_id == plan.id) else None
+    else:
+        return None, None, fail('bad_intent', 400)
+
+    total, _tax = _apply_tax(_plan_price(plan, held))
+    if total <= 0:
+        return None, None, fail('nothing_to_pay', 400)
+    return plan, float(total), None
+
+
+def _order_intent(order):
+    """The renewal intent stored on an order, or ''."""
+    note = order.note or ''
+    if _INTENT_TAG not in note:
+        return ''
+    return note.split(_INTENT_TAG, 1)[1].split(' - ')[0].strip()
+
+
+def _materialise_intent(order):
+    """Write the bill for a renewal that has just been PAID.
+
+    This is the whole point of the intent flow: the invoice number is spent,
+    and the customer's bill list grows, only once the money is actually there.
+    Raising it up front and deleting it afterwards left gaps in the numbering
+    and a window where the dashboard showed a due the customer had not agreed
+    to.
+    """
+    intent = _order_intent(order)
+    if not intent:
+        return None
+
+    customer = order.customer
+    active = CustomerPlan.query.filter_by(customer_id=customer.id,
+                                          status='active').first()
+
+    if intent == 'renew':
+        if not active or not active.plan:
+            return None
+        invoice = _raise_invoice(customer, active.plan,
+                                 'Renewal - ' + active.plan.name,
+                                 customer_plan=active)
+    elif intent.startswith('change:'):
+        try:
+            plan = db.session.get(Plan, int(intent.split(':', 1)[1]))
+        except (ValueError, IndexError):
+            return None
+        if not plan:
+            return None
+        invoice = _raise_invoice(customer, plan, 'Plan change - ' + plan.name)
+        # Read back by _apply_successful_payment to move the customer across.
+        invoice.remarks = f'PLAN_CHANGE:{plan.id}'
+    else:
+        return None
+
+    order.invoice_id = invoice.id
+    db.session.flush()
+    return invoice
 
 
 def _allocate(order, amount, txn_id, method):
@@ -727,9 +892,21 @@ def _apply_successful_payment(order, txn_id=None, method=None):
     if order.status == 'paid':
         return order
 
-    invoice = order.invoice
     customer = order.customer
     method = str(method or 'Online')[:50]
+
+    # A renewal order carries no invoice until this moment - the bill is
+    # written now, against money that has actually arrived.
+    invoice = order.invoice or _materialise_intent(order)
+    if invoice is None:
+        # No bill to credit and no intent to build one from. Refusing here
+        # would strand the customer's money, so fall through to _allocate,
+        # which puts it against their oldest open bill or holds it as credit.
+        open_now = _open_invoices(customer.id)
+        if open_now:
+            order.invoice_id = open_now[0].id
+            db.session.flush()
+            invoice = order.invoice
 
     payment = _allocate(order, order.amount, txn_id, method)
 
@@ -743,7 +920,7 @@ def _apply_successful_payment(order, txn_id=None, method=None):
 
     # A plan-change invoice carries PLAN_CHANGE:<id> in remarks.
     target_plan = None
-    if invoice.remarks and 'PLAN_CHANGE:' in invoice.remarks:
+    if invoice is not None and invoice.remarks and 'PLAN_CHANGE:' in invoice.remarks:
         try:
             target_plan = db.session.get(
                 Plan, int(invoice.remarks.split('PLAN_CHANGE:')[1].split(':')[0]))

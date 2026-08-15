@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { post } from "../api/client";
+import { del, post } from "../api/client";
 import { useFetch } from "../api/useFetch";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -97,6 +97,19 @@ export default function CustomerDetail() {
         message: "Future bills will be raised at the full plan price.",
         confirmLabel: "Cancel discount",
       },
+      // The only action here that cannot be undone. The wording names the
+      // customer and says plainly what survives - nothing - because "are you
+      // sure?" is a question people answer yes to without reading.
+      delete: {
+        title: `Delete ${customer?.full_name || "this customer"} permanently?`,
+        message: "The customer record, their plan and their login are removed "
+          + "and cannot be restored. This only works while the account has no "
+          + "invoices and no payments — if it has any, nothing is deleted and "
+          + "you will be told why. To close a customer who has been billed, "
+          + "use Terminate instead.",
+        confirmLabel: "Delete permanently",
+        tone: "danger",
+      },
       "reset-password": {
         title: "Reset the portal password?",
         message: "A new temporary password is generated and texted to the customer. "
@@ -117,6 +130,13 @@ export default function CustomerDetail() {
           toast.warning("The record was updated, but the router did not confirm "
             + "the change. Check the line before telling the customer.");
         }
+      } else if (key === "delete") {
+        const response = await del(`/customers/${id}`);
+        const payload = response?.data ?? response;
+        toast.success(`${payload?.name || "Customer"} deleted.`);
+        // The record this screen is showing no longer exists, so leaving.
+        navigate("/customers", { replace: true });
+        return;
       } else if (key === "clear-discount") {
         await clearDiscount(id);
         toast.success("Discount cancelled.");
@@ -142,7 +162,7 @@ export default function CustomerDetail() {
     } finally {
       setBusyAction(null);
     }
-  }, [busyAction, confirm, id, refetch, toast]);
+  }, [busyAction, confirm, customer, id, navigate, refetch, toast]);
 
   function onOptionPick(key) {
     switch (key) {
