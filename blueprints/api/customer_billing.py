@@ -278,24 +278,16 @@ def invoice_delete(iid):
     if invoice is None:
         return fail('not_found', 404)
 
-    if invoice.payments:
-        # Not `invoice.paid_amount > 0`: that only counts approved payments, so
-        # an invoice with a pending or rejected payment row slipped through,
-        # and deleting it made the ORM try to null that row's invoice_id -
-        # which the NOT NULL column rejects with an IntegrityError.
-        return fail('invoice_has_payments', 409,
-                    detail=f'{invoice.invoice_no} has payment records against '
-                           f'it. Cancel them instead of deleting the invoice, '
-                           f'so the payment records survive.')
-
     number = invoice.invoice_no
     customer_id = invoice.customer_id
 
-    try:
-        from models_ext import InvoiceItem
-        InvoiceItem.query.filter_by(invoice_id=iid).delete()
-    except Exception:
-        pass
+    # The bill can go even when money touched it - the payment rows are the
+    # record, and they stay in the ledger with only the bill link detached.
+    from services.payments import detach_payment_records
+    if not detach_payment_records(invoice):
+        return fail('invoice_has_sales_return', 409,
+                    detail=f'{number} has a sales return / credit note '
+                           f'against it. Delete the return first.')
 
     db.session.delete(invoice)
     db.session.commit()

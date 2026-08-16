@@ -45,6 +45,54 @@ def column_ddl(column, dialect):
     return ddl
 
 
+#: Columns that started NOT NULL and must now accept NULL on databases that
+#: already hold the old shape (fresh databases get the model's definition from
+#: CREATE TABLE, so they need nothing here). The bill can be deleted while the
+#: payment rows survive only if the child FK can be nulled, so the ORM can
+#: detach them instead of failing the delete.
+NULLIFY_COLUMNS = {
+    'payments': ('invoice_id', 'Integer'),
+}
+
+
+def nullify_columns(db, *, dry_run=False, log=None):
+    """MODIFY any listed column that is still NOT NULL but should be nullable."""
+    say = log or (lambda *a, **k: None)
+    engine = db.engine
+    dialect = engine.dialect
+
+    if dialect.name not in ('mysql', 'mariadb'):
+        # SQLite has no ALTER COLUMN; a fresh SQLite DB gets the new model's
+        # nullable definition from CREATE TABLE.
+        return []
+
+    changed = []
+    inspector = inspect(engine)
+    for table_name, (column_name, type_name) in NULLIFY_COLUMNS.items():
+        try:
+            live = {c['name']: c for c in inspector.get_columns(table_name)}
+        except Exception:                                   # noqa: BLE001
+            continue
+        column = live.get(column_name)
+        if column is None or column.get('nullable'):
+            continue
+        stmt = (f'ALTER TABLE `{table_name}` '
+                f'MODIFY COLUMN `{column_name}` {type_name} NULL')
+        if dry_run:
+            say(f'would run: {stmt}')
+            changed.append((table_name, column_name))
+            continue
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(stmt))
+            changed.append((table_name, column_name))
+            say(f'made {table_name}.{column_name} nullable')
+        except SQLAlchemyError as exc:
+            msg = str(getattr(exc, 'orig', exc))
+            say(f'FAILED making {table_name}.{column_name} nullable: {msg}')
+    return changed
+
+
 def sync_schema(db, *, dry_run=False, log=None):
     """
     Add whatever the models declare and the database is missing.
@@ -95,5 +143,8 @@ def sync_schema(db, *, dry_run=False, log=None):
                 msg = str(getattr(exc, 'orig', exc))
                 result['failed'].append((table_name, column.name, msg))
                 say(f"FAILED {table_name}.{column.name}: {msg}")
+
+    # ---- 3. nullability changes ------------------------------------------- #
+    nullify_columns(db, dry_run=dry_run, log=say)
 
     return result

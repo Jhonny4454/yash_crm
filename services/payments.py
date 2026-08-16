@@ -16,6 +16,48 @@ from models import db
 from services import renewals
 
 
+def detach_payment_records(invoice):
+    """
+    Detach every record pointing at an invoice about to be deleted.
+
+    The payment rows ARE the ledger: deleting them with the bill would erase
+    the trace of money that changed hands. So the child rows keep their
+    amounts, receipt numbers and modes, and lose only the bill link - the
+    customer's payment history survives the bill. The other tables that point
+    at invoices would block the DELETE outright, so they are detached the same
+    way.
+
+    Returns False - and changes nothing - if the bill has a sales return
+    (credit note) against it: that is itself a money document and its column
+    is NOT NULL, so it cannot be orphaned; the operator must deal with the
+    return first.
+
+    Must be called inside the same session, before ``db.session.delete(invoice)``.
+    """
+    if invoice is None:
+        return True
+
+    if invoice.sales_returns:
+        return False
+
+    for p in list(invoice.payments):
+        p.invoice_id = None
+
+    from models import OnlinePaymentOrder, VendorBill, WalletEntry
+    from models_ext import InvoiceItem, RenewalRequest
+
+    OnlinePaymentOrder.query.filter_by(invoice_id=invoice.id).update(
+        {'invoice_id': None})
+    RenewalRequest.query.filter_by(invoice_id=invoice.id).update(
+        {'invoice_id': None})
+    VendorBill.query.filter_by(invoice_id=invoice.id).update(
+        {'invoice_id': None})
+    WalletEntry.query.filter_by(invoice_id=invoice.id).update(
+        {'invoice_id': None})
+    InvoiceItem.query.filter_by(invoice_id=invoice.id).delete()
+    return True
+
+
 def _notify(customer, template_type, **kwargs):
     """Message the customer without ever breaking the transaction."""
     try:

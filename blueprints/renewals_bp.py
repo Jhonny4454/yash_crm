@@ -681,18 +681,15 @@ def addon_delete(id):
         return redirect(request.referrer or url_for('dashboard'))
 
     invoice = Invoice.query.get_or_404(id)
-    if invoice.payments:
-        # Not `paid_amount > 0` - that only counts approved payments, so an
-        # invoice with a pending or rejected payment slipped through and the
-        # delete then made the ORM null that row's invoice_id, which the
-        # NOT NULL column rejects.
-        flash('This invoice has payment records against it and cannot be '
-              'deleted. Reverse the payment first.', 'warning')
-        return redirect(url_for('customer_view', id=invoice.customer_id))
-
     customer_id = invoice.customer_id
     number = invoice.invoice_no
-    InvoiceItem.query.filter_by(invoice_id=invoice.id).delete()
+    # The bill can go even when money touched it; the payment rows survive
+    # with only the bill link detached.
+    from services.payments import detach_payment_records
+    if not detach_payment_records(invoice):
+        flash(f'{number} has a sales return / credit note against it. '
+              'Delete the return first.', 'warning')
+        return redirect(url_for('customer_view', id=customer_id))
     db.session.delete(invoice)
     db.session.commit()
     _audit('Delete Addon Invoice', f'{number} removed')

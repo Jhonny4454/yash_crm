@@ -309,7 +309,7 @@ class Invoice(db.Model):
 class Payment(db.Model):
     __tablename__ = 'payments'
     id = db.Column(db.Integer, primary_key=True)
-    invoice_id = db.Column(db.Integer, db.ForeignKey('invoices.id'), nullable=False)
+    invoice_id = db.Column(db.Integer, db.ForeignKey('invoices.id'), nullable=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
     amount = db.Column(db.Numeric(10, 2), nullable=False)
     payment_date = db.Column(db.Date, nullable=False, default=date.today)

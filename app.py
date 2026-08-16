@@ -2999,11 +2999,14 @@ def invoice_detailed(id):
 def invoice_delete(id):
     invoice = Invoice.query.get_or_404(id)
     customer_id = invoice.customer_id
-    if any(p.status == 'approved' for p in invoice.payments):
-        flash('Cannot delete an invoice that already has authorized payments.', 'danger')
+    # Payment rows are the record - keep them and detach the bill link, so the
+    # receipts survive the invoice. Previously this deleted every payment on
+    # the bill, which erased the money's trace entirely.
+    from services.payments import detach_payment_records
+    if not detach_payment_records(invoice):
+        flash('This invoice has a sales return / credit note against it. '
+              'Delete the return first.', 'danger')
         return redirect(url_for('customer_view', id=customer_id))
-    for p in list(invoice.payments):
-        db.session.delete(p)
     db.session.delete(invoice)
     db.session.commit()
     log_audit('Delete Invoice', f"Deleted invoice #{id}")
