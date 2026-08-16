@@ -66,17 +66,15 @@ export function PortalDashboard() {
     <PayDuesPanel outstanding={outstanding} invoiceCount={data?.due_invoice_count}
                   gateway={gateway} onPaid={refetch} />
 
-    <div className="grid-two">
-      <Rows title="Recent invoices" rows={data?.recent_invoices} limit={5}
-            empty="You have no recent invoices." />
-      {/* Four, and the Payments screen has the rest. The card answers one
-          question - did my last payment land - and a longer list only pushes
-          it further down a phone screen. The cap is here as well as in the
-          API so a browser that has not picked up the new build yet still
-          prints the short list. */}
-      <Rows title="Recent payments" rows={data?.recent_payments} limit={4}
-            empty="Your approved payments will appear here." />
-    </div>
+    {/* One card, four rows, and nothing else down here.
+        The bills had a card of their own beside this one, which repeated
+        what the amount-due box above already says and sent the customer to
+        the Invoices screen to do anything about it - so the homepage ended
+        on two lists and no action. What is left is the one thing this screen
+        cannot answer higher up: did my last payment land. The rest of the
+        receipts are on the Payments screen. */}
+    <Rows title="Recent payments" rows={data?.recent_payments} limit={4}
+          empty="Your approved payments will appear here." />
   </section>;
 }
 

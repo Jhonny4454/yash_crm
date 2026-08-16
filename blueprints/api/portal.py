@@ -32,13 +32,17 @@ from .utils import (body, current_customer_id, customer_required, fail, iso,
 
 bp = Blueprint('api_portal', __name__)
 
-#: How many rows the dashboard's "Recent" cards carry.
+#: How many rows the dashboard's "Recent" lists carry.
 #:
-#: The dashboard is a summary, not the history - both cards are backed by a
+#: The dashboard is a summary, not the history - both lists are backed by a
 #: full screen of their own (Invoices, Payments) that pages through
-#: everything. Payments is the shorter list on purpose: it sits below the
-#: fold on a phone, and four receipts is enough to answer "did my last
-#: payment go through?", which is the only reason anybody reads it here.
+#: everything. Four payments is enough to answer "did my last payment go
+#: through?", which is the only reason anybody reads that card.
+#:
+#: ``recent_invoices`` no longer has a card on the web homepage - the amount
+#: due, and the button that pays it, sit above it. The field stays in the
+#: response because the mobile app reads it, and dropping it here would break
+#: an app build that is already installed on somebody's phone.
 RECENT_INVOICES = 5
 RECENT_PAYMENTS = 4
 
