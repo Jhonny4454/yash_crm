@@ -536,6 +536,21 @@ def payment_entry(cid):
 
     db.session.commit()
 
+    # The automatic WhatsApp confirmation. One message per counter entry, not
+    # one per invoice - `created` can hold several rows when a single amount
+    # settles more than one bill, and four messages for one payment would be
+    # worse than none. The first row carries the headline amount and the
+    # balance placeholder reads that invoice's post-payment balance, exactly
+    # like the payment_send resend button below.
+    try:
+        from app import send_template_message
+        if created:
+            send_template_message(customer, 'payment_received',
+                                  invoice=created[0].invoice,
+                                  payment=created[0])
+    except Exception:
+        pass
+
     _audit('Payment Entry',
            f'{customer.full_name}: {amount} by {mode} against '
            f'{", ".join(i.invoice_no for i in invoices)}'

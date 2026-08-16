@@ -693,6 +693,17 @@ def payment_create():
     if invoice.balance <= 0:
         invoice.status = 'paid'
     db.session.commit()
+
+    # The counter entry (customer_billing.payment_entry) confirms every payment
+    # over WhatsApp; this older API route recorded the money in silence. Same
+    # message, same guard: messaging must never be able to fail the payment.
+    try:
+        from app import send_template_message
+        send_template_message(invoice.customer, 'payment_received',
+                              invoice=invoice, payment=payment)
+    except Exception:
+        pass
+
     return ok(payment_dict(payment)), 201
 
 

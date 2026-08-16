@@ -1091,6 +1091,23 @@ def _apply_successful_payment(order, txn_id=None, method=None):
         customer.is_active = True
 
     db.session.commit()
+
+    # The counter sends a payment_received confirmation automatically; the
+    # portal used to stop at the database row, so a customer who paid online
+    # heard nothing back. This is the one path every successful online payment
+    # lands on (webhook, status poll, return URL), so the message belongs here,
+    # once per order - never once per invoice _allocate may have split across.
+    # send_template_message never raises, but the import must not be able to
+    # roll a paid order back either, so the whole call is shielded.
+    if payment is not None:
+        try:
+            from app import send_template_message
+            send_template_message(customer, 'payment_received',
+                                  invoice=payment.invoice,
+                                  payment=payment, customer_plan=active)
+        except Exception:
+            current_app.logger.exception('payment_received send failed')
+
     return order
 
 
