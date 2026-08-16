@@ -1,0 +1,189 @@
+/* ==========================================================================
+   Dark mode - staff panel only.
+
+   Two layers, deliberately:
+
+   1. The tokens. index.css already drives most of the panel from a handful of
+      CSS variables, so redefining those under `[data-theme="dark"]` turns the
+      majority of the UI over on its own.
+
+   2. The surfaces that were written as literal `#fff` before those tokens
+      existed. Every one of them is listed below rather than left to a blanket
+      `* { background: … }`, because a rule that broad also repaints the things
+      that are meant to stay white - a status pill, a chart, a printed page.
+
+   Scoped with `body:not(.portal-mode)`. The customer portal has its own
+   palette (`--pt-*` in Portal.css) and its own light background; a staff
+   member switching to dark must not flip the customer's screen with it.
+
+   Printing is forced back to light further down: nobody wants a bill that
+   empties an ink cartridge.
+   ========================================================================== */
+
+:root[data-theme="dark"] {
+  --primary-color: #3b9fe0;
+  --primary-hover: #63b4e8;
+  --bg-body: #0f172a;
+  --surface: #1b2537;
+  --surface-2: #233047;
+  --sidebar-bg: #111a2b;
+  --sidebar-hover: #0b1220;
+  --text-main: #e2e8f0;
+  --text-muted: #94a3b8;
+  --text-light: #cbd5e1;
+  --border-light: #32405a;
+
+  /* A shadow on a dark surface has to be darker than the surface, not a
+     lighter grey, or every card gains a halo. */
+  --shadow-md: 0 4px 10px -2px rgba(0, 0, 0, .55), 0 2px 4px -2px rgba(0, 0, 0, .4);
+
+  /* Native controls - scrollbars, date pickers, autofill - follow this. */
+  color-scheme: dark;
+}
+
+/* Light stays the default and keeps the surface token defined, so the rules
+   below are the same in both themes and only the value moves. */
+:root { --surface: #fff; --surface-2: #f8fafc; }
+
+/* ---------------------------------------------------------- surfaces ---- */
+
+:root[data-theme="dark"] body:not(.portal-mode) {
+  background: var(--bg-body);
+  color: var(--text-main);
+}
+
+:root[data-theme="dark"] body:not(.portal-mode) .card,
+:root[data-theme="dark"] body:not(.portal-mode) .panel,
+:root[data-theme="dark"] body:not(.portal-mode) .panel-card,
+:root[data-theme="dark"] body:not(.portal-mode) .list-container,
+:root[data-theme="dark"] body:not(.portal-mode) .login-card,
+:root[data-theme="dark"] body:not(.portal-mode) .modal-card,
+:root[data-theme="dark"] body:not(.portal-mode) .modal-body,
+:root[data-theme="dark"] body:not(.portal-mode) .modal-foot,
+:root[data-theme="dark"] body:not(.portal-mode) .app-footer,
+:root[data-theme="dark"] body:not(.portal-mode) .metric-card,
+:root[data-theme="dark"] body:not(.portal-mode) table.data.cards-sm tr {
+  background: var(--surface);
+  color: var(--text-main);
+  border-color: var(--border-light);
+}
+
+/* Table chrome. The header band and the hover row are the two places a light
+   theme leans on near-white greys, which read as glare on dark. */
+:root[data-theme="dark"] body:not(.portal-mode) table.data th,
+:root[data-theme="dark"] body:not(.portal-mode) table.tbl th,
+:root[data-theme="dark"] body:not(.portal-mode) .panel-head,
+:root[data-theme="dark"] body:not(.portal-mode) .table-wrap thead th {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border-color: var(--border-light);
+}
+
+:root[data-theme="dark"] body:not(.portal-mode) table.data tbody tr:hover,
+:root[data-theme="dark"] body:not(.portal-mode) table.tbl tbody tr:hover,
+:root[data-theme="dark"] body:not(.portal-mode) table.data.cards-sm tr:hover {
+  background: var(--surface-2);
+}
+
+:root[data-theme="dark"] body:not(.portal-mode) table.data td,
+:root[data-theme="dark"] body:not(.portal-mode) table.tbl td {
+  border-color: var(--border-light);
+  color: var(--text-main);
+}
+
+/* ------------------------------------------------------------ inputs ---- */
+
+:root[data-theme="dark"] body:not(.portal-mode) .input,
+:root[data-theme="dark"] body:not(.portal-mode) .select,
+:root[data-theme="dark"] body:not(.portal-mode) textarea.input,
+:root[data-theme="dark"] body:not(.portal-mode) .field input,
+:root[data-theme="dark"] body:not(.portal-mode) .field select,
+:root[data-theme="dark"] body:not(.portal-mode) .field textarea,
+:root[data-theme="dark"] body:not(.portal-mode) .modal-body input,
+:root[data-theme="dark"] body:not(.portal-mode) .modal-body select,
+:root[data-theme="dark"] body:not(.portal-mode) .modal-body textarea,
+:root[data-theme="dark"] body:not(.portal-mode) .search-wrapper input,
+:root[data-theme="dark"] body:not(.portal-mode) .picker-results button {
+  background: var(--surface-2);
+  color: var(--text-main);
+  border-color: var(--border-light);
+}
+
+:root[data-theme="dark"] body:not(.portal-mode) ::placeholder { color: #7c8ba5; }
+
+/* Chrome paints autofilled fields a fixed pale yellow, over the top of any
+   background rule. An inset shadow the size of the field is the only thing
+   that covers it. */
+:root[data-theme="dark"] body:not(.portal-mode) input:-webkit-autofill,
+:root[data-theme="dark"] body:not(.portal-mode) input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 40px var(--surface-2) inset;
+  -webkit-text-fill-color: var(--text-main);
+}
+
+/* ----------------------------------------------------------- buttons ---- */
+
+:root[data-theme="dark"] body:not(.portal-mode) .btn,
+:root[data-theme="dark"] body:not(.portal-mode) .icon-btn,
+:root[data-theme="dark"] body:not(.portal-mode) .seg-toggle button {
+  background: var(--surface-2);
+  color: var(--text-main);
+  border-color: var(--border-light);
+}
+
+/* The primary button keeps its brand fill - it is the one thing on the page
+   that must not change meaning with the theme. */
+:root[data-theme="dark"] body:not(.portal-mode) .btn.primary,
+:root[data-theme="dark"] body:not(.portal-mode) .seg-toggle button.is-active {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  color: #06121f;
+}
+
+:root[data-theme="dark"] body:not(.portal-mode) .btn-icon-sm:hover {
+  background: var(--surface-2);
+}
+
+/* ------------------------------------------------------------- misc ----- */
+
+:root[data-theme="dark"] body:not(.portal-mode) .hint,
+:root[data-theme="dark"] body:not(.portal-mode) .muted,
+:root[data-theme="dark"] body:not(.portal-mode) small { color: var(--text-muted); }
+
+:root[data-theme="dark"] body:not(.portal-mode) a { color: var(--primary-hover); }
+
+/* Skeletons are a pale grey animation over a white card; on dark they flash. */
+:root[data-theme="dark"] body:not(.portal-mode) .skeleton {
+  background: linear-gradient(90deg, #223049, #2c3c58, #223049);
+}
+
+/* ---- the toggle itself ------------------------------------------------- */
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font-size: .95rem;
+  cursor: pointer;
+}
+
+.theme-toggle:hover { background: rgba(255, 255, 255, .14); }
+.theme-toggle:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+
+/* ---- printing ---------------------------------------------------------- */
+
+/* A bill printed from a dark screen would come out as a black page. */
+@media print {
+  :root[data-theme="dark"] body { background: #fff !important; color: #000 !important; }
+  :root[data-theme="dark"] body * {
+    background-color: transparent !important;
+    color: #000 !important;
+    border-color: #999 !important;
+  }
+  .theme-toggle { display: none !important; }
+}

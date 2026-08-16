@@ -59,6 +59,23 @@
       }
       @keyframes boot { to { background-position: -200% 0; } }
     </style>
+      <!-- Theme, before the first paint.
+
+         The bundle applies the stored choice too, but it does so after React
+         mounts - long enough for a full-white flash on every page load for
+         anybody using dark mode. This runs while the bundle is still
+         downloading. It is inline and tiny for exactly that reason. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('unicrm.theme');
+          var dark = stored
+            ? stored === 'dark'
+            : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        } catch (e) { /* storage blocked - stay light */ }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

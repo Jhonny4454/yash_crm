@@ -82,6 +82,13 @@ body.sidebar-collapsed .sidebar { width: var(--sidebar-w-collapsed); }
   border-bottom: 1px solid rgba(255,255,255,.05);
 }
 .sidebar .brand img { max-width: 92px; height: auto; }
+
+/* Logo only, so it gets the room the name used to take and can be read at a
+   glance instead of squinted at. Collapsed rail shrinks it rather than
+   dropping it - a rail with nothing at the top looks broken. */
+.sidebar .brand-logo-only { padding: .5rem 1rem 1rem; }
+.sidebar .brand-logo-only img { max-width: 118px; }
+body.sidebar-collapsed .sidebar .brand-logo-only img { max-width: 42px; }
 .sidebar .brand .brand-mark {
   width: 46px; height: 46px; margin: 0 auto; border-radius: 10px;
   background: var(--primary-color); color: #fff;

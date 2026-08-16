@@ -478,13 +478,18 @@ export default function Sidebar({
         className={`sidebar${mobileOpen ? " mobile-open" : ""}`}
         aria-label="Main navigation"
       >
-        <div className="brand">
+        {/* The logo alone. The name sat beside it in a 240px rail and had to
+            be truncated to fit - "Yash Intern..." - which reads as a rendering
+            fault rather than a brand. The logo carries the name inside it, and
+            it is the same mark on the bill and the customer portal, so nothing
+            is lost by letting it speak for itself. The company name is still
+            announced to a screen reader through the image's alt text. */}
+        <div className="brand brand-logo-only">
           <img
             className="brand-logo"
             src={company?.logo_url || logoImage}
-            alt={company?.name || "YASH"}
+            alt={company?.name || "YASH Internet Services"}
           />
-          <h5>{company?.name || "Yash Internet Services"}</h5>
           {onCloseMobile && (
             <button type="button" className="drawer-close" onClick={onCloseMobile}
                     aria-label="Close menu">

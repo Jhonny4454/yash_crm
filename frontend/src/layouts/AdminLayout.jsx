@@ -5,6 +5,7 @@ import DashboardHeader from "../components/dashboard/DashboardHeader";
 import { useAuth } from "../context/AuthContext";
 import { TITLES } from "../components/menu";
 import Breadcrumbs from "../components/Breadcrumbs";
+import ThemeToggle from "../components/ThemeToggle";
 import "../styles/Dashboard.css";
 
 const MOBILE_MAX = 991;
@@ -152,6 +153,11 @@ export default function AdminLayout() {
               <i className="fas fa-search" />
             </button>
           </form>
+
+          {/* Beside the account, not buried in Settings: it is a property of
+              the screen you are sitting at, and the person who wants it wants
+              it now. */}
+          <ThemeToggle />
 
           <div className="user-greeting">
             <span className="who">
