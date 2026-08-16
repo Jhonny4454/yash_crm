@@ -62,7 +62,10 @@
   left: 0;
   right: 0;
   height: 1px;
-  background: var(--pt-line, #e2e8f0);
+  /* A shade firmer than --pt-line. The panel's own border is the lightest
+     line the portal draws, and a divider the same weight inside it did not
+     read as a separator at arm's length on a phone. */
+  background: #dbe3ec;
 }
 .bill-row:hover { background: #f8fafc; }
 .bill-row:active { background: #f1f5f9; }

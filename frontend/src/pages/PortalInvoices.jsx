@@ -99,7 +99,12 @@ function BillRow({ invoice, gateway, onPaid, ask }) {
   const tone = !unpaid ? "is-paid" : overdue ? "is-overdue" : "is-due";
 
   return (
-    <div className={`bill-row ${tone}`} {...billRowProps(invoice, ask)}>
+    /* The row's classes go THROUGH billRowProps, not beside it: those props
+       carry a className of their own, and a `{...spread}` after a className
+       attribute silently replaces it. That is what stripped `bill-row` off
+       every row - the layout, the padding and the dividers all vanished and
+       the amounts fell out of the panel. */
+    <div {...billRowProps(invoice, ask, `bill-row ${tone}`)}>
       <div className="bill-row-id">
         <strong className="bill-row-no">{invoice.invoice_no || `Bill #${invoice.id}`}</strong>
         <span className="bill-row-dates">

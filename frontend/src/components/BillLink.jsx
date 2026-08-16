@@ -120,10 +120,17 @@ export function BillActions({ pending, working, dismiss, run }) {
  * A real button to assistive technology and to the keyboard, not a div with a
  * click handler - a row reachable only by mouse is not clickable "on all
  * devices".
+ *
+ * `extraClasses` exists because these props include a className of their own,
+ * and a caller writing `<div className="my-row" {...billRowProps(...)}>` has
+ * that className silently replaced. The row goes on working and loses every
+ * one of its styles - which is how the bill list ended up with no layout, no
+ * dividers and amounts hanging off the edge of the panel. Pass the row's own
+ * classes here and they are merged instead of lost.
  */
-export function billRowProps(invoice, ask) {
+export function billRowProps(invoice, ask, extraClasses = "") {
   return {
-    className: "is-billrow",
+    className: `is-billrow${extraClasses ? ` ${extraClasses}` : ""}`,
     role: "button",
     tabIndex: 0,
     title: `Bill ${invoice.invoice_no || ""}`.trim(),
