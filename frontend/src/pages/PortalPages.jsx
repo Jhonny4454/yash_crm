@@ -43,9 +43,14 @@ export function PortalDashboard() {
           {plan?.speed_mbps ? ` · ${plan.speed_mbps} Mbps` : ""}
         </p>
         <PlanCountdown plan={plan} />
-        <Link className="btn primary pt-hero-go" to="/customer/plans">
-          Renew plan
-        </Link>
+        {/* No button when the office renews this account for them: sending a
+            customer to a screen that only says no is worse than saying it
+            here. */}
+        {data?.can_renew === false && data?.renewal_note
+          ? <p className="pt-hero-meta">{data.renewal_note}</p>
+          : <Link className="btn primary pt-hero-go" to="/customer/plans">
+              Renew plan
+            </Link>}
       </section>
 
       <section className={`panel pt-hero-box pt-hero-due${outstanding > 0 ? " is-due" : ""}`}>
@@ -152,6 +157,16 @@ export function PortalPlans() {
   });
 
   const current = account?.active_plan;
+
+  /* The office can switch self-renewal off for a connection, and then the
+     server refuses both Renew and Change plan. The screen has to say so
+     instead of offering buttons that fail: a customer who taps Renew & pay,
+     waits, and is told no learns that the portal is broken. The quote answers
+     for the plan they are actually on; the dashboard carries the same flag so
+     the home screen can be honest too. */
+  const renewalOff = quote?.renewal_blocked
+    ? (quote.reason || "Online renewal is switched off for your connection.")
+    : (account?.can_renew === false && account?.renewal_note) || "";
 
   /**
    * Pay first, bill afterwards - when there is a gateway to pay through.
@@ -304,9 +319,13 @@ export function PortalPlans() {
         {/* The bill, itemised, before they commit to it. The server does the
             GST arithmetic - the same function the counter uses - so the
             figure here is the figure on the invoice. */}
-        <PriceLines quote={quote} fallback={current.price} />
+        {!renewalOff && <PriceLines quote={quote} fallback={current.price} />}
 
-        {quote?.new_end_date && (
+        {renewalOff && (
+          <p className="renew-card-off" role="status">{renewalOff}</p>
+        )}
+
+        {!renewalOff && quote?.new_end_date && (
           <p className="renew-card-note">
             Renewing extends your plan to <strong>{fmtDate(quote.new_end_date)}</strong>.
             Days you have already paid for are not lost.
@@ -323,6 +342,7 @@ export function PortalPlans() {
         {/* The label says what the button does, in full. "Renew this plan"
             gave no warning that a payment window was about to open, and a
             checkout nobody expected is a checkout people close. */}
+        {!renewalOff && (
         <button className="btn primary renew-card-go"
                 disabled={busy === "renew" || paying}
                 onClick={() => (gateway?.enabled
@@ -339,13 +359,14 @@ export function PortalPlans() {
                                    ?? quote?.total ?? current.price)}`
               : "Renew this plan"}
         </button>
+        )}
       </section>
     )}
 
     {/* --------------------------------------------------------- change --
         Behind its own button. A plan list sitting open beside Renew is how
         people change plan without meaning to. */}
-    {!changing ? (
+    {renewalOff ? null : !changing ? (
       <button type="button" className="btn plan-change-open"
               onClick={() => setChanging(true)}>
         {current ? "Change to a different plan" : "Choose a plan"}

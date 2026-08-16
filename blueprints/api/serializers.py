@@ -441,5 +441,17 @@ def payment_dict(p):
                           if p.authorized_by_user else ''),
         'received_by': (p.received_by_user.full_name
                         if p.received_by_user else ''),
+        # Who to print in a "Received by" column.
+        #
+        # A payment the customer made themselves has no staff member behind
+        # it, so that column was a dash - and a dash reads as "nobody recorded
+        # this", which is the opposite of what happened. It says Self Renew
+        # instead, so an operator scanning the payment history can see at a
+        # glance how much of it came through the portal without opening a
+        # single row.
+        'received_by_label': (
+            p.received_by_user.full_name if p.received_by_user
+            else ('Self Renew' if (p.source or '') in ('portal', 'gateway')
+                  else '')),
         'created_at': iso(p.created_at),
     }

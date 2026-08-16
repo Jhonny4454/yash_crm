@@ -401,6 +401,18 @@ body.portal-mode {
 .portal-shell .pay-dues-total { font-size: 1.5rem; }
 .portal-shell .pay-dues-cta { width: auto; }
 
+/* The renewal switch, when the office has it off. Not an error - the
+   customer has done nothing wrong - so it reads as a notice, not a failure. */
+.portal-shell .renew-card-off {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #fde68a;
+  border-radius: 12px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: .86rem;
+}
+
 .portal-shell .current-plan { border-radius: var(--pt-radius); }
 .portal-shell .section-title { margin-top: 4px; }
 

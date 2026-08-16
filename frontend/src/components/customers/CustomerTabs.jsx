@@ -818,7 +818,10 @@ export function PaymentHistoryTab({ payments, onRefresh }) {
                 <td>{payment.payment_mode || "—"}</td>
                 <td>{Number(payment.discount_amount) > 0
                   ? `Yes — ${inr(payment.discount_amount)}` : "No"}</td>
-                <td>{payment.received_by || "—"}</td>
+                {/* `received_by_label` already says Self Renew for a payment
+                    the customer made from the portal, where there is no staff
+                    member to name. */}
+                <td>{payment.received_by_label || payment.received_by || "—"}</td>
                 <td><StatusPill value={payment.status} kind="payment" /></td>
                 <td><ReceiptActions payment={payment} onChanged={onRefresh} /></td>
               </tr>

@@ -24,6 +24,7 @@ from models import (Customer, CustomerPlan, Invoice, OnlinePaymentOrder,
                     Payment, Plan, db)
 from services import cashfree
 from services.outstanding import OPEN_STATUSES, outstanding_for_customer
+from services.plans import current_plan, current_plan_of
 
 from .serializers import (company_branding, customer_dict, customer_plan_dict,
                           invoice_dict, payment_dict, plan_dict)
@@ -174,7 +175,11 @@ def portal_dashboard():
     if not customer:
         return fail('not_found', 404)
 
-    active = next((cp for cp in customer.plans if cp.status == 'active'), None)
+    # The same row the admin's Plan tab shows. Picking whichever open row the
+    # database returned first meant an account with a second open plan could
+    # have the office toggling one row's Online Renewal switch while the
+    # portal read the other one's.
+    active = current_plan_of(customer)
     invoices = Invoice.query.options(
         selectinload(Invoice.payments), joinedload(Invoice.customer)
     ).filter_by(customer_id=customer.id).order_by(
@@ -204,6 +209,11 @@ def portal_dashboard():
         # disabled customer can sign in: they arrive at a working portal with
         # a dead line, and this is what tells them why.
         'account_status': _account_status(customer, active),
+        # Whether the Renew button on the home screen should do anything. The
+        # office can switch self-renewal off per plan, and a button that opens
+        # a screen only to refuse there is worse than no button.
+        'can_renew': bool(active) and not _self_renewal_blocked(active),
+        'renewal_note': RENEWAL_OFF if _self_renewal_blocked(active) else '',
         'outstanding': outstanding,
         'due_invoice_count': len(due),
         'oldest_due_invoice': invoice_dict(due[0]) if due else None,
@@ -271,8 +281,7 @@ def portal_plans():
     """
     rows = Plan.query.filter_by(is_active=True).order_by(Plan.price_monthly).all()
     customer = db.session.get(Customer, current_customer_id())
-    active = CustomerPlan.query.filter_by(customer_id=current_customer_id(),
-                                          status='active').first()
+    active = current_plan(current_customer_id())
     return ok([{**plan_dict(p), **_price_breakdown(p, active, customer),
                 'is_current': bool(active and active.plan_id == p.id)}
                for p in rows])
@@ -289,16 +298,20 @@ def portal_renew_quote():
     the figure that button is allowed to show.
     """
     customer = db.session.get(Customer, current_customer_id())
-    active = CustomerPlan.query.filter_by(customer_id=customer.id,
-                                          status='active').first()
+    active = current_plan(customer.id)
     if not active or not active.plan:
         return ok({'active_plan': None, 'can_renew': False,
+                   'renewal_blocked': False,
                    'reason': 'There is no active plan on this account.'})
     if _self_renewal_blocked(active):
         # Answered before the price, not after: a customer who cannot renew
         # should not be shown a figure and a button that then refuses.
+        #
+        # `renewal_blocked` is the machine-readable half. "No active plan" is
+        # also can_renew=False, and the screen has to tell the two apart -
+        # somebody with no plan still needs the button that gets them one.
         return ok({'active_plan': None, 'can_renew': False,
-                   'reason': RENEWAL_OFF})
+                   'renewal_blocked': True, 'reason': RENEWAL_OFF})
 
     plan = active.plan
     validity = int(plan.validity_days or 30)
@@ -501,8 +514,7 @@ def portal_renew():
     with a different price.
     """
     customer = db.session.get(Customer, current_customer_id())
-    active = CustomerPlan.query.filter_by(customer_id=customer.id,
-                                          status='active').first()
+    active = current_plan(customer.id)
     if not active or not active.plan:
         return fail('no_plan_to_renew', 400,
                     detail='There is no active plan on this account to renew. '
@@ -540,8 +552,7 @@ def portal_change_plan():
         return fail('plan_not_found', 404)
 
     customer = db.session.get(Customer, current_customer_id())
-    active = CustomerPlan.query.filter_by(customer_id=customer.id,
-                                          status='active').first()
+    active = current_plan(customer.id)
     if _self_renewal_blocked(active):
         return fail('online_renewal_disabled', 403, detail=RENEWAL_OFF)
 
@@ -823,8 +834,7 @@ _INTENT_TAG = 'INTENT:'
 def _intent_quote(intent):
     """(plan, amount, error) for a renewal intent - 'renew' or 'change:<id>'."""
     customer = db.session.get(Customer, current_customer_id())
-    active = CustomerPlan.query.filter_by(customer_id=customer.id,
-                                          status='active').first()
+    active = current_plan(customer.id)
 
     if _self_renewal_blocked(active):
         # The order endpoint can raise a renewal on its own, so the switch has
@@ -877,8 +887,7 @@ def _materialise_intent(order):
         return None
 
     customer = order.customer
-    active = CustomerPlan.query.filter_by(customer_id=customer.id,
-                                          status='active').first()
+    active = current_plan(customer.id)
 
     if intent == 'renew':
         if not active or not active.plan:
@@ -1006,8 +1015,7 @@ def _apply_successful_payment(order, txn_id=None, method=None):
     order.payment_method = method
     order.payment_id = payment.id if payment else None
 
-    active = CustomerPlan.query.filter_by(customer_id=customer.id,
-                                          status='active').first()
+    active = current_plan(customer.id)
 
     # A plan-change invoice carries PLAN_CHANGE:<id> in remarks.
     target_plan = None
