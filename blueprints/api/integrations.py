@@ -332,6 +332,111 @@ def cashfree_test():
                    'detail': f'The check itself failed: {exc}'})
 
 
+@bp.get('/settings/cloudinary/status')
+@staff_required
+def cloudinary_status():
+    """Whether image storage on Cloudinary is switched on and usable.
+
+    Mirrors the Cashfree/WhatsApp status blocks: the operator needs to see,
+    on the same screen as the fields, whether the stored credentials can
+    actually be used - and why not, when they cannot.
+    """
+    enabled = _setting_value('cloudinary_enabled') in ('1', 'true', 'True',
+                                                       'yes', 'on')
+    cloud_name = (_setting_value('cloudinary_cloud_name') or '').strip()
+    api_key = (_setting_value('cloudinary_api_key') or '').strip()
+    api_secret = (_setting_value('cloudinary_api_secret') or '').strip()
+    preset = (_setting_value('cloudinary_upload_preset') or '').strip()
+
+    blocking = []
+    if not enabled:
+        blocking.append('Cloudinary storage is switched off. Uploads stay on '
+                        'the server disk, where a redeploy wipes them.')
+    if not cloud_name:
+        blocking.append('No cloud name is set.')
+    if not api_key:
+        blocking.append('No API key is set.')
+    if not api_secret:
+        blocking.append('No API secret is set.')
+
+    return ok({
+        'enabled': enabled,
+        'cloud_name': cloud_name,
+        'has_api_key': bool(api_key),
+        'has_api_secret': bool(api_secret),
+        'has_upload_preset': bool(preset),
+        'ready': enabled and bool(cloud_name) and bool(api_key) and bool(api_secret),
+        'blocking': blocking,
+    })
+
+
+@bp.post('/settings/cloudinary/test')
+@admin_required
+def cloudinary_test():
+    """Ask Cloudinary whether these credentials work. Creates nothing.
+
+    A read-only Admin API call (list up to one image) that authenticates with
+    the stored key/secret over HTTPS. A wrong key, a wrong secret or a
+    wrong environment all come back 401/403 from Cloudinary itself, which is
+    what this endpoint reports verbatim.
+    """
+    import base64
+    import json as _json
+    import urllib.error
+    import urllib.request
+
+    from services.messaging import invalidate_settings_cache
+
+    cloud_name = (_setting_value('cloudinary_cloud_name') or '').strip()
+    api_key = (_setting_value('cloudinary_api_key') or '').strip()
+    api_secret = (_setting_value('cloudinary_api_secret') or '').strip()
+
+    missing = []
+    if not cloud_name:
+        missing.append('cloud name')
+    if not api_key:
+        missing.append('API key')
+    if not api_secret:
+        missing.append('API secret')
+    if missing:
+        return ok({'ok': False,
+                   'detail': f"Not configured: {' and '.join(missing)} not set."})
+
+    token = base64.b64encode(f'{api_key}:{api_secret}'.encode('utf-8')).decode('ascii')
+    url = (f'https://api.cloudinary.com/v1_1/{cloud_name}/resources/image'
+           f'?max_results=1')
+    req = urllib.request.Request(url, headers={
+        'Authorization': f'Basic {token}',
+        'Accept': 'application/json',
+    })
+
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            body = resp.read().decode('utf-8', 'replace')
+        return ok({
+            'ok': True,
+            'cloud': cloud_name,
+            'http_status': resp.status,
+            'detail': f'Connected to Cloudinary as {cloud_name}. Credentials '
+                      f'are valid.',
+        })
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode('utf-8', 'replace')[:500]
+        reason = ''
+        try:
+            reason = _json.loads(raw).get('error', {}).get('message', '')
+        except Exception:                                   # noqa: BLE001
+            reason = ''
+        detail = f'Cloudinary refused the request (HTTP {exc.code}).'
+        if reason:
+            detail += f' {reason}'
+        return ok({'ok': False, 'cloud': cloud_name,
+                   'http_status': exc.code, 'detail': detail})
+    except Exception as exc:                                # noqa: BLE001
+        return ok({'ok': False, 'cloud': cloud_name,
+                   'detail': f'The check itself failed: {exc}'})
+
+
 @bp.get('/settings/whatsapp/status')
 @staff_required
 def whatsapp_status():

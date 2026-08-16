@@ -221,6 +221,7 @@ export default function SettingsPage() {
                   payment is off, so the office has to be able to see it
                   somewhere. This is that somewhere. */}
               {group.key === "payment" && <CashfreeStatus saveCount={saveCount} />}
+              {group.key === "cloudinary" && <CloudinaryStatus saveCount={saveCount} />}
             </section>
           ))}
 
@@ -322,6 +323,74 @@ function CashfreeStatus({ saveCount }) {
         <p className="set-status-line set-status-quiet">
           Customers currently see: “{data.portal_message}” with your bank
           details and phone number, so they can still pay.
+        </p>
+      )}
+
+      <div className="set-status-actions">
+        <button type="button" className="btn sm" onClick={test} disabled={testing}>
+          {testing ? "Checking…" : "Test connection"}
+        </button>
+        {result && (
+          <span className={result.ok ? "set-status-ok" : "set-status-bad"}>
+            {result.detail}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Whether image storage on Cloudinary is switched on and usable.
+ *
+ * Same idea as CashfreeStatus: the stored credentials decide what actually
+ * happens, so the office sees the verdict - and a Test button that asks
+ * Cloudinary itself - right next to the fields. The test is read-only and
+ * creates nothing.
+ */
+function CloudinaryStatus({ saveCount }) {
+  const { data, loading, refetch } = useFetch("/settings/cloudinary/status", { saveCount });
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState(null);
+
+  async function test() {
+    setTesting(true);
+    setResult(null);
+    try {
+      const response = await post("/settings/cloudinary/test", {});
+      setResult((response?.data ?? response) || null);
+    } catch (err) {
+      setResult({ ok: false, detail: readableError(err) });
+    } finally {
+      setTesting(false);
+      refetch();
+    }
+  }
+
+  if (loading || !data) return null;
+
+  return (
+    <div className={`set-status${data.ready ? " is-ok" : " is-blocked"}`}>
+      <p className="set-status-head">
+        <strong>
+          {data.ready
+            ? "Cloudinary image storage is on."
+            : "Cloudinary image storage is not usable yet."}
+        </strong>
+        {" "}
+        {data.enabled
+          ? `Cloud: ${data.cloud_name || "—"}`
+          : "Switch on \"Store images on Cloudinary\" above to use it."}
+      </p>
+
+      {!data.ready && data.blocking.map((line) => (
+        <p key={line} className="set-status-line">{line}</p>
+      ))}
+
+      {data.enabled && !data.has_upload_preset && (
+        <p className="set-status-line set-status-quiet">
+          No upload preset set — uploads will be signed server-side. An
+          unsigned preset would let the browser upload directly.
         </p>
       )}
 

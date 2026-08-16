@@ -48,6 +48,10 @@ GROUPS = [
     ('branding', 'Branding & links',
      'The banner in the customer portal and the app/website links used in '
      'messages.'),
+    ('cloudinary', 'Cloudinary',
+     'Cloud image storage for the logo, portal banner and customer documents. '
+     'Files live on Cloudinary, not on the server disk, so they survive '
+     'redeploys.'),
     ('general', 'Other', ''),
 ]
 
@@ -266,6 +270,31 @@ FIELDS = {
     'banner_image': dict(
         group='branding', order=11, input='text', label='Portal banner image',
         help='Filename of an image already uploaded to static/uploads.'),
+
+    # ---------------------------------------------------------- cloudinary --
+    'cloudinary_enabled': dict(
+        group='cloudinary', order=10, input='switch', label='Store images on Cloudinary',
+        help='Off keeps uploads on the server disk, where a redeploy wipes them.'),
+    'cloudinary_cloud_name': dict(
+        group='cloudinary', order=11, input='text', label='Cloud name',
+        help='From the Cloudinary Dashboard. It is the first part of every '
+             'delivery URL, so it is not a secret.'),
+    'cloudinary_api_key': dict(
+        group='cloudinary', order=12, input='password', label='API key',
+        help='From Cloudinary Dashboard > Settings > Access Keys.'),
+    'cloudinary_api_secret': dict(
+        group='cloudinary', order=13, input='password', label='API secret',
+        secret=True,
+        help='From Cloudinary Dashboard > Settings > Access Keys.'),
+    'cloudinary_upload_preset': dict(
+        group='cloudinary', order=20, input='text', label='Upload preset',
+        help='Optional. An unsigned preset lets the browser upload directly '
+             'without exposing the API secret. Blank falls back to signed '
+             'server-side uploads.'),
+    'cloudinary_folder': dict(
+        group='cloudinary', order=21, input='text', label='Folder',
+        help='Optional. Where uploads are stored inside your Cloudinary '
+             'account, e.g. yash-crm.'),
 
     # -------------------------------------------------------------- general --
     'app_link': dict(

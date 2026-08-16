@@ -170,6 +170,16 @@ SETTING_DEFAULTS = [
     ('mail_from_name',          '',       'str'),
     ('mail_use_tls',            'True',   'bool'),
     ('mail_use_ssl',            'False',  'bool'),
+
+    # Cloudinary cloud image storage. When enabled, logo, banner and customer
+    # document uploads go to Cloudinary instead of the server's local disk,
+    # which is wiped on every redeploy. Off keeps today's disk behaviour.
+    ('cloudinary_enabled',      'False',  'bool'),
+    ('cloudinary_cloud_name',   '',       'str'),
+    ('cloudinary_api_key',      '',       'str'),
+    ('cloudinary_api_secret',   '',       'str'),
+    ('cloudinary_upload_preset','',       'str'),
+    ('cloudinary_folder',       '',       'str'),
 ]
 
 
