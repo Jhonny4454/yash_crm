@@ -169,7 +169,7 @@ const EMPTY_ADJUSTMENT = { kind: "credit", amount: "", reason: "", invoice_id: "
  * has ever been on is on the Plan History tab, which is where the rest of
  * the rows belong.
  */
-export function PlanTab({ customer, plans, onAssign, onRenew, onEdit }) {
+export function PlanTab({ customer, plans, onAssign, onRenew, onEdit, onRefresh }) {
   const current = currentPlan(plans);
   const rows = current ? [current] : [];
 
@@ -211,7 +211,10 @@ export function PlanTab({ customer, plans, onAssign, onRenew, onEdit }) {
                     {plan.days_left ?? "—"}
                   </td>
                   <td><StatusPill value={plan.status} /></td>
-                  <td>{plan.auto_renew ? "Yes" : "No"}</td>
+                  <td>
+                    <OnlineRenewalToggle plan={plan} customer={customer}
+                                         onRefresh={onRefresh} />
+                  </td>
                   <td>
                     <div className="row-actions">
                       <button type="button" className="btn sm primary"
@@ -235,6 +238,72 @@ export function PlanTab({ customer, plans, onAssign, onRenew, onEdit }) {
         </p>
       )}
     </section>
+  );
+}
+
+/**
+ * The Online Renewal column, as a switch rather than a read-out.
+ *
+ * It printed `auto_renew`, which is a different thing wearing this label:
+ * auto_renew is the billing run's switch - whether the office raises the next
+ * invoice by itself - so turning it off to stop a customer renewing from the
+ * portal would also have stopped their bills. This writes `online_renewal`,
+ * which does exactly one thing: it decides whether the portal's Renew and
+ * Change plan buttons work for this customer. Their bills, their plan and
+ * their login are untouched either way.
+ *
+ * Switching OFF asks first. It takes a working button away from somebody who
+ * is not in the room to notice, and the operator should mean it. Switching
+ * back on is immediate - restoring something is not a decision worth
+ * interrupting.
+ */
+function OnlineRenewalToggle({ plan, customer, onRefresh }) {
+  const { toast, confirm } = useToast();
+  const [busy, setBusy] = useState(false);
+  // Absent reads as on: rows written before this column existed have no
+  // value, and a missing setting must not lock a customer out of a screen
+  // that worked yesterday.
+  const on = plan.online_renewal !== false;
+
+  async function toggle() {
+    if (busy) return;
+    const next = !on;
+    if (!next) {
+      const name = customer?.full_name || "This customer";
+      const ok = await confirm({
+        title: "Switch off online renewal?",
+        message: `${name} will no longer be able to renew or change this plan `
+          + "from the customer portal - they will be told to contact the "
+          + "office. Their bills are still raised as usual and they can still "
+          + "sign in and pay. You can switch it back on at any time.",
+        confirmLabel: "Switch off",
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
+
+    setBusy(true);
+    try {
+      await put(`/customer-plans/${plan.id}`, { online_renewal: next });
+      toast.success(next
+        ? "Online renewal is on - this customer can renew from the portal."
+        : "Online renewal is off - this customer must renew at the office.");
+      await onRefresh?.();
+    } catch (error) {
+      toast.error(error.detail || readableError(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button type="button" className={`toggle-pill${on ? " is-on" : " is-off"}`}
+            disabled={busy} onClick={toggle} aria-pressed={on}
+            title={on
+              ? "This customer can renew from the portal. Click to switch off."
+              : "This customer cannot renew from the portal. Click to switch on."}>
+      {busy ? "…" : on ? "Yes" : "No"}
+    </button>
   );
 }
 

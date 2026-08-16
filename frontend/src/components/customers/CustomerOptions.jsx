@@ -391,23 +391,32 @@ export function AssignPlanDialog({ customer, current, onClose, onDone }) {
  * lands on the Pending Invoice tab, where one payment entry clears whatever
  * they are actually settling - with the discount spread across it all.
  */
+/**
+ * Renew: one decision, and a receipt for what it will do.
+ *
+ * This dialog used to be a form. Package (with a plan list behind a link),
+ * cycles, start date, new expiry, amount, tax, remark - seven controls for an
+ * operation whose whole meaning is "the same again". Every one of them was a
+ * way to get a routine monthly renewal wrong: a stray keystroke in New expiry
+ * moved a customer's service, an edited Amount silently rewrote the price
+ * agreed with that customer, and picking a different package turned a renewal
+ * into a plan change that closes the current plan record.
+ *
+ * What is left is the only thing that genuinely varies from one renewal to
+ * the next: whether this bill carries GST. The plan, the dates and the price
+ * are printed, not offered - the server derives them exactly as this panel
+ * shows them, extending from the current expiry so paid-for days are not
+ * lost. Changing the package has its own button on the Plan tab, and editing
+ * the dates has its own dialog; neither belongs in the middle of taking
+ * money.
+ */
 export function RenewPlanDialog({ customer, plan, onClose, onDone }) {
   const { busy, run, toast } = useSubmit({ onDone, onClose });
 
   const [quote, setQuote] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [errors, setErrors] = useState({});
-  /* Renew means "the same plan again". The package list stays out of the way
-     until somebody asks for it: this dialog opened on a dropdown of every
-     plan in the master, so the ordinary monthly renewal - by far the most
-     common thing done here - started with a decision nobody wanted to make,
-     and picking the wrong line silently turned a renewal into a plan change
-     that closes the customer's current plan record. */
-  const [picking, setPicking] = useState(false);
   const [form, setForm] = useState({
-    plan_id: "", periods: 1, start_date: "", end_date: "",
-    amount: "", tax_applicable: "notax", remarks: "",
-    send_message: true, reactivate: false,
+    taxable: false, send_message: true, reactivate: false,
   });
 
   useEffect(() => {
@@ -417,18 +426,12 @@ export function RenewPlanDialog({ customer, plan, onClose, onDone }) {
         if (cancelled) return;
         const q = response?.data ?? response;
         setQuote(q);
-        const current = q?.active_plan;
         setForm((f) => ({
           ...f,
-          plan_id: String(current?.plan_id || ""),
-          start_date: q?.suggested?.start_date || "",
-          end_date: q?.suggested?.end_date || "",
-          amount: rupees(current?.price),
-          // Open on whatever the company is configured to do, not a hard-coded
-          // "Non-taxable". The customer portal bills from the same setting, so
-          // a default of notax here meant the same renewal cost less at the
-          // counter than it did online.
-          tax_applicable: q?.tax_default || "notax",
+          // Opens on what this CUSTOMER is: tax_default is the company
+          // setting narrowed by the customer's own Taxable / Non-Taxable
+          // flag, so a non-taxable account is not quoted GST by accident.
+          taxable: (q?.tax_default || 'notax') !== 'notax',
           reactivate: q?.customer?.is_active === false,
         }));
       })
@@ -437,70 +440,36 @@ export function RenewPlanDialog({ customer, plan, onClose, onDone }) {
     return () => { cancelled = true; };
   }, [customer.id]);
 
-  const plans = quote?.plans || [];
-  const chosen = plans.find((p) => String(p.id) === String(form.plan_id));
-  const isChange = Boolean(quote?.active_plan
-    && String(quote.active_plan.plan_id) !== String(form.plan_id));
-  // With no active plan there is nothing to renew, so the list is the only
-  // way forward and hiding it would leave a dead dialog.
-  const mustPick = !quote?.active_plan;
-  const showPlanList = picking || mustPick;
-
-  // Keep the dates and price in step with the plan and cycle count, so the
-  // operator is never quoting from a figure that no longer applies.
-  useEffect(() => {
-    if (!chosen || !quote) return;
-    const from = new Date(quote.suggested.extends_from);
-    from.setDate(from.getDate()
-      + (chosen.validity_days || 30) * Number(form.periods || 1));
-    /* Renewing the plan they are already on charges the price agreed with
-       THIS customer, not the master price - which is what the server does
-       when no amount is sent, and what the locked plan card above shows. A
-       customer on a 1000 plan at an agreed 800 was being shown "₹800 ·
-       renewing the same plan" over a button that billed ₹1,000. */
-    const samePlan = String(chosen.id) === String(quote.active_plan?.plan_id);
-    const unit = samePlan
-      ? Number(quote.active_plan.price ?? chosen.price_monthly ?? 0)
-      : Number(chosen.price_monthly || 0);
-    setForm((f) => ({
-      ...f,
-      end_date: from.toISOString().slice(0, 10),
-      amount: rupees(unit * Number(form.periods || 1)),
-    }));
-  }, [form.plan_id, form.periods, chosen, quote]);
-
-  const amount = Number(form.amount || 0);
+  const active = quote?.active_plan;
   const gst = Number(quote?.gst_percent || 0);
-  const tax = form.tax_applicable === "exclude" ? amount * gst / 100 : 0;
-  const grandTotal = amount + tax;
+  /* HOW a taxable renewal is expressed - GST added on top, or already inside
+     the plan price - is a company setting, not a per-renewal choice, so the
+     operator picks only taxed or not. */
+  const taxableMode = quote?.tax_default && quote.tax_default !== "notax"
+    ? quote.tax_default : "exclude";
+  const mode = form.taxable ? taxableMode : "notax";
+  const { base, tax, total } = splitTax(active?.price, gst, mode);
 
-  const set = (key) => (event) => {
-    const value = event.target.type === "checkbox"
-      ? event.target.checked : event.target.value;
-    setForm((f) => ({ ...f, [key]: value }));
-    setErrors((e) => ({ ...e, [key]: undefined }));
-  };
+  // The package row's own details, for the speed the plan list carries and
+  // the quote's active_plan does not.
+  const master = (quote?.plans || []).find(
+    (p) => String(p.id) === String(active?.plan_id));
 
   function submit(event) {
     event.preventDefault();
-    const found = {};
-    if (!form.plan_id) found.plan_id = "Choose a plan.";
-    if (amount < 0) found.amount = "The amount cannot be negative.";
-    if (form.end_date && form.start_date && form.end_date <= form.start_date) {
-      found.end_date = "Must be after the start date.";
-    }
-    setErrors(found);
-    if (Object.keys(found).length) return;
-
     run(async () => {
+      /* Only the tax choice is sent. No dates, no amount, no plan id: the
+         server then uses its own defaults - this plan, one cycle, extending
+         from the current expiry, at the price agreed with this customer -
+         which is the same arithmetic printed above the button. Sending an
+         amount would also overwrite that agreed price. */
       const response = await post(`/customers/${customer.id}/renew`, {
-        ...form,
-        plan_id: Number(form.plan_id),
-        periods: Number(form.periods) || 1,
-        amount,
+        periods: 1,
+        tax_applicable: mode,
+        send_message: form.send_message,
+        reactivate: form.reactivate,
       });
       const payload = response?.data ?? response;
-      // A message that was only logged must never read as one that arrived.
       if (payload.message_status === "dry-run") {
         toast.warning("The renewal message was logged but NOT sent - the "
           + "messaging gateway is not configured.", { duration: 10000 });
@@ -512,134 +481,130 @@ export function RenewPlanDialog({ customer, plan, onClose, onDone }) {
   }
 
   if (loading) {
-    return <Modal title="Renew plan" onClose={onClose} width={700}>
+    return <Modal title="Renew plan" onClose={onClose} width={760}>
       <p className="hint">Loading the customer's plan…</p>
     </Modal>;
   }
 
+  // Nothing to renew is not an error, it is a different job - say which one.
+  if (!active) {
+    return (
+      <Modal title="Renew plan" onClose={onClose} width={760}>
+        <p className="hint">
+          This customer has no active plan, so there is nothing to renew.
+          Use <strong>Assign/Change</strong> on the Plan tab to put them on
+          a package.
+        </p>
+        <DialogButtons busy={false} onClose={onClose} label="" closeLabel="Close" />
+      </Modal>
+    );
+  }
+
   return (
-    <Modal title={isChange ? "Change plan" : "Renew plan"}
-           onClose={onClose} width={700}>
-      <form onSubmit={submit} className="renew-form">
-        <fieldset className="renew-block">
-          <legend>Plan</legend>
-          <div className="renew-grid">
-            {showPlanList ? (
-              <label>
-                <span>Package</span>
-                <select value={form.plan_id} onChange={set("plan_id")} autoFocus>
-                  <option value="">-Select-</option>
-                  {plans.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} — {inr(p.price_monthly)} / {p.validity_days}d
-                      {String(p.id) === String(quote?.active_plan?.plan_id)
-                        ? "  (current plan)" : ""}
-                    </option>
-                  ))}
-                </select>
-                {errors.plan_id && <small className="field-error">{errors.plan_id}</small>}
-                {!mustPick && (
-                  <button type="button" className="link-btn" onClick={() => {
-                    setPicking(false);
-                    setForm((f) => ({ ...f, plan_id: String(quote.active_plan.plan_id) }));
-                  }}>Keep the current plan instead</button>
-                )}
-              </label>
-            ) : (
-              <label>
-                <span>Package</span>
-                <div className="renew-locked">
-                  <strong>{quote.active_plan.plan_name}</strong>
-                  <span>{inr(quote.active_plan.price)} · renewing the same plan</span>
-                </div>
-                <button type="button" className="link-btn"
-                        onClick={() => setPicking(true)}>
-                  Change to a different plan
-                </button>
-              </label>
-            )}
+    <Modal title="Renew plan" onClose={onClose} width={760}>
+      <form onSubmit={submit} className="renew-lite">
+        <div className="renew-tax">
+          <span className="renew-tax-label">Tax type</span>
+          <div className="renew-tax-choices">
             <label>
-              <span>Cycles</span>
-              <MoneyInput min="1" max="36" value={form.periods} onChange={set("periods")} />
-            </label>
-            <DateField label="Start date" value={form.start_date}
-                       onChange={(v) => setForm((f) => ({ ...f, start_date: v }))} />
-            <div>
-              <DateField label="New expiry" value={form.end_date}
-                         onChange={(v) => setForm((f) => ({ ...f, end_date: v }))} />
-              {errors.end_date && <small className="field-error">{errors.end_date}</small>}
-            </div>
-          </div>
-          {quote?.active_plan && (
-            <p className="hint">
-              Currently {quote.active_plan.plan_name}, expiring{" "}
-              {fmtDate(quote.active_plan.end_date)}
-              {quote.active_plan.days_left >= 0
-                ? ` (${quote.active_plan.days_left} days left).`
-                : ` (${Math.abs(quote.active_plan.days_left)} days ago).`}
-              {" "}The new period runs from {fmtDate(quote.suggested.extends_from)},
-              so days already paid for are not lost.
-              {isChange && " Changing the plan closes the current one and starts a new record."}
-            </p>
-          )}
-        </fieldset>
-
-        <fieldset className="renew-block">
-          <legend>Charge</legend>
-          <div className="renew-grid">
-            <label>
-              <span>Amount</span>
-              <MoneyInput value={form.amount} onChange={set("amount")} />
-              {errors.amount && <small className="field-error">{errors.amount}</small>}
+              <input type="radio" name="renew-tax" checked={form.taxable}
+                     onChange={() => setForm((f) => ({ ...f, taxable: true }))} />
+              <span>Taxable</span>
             </label>
             <label>
-              <span>Tax</span>
-              <select value={form.tax_applicable} onChange={set("tax_applicable")}>
-                <option value="notax">Non-taxable</option>
-                <option value="exclude">Add GST {gst}%</option>
-                <option value="include">GST {gst}% included</option>
-              </select>
-            </label>
-            <label className="span-2">
-              <span>Remark</span>
-              <input value={form.remarks} onChange={set("remarks")}
-                     placeholder="Optional note on the invoice" />
+              <input type="radio" name="renew-tax" checked={!form.taxable}
+                     onChange={() => setForm((f) => ({ ...f, taxable: false }))} />
+              <span>Non-taxable</span>
             </label>
           </div>
+        </div>
 
-          <div className="renew-total">
-            <span>Amount {inr(amount)}</span>
-            {tax > 0 && <span>plus GST {inr(tax)}</span>}
-            <strong>Invoice {inr(grandTotal)}</strong>
-          </div>
-        </fieldset>
+        <div className="renew-sums">
+          <span>Base amount <strong>{inr(base)}</strong></span>
+          <span>GST {form.taxable ? `${gst}%` : ""} <strong>{inr(tax)}</strong></span>
+          <span className="is-total">Total <strong>{inr(total)}</strong></span>
+        </div>
 
+        <div className="table-wrap">
+          <table className="data cards-sm renew-plan-table">
+            <thead>
+              <tr>
+                <th>Package name</th><th>Type</th><th className="num">Price</th>
+                <th>Start date</th><th>End date</th>
+                <th className="num">Days rem.</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td data-label="Package name">{active.plan_name}</td>
+                <td data-label="Type">
+                  {master?.speed_mbps ? `${master.speed_mbps} Mbps` : "—"}
+                </td>
+                <td className="num" data-label="Price">{inr(active.price)}</td>
+                <td data-label="Start date">{fmtDate(active.start_date)}</td>
+                <td data-label="End date">{fmtDate(active.end_date)}</td>
+                <td className="num" data-label="Days rem.">
+                  {Number(active.days_left ?? 0)}
+                </td>
+                <td data-label="Status">
+                  <span className={`pill ${active.days_left >= 0 ? "ok" : "danger"}`}>
+                    {active.days_left >= 0 ? "Active" : "Expired"}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Read-only, and the one fact the operator is committing to. */}
         <p className="renew-note">
-          This raises the invoice only. Collect the money on the Pending
-          Invoice tab, where it can be settled together with any addon charge
+          Renewing extends this plan to{" "}
+          <strong>{fmtDate(quote?.suggested?.end_date)}</strong> and raises the
+          invoice. Collect the money on the Pending Invoice tab
           {quote?.outstanding > 0
-            ? ` — this account already owes ${inr(quote.outstanding)}.`
+            ? `, where this account already owes ${inr(quote.outstanding)}.`
             : "."}
         </p>
 
         {quote?.customer?.is_active === false && (
           <label className="dlg-check">
-            <input type="checkbox" checked={form.reactivate} onChange={set("reactivate")} />
+            <input type="checkbox" checked={form.reactivate}
+                   onChange={(e) => setForm((f) => ({ ...f, reactivate: e.target.checked }))} />
             <span>Reconnect this customer — their line is currently disabled</span>
           </label>
         )}
 
         <label className="dlg-check">
-          <input type="checkbox" checked={form.send_message} onChange={set("send_message")} />
+          <input type="checkbox" checked={form.send_message}
+                 onChange={(e) => setForm((f) => ({ ...f, send_message: e.target.checked }))} />
           <span>WhatsApp the customer that their plan has been renewed</span>
         </label>
 
-        <DialogButtons busy={busy} onClose={onClose}
-                       label={`${isChange ? "Change plan" : "Renew"} and bill `
-                              + `${inr(grandTotal)}`} />
+        <DialogButtons busy={busy} onClose={onClose} label={`Renew ${inr(total)}`} />
       </form>
     </Modal>
   );
+}
+
+/**
+ * Split a price into base, GST and total the way the server will.
+ *
+ * `exclude` adds the rate on top; `include` means the price already contains
+ * it and the base is worked backwards, which is how a 500 plan reads as 423.73
+ * plus 76.27. Anything else is not taxed and the three figures collapse to one.
+ */
+function splitTax(amount, gstPercent, mode) {
+  const value = Number(amount || 0);
+  const rate = Number(gstPercent || 0);
+  if (!value || rate <= 0 || mode === "notax") {
+    return { base: value, tax: 0, total: value };
+  }
+  if (mode === "include") {
+    const baseValue = value / (1 + rate / 100);
+    return { base: baseValue, tax: value - baseValue, total: value };
+  }
+  const taxValue = value * rate / 100;
+  return { base: value, tax: taxValue, total: value + taxValue };
 }
 
 export function EditPlanDialog({ plan, onClose, onDone }) {

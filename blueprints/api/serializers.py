@@ -318,6 +318,9 @@ def customer_plan_dict(cp):
         'is_expired': bool(days_left is not None and days_left < 0),
         'status': cp.status,
         'auto_renew': bool(cp.auto_renew),
+        #: The Plan tab's "Online Renewal" column, and the switch the portal
+        #: checks before it lets a customer renew themselves.
+        'online_renewal': cp.renewable_online,
         'grace_period_days': cp.grace_period_days or 0,
         'last_invoice_date': iso(cp.last_invoice_date),
         'suspension_review_status': cp.suspension_review_status,

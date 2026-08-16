@@ -123,6 +123,25 @@ def _account_status(customer, active_plan):
     }
 
 
+#: What the portal says when the office has switched self-renewal off.
+#:
+#: Not an error and not a fault: somebody decided this account is renewed at
+#: the office, so the message says who to talk to rather than "forbidden".
+RENEWAL_OFF = ('Online renewal is switched off for your connection. '
+               'Please contact the office to renew your plan.')
+
+
+def _self_renewal_blocked(active_plan):
+    """True when the customer may not renew this plan themselves.
+
+    The switch is per plan row and lives on the admin Plan tab, under Online
+    Renewal. It is deliberately NOT ``auto_renew``: that one drives the
+    office's billing run, and turning it off to stop a customer renewing
+    online would also stop their invoices being raised.
+    """
+    return bool(active_plan) and not active_plan.renewable_online
+
+
 def _open_invoices(customer_id):
     """This customer's unsettled bills, oldest first.
 
@@ -275,6 +294,11 @@ def portal_renew_quote():
     if not active or not active.plan:
         return ok({'active_plan': None, 'can_renew': False,
                    'reason': 'There is no active plan on this account.'})
+    if _self_renewal_blocked(active):
+        # Answered before the price, not after: a customer who cannot renew
+        # should not be shown a figure and a button that then refuses.
+        return ok({'active_plan': None, 'can_renew': False,
+                   'reason': RENEWAL_OFF})
 
     plan = active.plan
     validity = int(plan.validity_days or 30)
@@ -483,6 +507,8 @@ def portal_renew():
         return fail('no_plan_to_renew', 400,
                     detail='There is no active plan on this account to renew. '
                            'Choose a plan instead, or contact the office.')
+    if _self_renewal_blocked(active):
+        return fail('online_renewal_disabled', 403, detail=RENEWAL_OFF)
 
     # Reuse an open invoice if there already is one, rather than stacking a
     # second bill on an account that has not settled the first.
@@ -516,6 +542,9 @@ def portal_change_plan():
     customer = db.session.get(Customer, current_customer_id())
     active = CustomerPlan.query.filter_by(customer_id=customer.id,
                                           status='active').first()
+    if _self_renewal_blocked(active):
+        return fail('online_renewal_disabled', 403, detail=RENEWAL_OFF)
+
     # Asking to "change" to the plan already held is a renewal, and billing it
     # as a change would close the current plan record for no reason.
     if active and active.plan_id == plan.id:
@@ -796,6 +825,12 @@ def _intent_quote(intent):
     customer = db.session.get(Customer, current_customer_id())
     active = CustomerPlan.query.filter_by(customer_id=customer.id,
                                           status='active').first()
+
+    if _self_renewal_blocked(active):
+        # The order endpoint can raise a renewal on its own, so the switch has
+        # to be checked here too - blocking only the two obvious routes would
+        # leave a way in through the pay button.
+        return None, None, fail('online_renewal_disabled', 403, detail=RENEWAL_OFF)
 
     if intent == 'renew':
         if not active or not active.plan:

@@ -597,6 +597,11 @@ def customer_plan_update(pid):
 
     if 'auto_renew' in data:
         customer_plan.auto_renew = bool(data['auto_renew'])
+    # The Plan tab's Online Renewal column writes here. Off means the customer
+    # can still see their plan in the portal but cannot renew or change it
+    # themselves - the office does it for them.
+    if 'online_renewal' in data:
+        customer_plan.online_renewal = bool(data['online_renewal'])
     if 'status' in data and data['status'] in ('active', 'expired',
                                                'cancelled', 'terminated'):
         customer_plan.status = data['status']

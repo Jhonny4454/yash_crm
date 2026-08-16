@@ -247,7 +247,7 @@ export default function CustomerDetail() {
           <OverviewTab customer={customer} outstanding={outstanding} onRefresh={refetch} />
         )}
         {tab === "plan" && (
-          <PlanTab customer={customer} plans={plans}
+          <PlanTab customer={customer} plans={plans} onRefresh={refetch}
                    onAssign={(plan) => setDialog({ type: "assign", plan: plan || activePlan })}
                    onRenew={(plan) => setDialog({ type: "renew", plan })}
                    onEdit={(plan) => setDialog({ type: "edit-plan", plan })} />

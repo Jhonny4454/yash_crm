@@ -61,6 +61,9 @@ NEW_COLUMNS = {
         # Per-customer plan price. Without it the Customer-vs-Master billing
         # setting had nothing to resolve to and always used the master price.
         ('price', 'DECIMAL(10,2) NULL'),
+        # Whether the customer may renew this plan from the portal. Defaults
+        # to 1 so every existing plan keeps working exactly as it did.
+        ('online_renewal', 'TINYINT(1) NULL DEFAULT 1'),
     ],
     'payments': [
         ('discount_reason', 'VARCHAR(100) NULL'),

@@ -958,3 +958,28 @@
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
+
+/* ---- Online Renewal switch (Plan tab) ---------------------------------
+ *
+ * A pill that looks like the state it reports and behaves like the button it
+ * is. It still reads Yes / No, because that is what this column has always
+ * said - an operator should not have to learn a new word to keep using it.
+ */
+.toggle-pill {
+  min-width: 3.4rem;
+  min-height: 32px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.toggle-pill.is-on { background: #dcfce7; border-color: #86efac; color: #15803d; }
+.toggle-pill.is-off { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; }
+
+.toggle-pill:hover:not(:disabled) { filter: brightness(0.97); }
+.toggle-pill:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.toggle-pill:disabled { opacity: 0.6; cursor: progress; }

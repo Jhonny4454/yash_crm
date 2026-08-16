@@ -330,6 +330,90 @@ small.ok { color: #15803d; }
   .status-tabs button, .cd-tabs button { min-height: 38px; }
 }
 
+/* ---- Renew plan (compact) ---------------------------------------------
+ *
+ * One choice - taxed or not - then the figures it produces and the plan it
+ * applies to, read-only. The dialog it replaced had seven inputs for an
+ * operation that means "the same again", so it is deliberately built out of
+ * things you cannot type into.
+ */
+.renew-lite { display: grid; gap: 0.85rem; }
+
+.renew-tax {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.renew-tax-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.renew-tax-choices { display: flex; gap: 1.1rem; flex-wrap: wrap; }
+
+.renew-tax-choices label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1e293b;
+  cursor: pointer;
+  /* 40px so a thumb can hit it on a phone without hitting the other one. */
+  min-height: 40px;
+}
+
+.renew-sums {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.renew-sums strong {
+  margin-left: 0.35rem;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.renew-sums .is-total strong { font-size: 1.15rem; }
+
+.renew-plan-table { font-size: 0.84rem; }
+.renew-plan-table th { white-space: nowrap; }
+
+.renew-note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+@media (max-width: 560px) {
+  /* The label sits above the two choices rather than beside them - at 360px
+     "Tax type" plus both radios on one line leaves each label clipped. */
+  .renew-tax { display: grid; gap: 0.35rem; }
+  .renew-sums {
+    flex-direction: column;
+    /* Not `baseline` here: the rows have to stretch to the full width or the
+       figure sits against its own label instead of against the right edge. */
+    align-items: stretch;
+    gap: 0.25rem;
+  }
+  .renew-sums span { display: flex; justify-content: space-between; }
+  .renew-sums strong { margin-left: 0; }
+}
+
 /* ---- Phone layout ------------------------------------------------------ */
 
 @media (max-width: 640px) {

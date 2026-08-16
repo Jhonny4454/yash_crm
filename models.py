@@ -194,6 +194,14 @@ class CustomerPlan(db.Model):
     end_date = db.Column(db.Date, nullable=False)
     status = db.Column(db.Enum('active', 'expired', 'cancelled', 'terminated'), default='active')
     auto_renew = db.Column(db.Boolean, default=True)
+    #: Whether the CUSTOMER may renew this plan themselves from the portal.
+    #:
+    #: Separate from ``auto_renew`` on purpose, though the Plan tab used to
+    #: print that one under an "Online Renewal" heading. ``auto_renew`` is the
+    #: billing run's switch - it decides whether the office raises the next
+    #: invoice automatically - and turning it off to stop a customer renewing
+    #: online would also stop their bills being raised at all.
+    online_renewal = db.Column(db.Boolean, default=True)
     grace_period_days = db.Column(db.Integer, default=1)
     last_invoice_date = db.Column(db.Date)
     # What THIS customer pays for the plan, when it differs from the master
@@ -206,6 +214,16 @@ class CustomerPlan(db.Model):
 
     plan = db.relationship('Plan', backref='customer_plans')
     invoices = db.relationship('Invoice', backref='customer_plan', lazy=True)
+
+    @property
+    def renewable_online(self):
+        """Whether the portal should let this customer renew.
+
+        NULL reads as yes: every row written before this column existed has
+        no value, and a missing setting must not silently lock customers out
+        of a screen that worked yesterday.
+        """
+        return self.online_renewal is not False
 
     @property
     def effective_price(self):
