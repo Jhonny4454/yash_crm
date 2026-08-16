@@ -32,6 +32,16 @@ from .utils import (body, current_customer_id, customer_required, fail, iso,
 
 bp = Blueprint('api_portal', __name__)
 
+#: How many rows the dashboard's "Recent" cards carry.
+#:
+#: The dashboard is a summary, not the history - both cards are backed by a
+#: full screen of their own (Invoices, Payments) that pages through
+#: everything. Payments is the shorter list on purpose: it sits below the
+#: fold on a phone, and four receipts is enough to answer "did my last
+#: payment go through?", which is the only reason anybody reads it here.
+RECENT_INVOICES = 5
+RECENT_PAYMENTS = 4
+
 
 def _setting_value(key):
     """One settings row, without importing the whole messaging module.
@@ -137,14 +147,14 @@ def portal_dashboard():
     invoices = Invoice.query.options(
         selectinload(Invoice.payments), joinedload(Invoice.customer)
     ).filter_by(customer_id=customer.id).order_by(
-        Invoice.issue_date.desc(), Invoice.id.desc()).limit(5).all()
+        Invoice.issue_date.desc(), Invoice.id.desc()).limit(RECENT_INVOICES).all()
     payments = Payment.query.options(
         joinedload(Payment.invoice), joinedload(Payment.customer),
         joinedload(Payment.received_by_user),
         joinedload(Payment.authorized_by_user),
     ).filter_by(customer_id=customer.id).filter(
         Payment.status == 'approved').order_by(
-        Payment.payment_date.desc(), Payment.id.desc()).limit(5).all()
+        Payment.payment_date.desc(), Payment.id.desc()).limit(RECENT_PAYMENTS).all()
 
     # One query, and the same arithmetic the admin dashboard uses. Reading
     # Invoice.balance in a loop lazy-loads each invoice's payments, so the

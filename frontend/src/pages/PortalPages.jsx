@@ -67,9 +67,14 @@ export function PortalDashboard() {
                   gateway={gateway} onPaid={refetch} />
 
     <div className="grid-two">
-      <Rows title="Recent invoices" rows={data?.recent_invoices}
+      <Rows title="Recent invoices" rows={data?.recent_invoices} limit={5}
             empty="You have no recent invoices." />
-      <Rows title="Recent payments" rows={data?.recent_payments}
+      {/* Four, and the Payments screen has the rest. The card answers one
+          question - did my last payment land - and a longer list only pushes
+          it further down a phone screen. The cap is here as well as in the
+          API so a browser that has not picked up the new build yet still
+          prints the short list. */}
+      <Rows title="Recent payments" rows={data?.recent_payments} limit={4}
             empty="Your approved payments will appear here." />
     </div>
   </section>;
@@ -693,15 +698,16 @@ export function PortalProfile() {
  * decided per row by whether it carries an invoice_no - a row that looks
  * clickable and is not is worse than one that plainly is not.
  */
-function Rows({ title, rows, empty }) {
+function Rows({ title, rows, empty, limit }) {
   const bill = useBillActions();
+  const shown = limit ? (rows || []).slice(0, limit) : rows;
 
   return (
     <section className="panel">
       <h2>{title}</h2>
-      {!rows?.length ? <Empty title="Nothing to show" hint={empty} /> : (
+      {!shown?.length ? <Empty title="Nothing to show" hint={empty} /> : (
         <div className="list-cards">
-          {rows.map((row) => {
+          {shown.map((row) => {
             const isBill = Boolean(row.invoice_no);
             return (
               <article key={row.id}
