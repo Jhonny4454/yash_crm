@@ -29,11 +29,18 @@ export default function Customers() {
     useFetch("/customers", { q, status, from: from || undefined, to: to || undefined, page });
 
   async function remove(c) {
-    // The API deactivates rather than hard-deletes, so say so plainly.
+    // This button said "Deactivate" because the endpoint behind it only set a
+    // flag. It deletes now, so the wording has to carry that weight: name the
+    // customer, say what goes with them, and point at the reversible option
+    // for the far more common case of a customer who has simply left.
     const confirmed = await confirm({
-      title: "Deactivate customer?",
-      message: `${c.full_name} will be deactivated and will no longer be able to sign in to the portal. Their invoices and payments are kept.`,
-      confirmLabel: "Deactivate",
+      title: `Delete ${c.full_name} permanently?`,
+      message: "This removes the customer and everything attached to them - "
+        + "plans, invoices, receipts, payment history and message log. Invoices "
+        + "are GST records, so deleting them also changes totals that may "
+        + "already have been reported. It cannot be undone. To stop the "
+        + "connection and keep the history, open the customer and use Disable.",
+      confirmLabel: "Delete permanently",
       tone: "danger",
     });
     if (!confirmed) return;
@@ -42,7 +49,7 @@ export default function Customers() {
     setActionError(null);
     try {
       await del(`/customers/${c.id}`);
-      toast.success(`${c.full_name} has been deactivated.`);
+      toast.success(`${c.full_name} has been deleted.`);
       refetch();
     } catch (err) {
       setActionError(err);

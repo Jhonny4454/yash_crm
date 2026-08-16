@@ -404,15 +404,18 @@ def customer_username_available():
     return ok({'username': raw, 'available': free, 'reason': reason})
 
 
-@bp.delete('/customers/<int:cid>')
-@admin_required
-def customer_delete(cid):
-    customer = db.session.get(Customer, cid)
-    if not customer:
-        return fail('not_found', 404)
-    customer.is_active = False
-    db.session.commit()
-    return ok({'status': 'deactivated'})
+# DELETE /customers/<cid> is NOT defined here.
+#
+# It was - as a soft delete that only set is_active = False - while
+# customer_actions.py defined the same URL as a real delete. Two handlers for
+# one route, and which of them answered came down to blueprint registration
+# order rather than a decision: the customers list showed a trash icon,
+# confirmed "Deactivate customer?", and the customer screen offered a
+# permanent delete, both hitting the same endpoint.
+#
+# The delete lives in customer_actions.py, which removes the account and
+# everything attached to it. Deactivating is still available, and is a
+# different verb: POST /customers/<cid>/disable.
 
 
 # --------------------------------------------------------------------------- #

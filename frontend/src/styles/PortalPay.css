@@ -2,33 +2,145 @@
    Customer portal - invoices and the pay-now flow.
    ==================================================================== */
 
-.portal-invoices .num { text-align: right; font-variant-numeric: tabular-nums; }
-.portal-invoices .due { color: #b91c1c; }
+/* ---- The bill list ------------------------------------------------------
+ *
+ * One row per bill, the same row on a phone and on a desktop. It replaced a
+ * seven-column table that stacked into seven labelled lines per bill below
+ * 720px - one bill filling half a phone screen - and that on a desktop was
+ * mostly white space between the two numbers anybody came to read.
+ *
+ * Rows are divided by a hairline rather than boxed as cards: a dozen bordered
+ * cards is a dozen borders of noise and about 200px of padding, and a page of
+ * twelve bills is most customers' whole history. The panel's horizontal
+ * padding is cancelled so the dividers and the pressed state run the full
+ * width - that is what makes a row read as a row rather than an indented
+ * paragraph.
+ */
+.bill-panel { padding-top: 13px; padding-bottom: 4px; }
 
-.portal-invoices .mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.85rem;
+.bill-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.portal-invoices .row-actions {
-  display: flex;
-  gap: 0.4rem;
-  justify-content: flex-end;
+.bill-panel-head h2 { margin: 0; }
+
+.bill-panel-hint { font-size: 0.76rem; color: var(--pt-muted, #64748b); }
+
+.bill-list { margin: 8px -16px 0; }
+
+/* Every row reserves the Pay button's width while any bill on the page can
+   be paid, so the amounts line up whether or not their own row has a button.
+   Without it a settled row's figure sat 58px right of an unpaid one's, and a
+   column of money that does not line up is a column nobody can scan. */
+.bill-list.has-pay .bill-row { grid-template-columns: minmax(0, 1fr) auto 58px; }
+
+.bill-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px 6px 13px;
+  position: relative;
+  /* The status is this edge. A pill in a column of its own was the widest
+     thing on the row and the least often read. */
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The divider is a pseudo-element inset past the status edge, not a
+   border-top: a border would cut the coloured edge into dashes, one gap per
+   row, which reads as damage rather than as a list. */
+.bill-row + .bill-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--pt-line, #e2e8f0);
+}
+.bill-row:hover { background: #f8fafc; }
+.bill-row:active { background: #f1f5f9; }
+.bill-row:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
+
+.bill-row.is-due { border-left-color: #f59e0b; }
+.bill-row.is-overdue { border-left-color: #dc2626; }
+.bill-row.is-paid { border-left-color: #86efac; }
+
+.bill-row-id { min-width: 0; display: grid; gap: 1px; }
+
+.bill-row-no {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* The amount is part of the button label, so it must not be clipped when the
-   label grows from "Pay ₹799.00" to "Waiting for payment…". */
+.bill-row-dates {
+  font-size: 0.7rem;
+  line-height: 1.25;
+  color: var(--pt-muted, #64748b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bill-row-money {
+  display: grid;
+  gap: 1px;
+  justify-items: end;
+  text-align: right;
+}
+
+.bill-row-money strong {
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+}
+
+.bill-row-money span {
+  font-size: 0.63rem;
+  line-height: 1.25;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--pt-muted, #64748b);
+}
+
+.bill-row.is-due .bill-row-money strong,
+.bill-row.is-overdue .bill-row-money strong { color: #b91c1c; }
+.bill-row.is-overdue .bill-row-money span { color: #b91c1c; font-weight: 700; }
+
+/* The amount is part of the label on the account-wide button, so it must not
+   be clipped when that label grows to "Waiting for payment…". The per-row
+   button carries no amount - the row prints it - so it stays narrow. */
 .pay-btn { min-width: 9.5rem; justify-content: center; }
+
+.portal-shell .pay-btn.is-compact,
+.pay-btn.is-compact {
+  min-width: 0;
+  width: 100%;
+  padding: 4px 11px;
+  font-size: 0.76rem;
+  /* This button sets the row height - it is the tallest thing on the row -
+     so it is as small as a thumb target can honestly be. 30px next to a
+     42px row, rather than the portal's standard 44px which made every row
+     as tall as a button whether it had one or not. */
+  min-height: 30px;
+  white-space: nowrap;
+}
 
 /* While a payment is in flight the button is the only thing that matters on
    the row - make the disabled state read as "working", not "unavailable". */
 .pay-btn:disabled { opacity: 0.9; cursor: progress; }
-
-@media (max-width: 640px) {
-  .portal-invoices .row-actions { flex-direction: column; align-items: stretch; }
-  .pay-btn { min-width: 0; }
-}
 
 /* ---- Renew or change plan ---------------------------------------------- */
 
@@ -152,69 +264,58 @@
    the dashboard metrics, so it is styled as a statement rather than a row. */
 .metric-card.is-due strong { color: #b91c1c; }
 
+/* One band, not three stacked rows: who is being paid and how much on the
+   left, the button on the right, and nothing below either of them unless
+   there is no card gateway and the bank details have to be printed. */
 .pay-dues {
   display: grid;
   gap: 12px;
-  border: 2px solid #fca5a5;
-  background: #fff7f7;
+  border: 1px solid #fca5a5;
+  background: linear-gradient(140deg, #fff5f5, #fff);
 }
 
 .pay-dues-head {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.pay-dues-head h2 { margin: 0 0 2px; font-size: 1.02rem; }
-.pay-dues-head p { margin: 0; font-size: 0.87rem; color: var(--muted, #6b7280); }
-
-.pay-dues-total {
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: #b91c1c;
-  white-space: nowrap;
-}
-
-.pay-dues-row {
-  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
 }
 
-.pay-dues-row label {
+.pay-dues-lede { min-width: 0; }
+
+.pay-dues-head h2 {
+  margin: 0 0 1px;
   font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--muted, #6b7280);
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: var(--pt-muted, #64748b);
+  /* The payee is a label above the number, not a headline competing with it:
+     the customer needs to know WHO before they tap, and HOW MUCH is what
+     they are looking at. */
+  text-transform: none;
 }
 
-/* The rupee sign is part of the field, not the value, so the customer never
-   has to guess whether to type it. */
-.pay-dues-input {
+.pay-dues-head p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--pt-muted, #6b7280);
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 6px;
-  border: 1px solid var(--line, #d1d5db);
-  border-radius: 8px;
-  background: #fff;
-  padding-left: 10px;
-  min-width: 0;
+  flex-wrap: wrap;
 }
 
-.pay-dues-input span { color: var(--muted, #6b7280); font-weight: 600; }
-
-.pay-dues-input .input {
-  border: 0;
-  background: transparent;
-  width: 8.5rem;
-  min-width: 0;
-  padding-left: 2px;
+.pay-dues-total {
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: #b91c1c;
+  line-height: 1.1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
-.pay-dues-input .input:focus { outline: none; }
-.pay-dues-input:focus-within { border-color: #2563eb; }
+.pay-dues-cta { white-space: nowrap; }
 
 .pay-dues-note,
 .pay-dues-warn,
@@ -224,11 +325,16 @@
 .pay-dues-warn { color: #b91c1c; font-weight: 600; }
 .pay-dues-off { color: #92400e; }
 
-@media (max-width: 560px) {
-  .pay-dues-row { align-items: stretch; }
-  .pay-dues-row .btn,
-  .pay-dues-input { width: 100%; }
-  .pay-dues-input .input { width: 100%; }
+/* The lede shrinks so the button can stay beside it rather than under it -
+   on a phone that is 60px of screen back, which is a bill and a half. */
+.pay-dues-lede { flex: 1 1 0; min-width: 0; }
+.pay-dues-cta { flex: 0 0 auto; }
+
+@media (max-width: 340px) {
+  /* Below this the two stop fitting side by side without the button losing
+     its label, so it goes full width - no loss: a payment button that spans
+     the screen is the easiest thing on it to hit. */
+  .pay-dues-cta { width: 100%; }
 }
 
 /* Offline payment instructions, shown when there is no card gateway. */

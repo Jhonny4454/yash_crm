@@ -21,6 +21,7 @@ from datetime import date, datetime, timedelta
 from flask import Blueprint
 
 from models import Customer, CustomerPlan, Invoice, Plan, db
+from services.customer_purge import purge_customer
 from services.plans import close_active_plans, current_plan
 
 from .serializers import customer_dict, customer_plan_dict, invoice_dict
@@ -496,7 +497,7 @@ def _notify_renewal(customer, customer_plan, plan, invoice, send=True):
 #  Removing a customer
 # --------------------------------------------------------------------------- #
 def _customer_history(customer):
-    """What is attached to this customer that the business has to keep."""
+    """What is on file for this customer, for the warning and the audit line."""
     from models import Payment
 
     invoices = Invoice.query.filter_by(customer_id=customer.id).count()
@@ -507,68 +508,38 @@ def _customer_history(customer):
 @bp.delete('/customers/<int:cid>')
 @admin_required
 def customer_delete(cid):
-    """Remove a customer record entirely.
+    """Remove a customer and everything attached to them. Permanently.
 
-    Deliberately narrow: this deletes ONLY a customer with no invoices and no
-    payments. That is the case it exists for - the duplicate, the typo, the
-    row created during a demo - and it is the only case where deleting is
-    honest.
+    This used to refuse the moment a bill existed, and the customers list
+    called the same URL expecting a deactivation - so between the two of them
+    there was no way to actually remove a record, only ways to be told no.
+    Delete now means delete: the customer, their plans, their bills, their
+    receipts, their message history, all of it (see services/customer_purge).
 
-    A customer who has been invoiced cannot be deleted, and the answer is a
-    400 explaining why rather than a cascade. Two reasons:
+    What that costs is worth stating plainly, because the operator pressing
+    this cannot get it back:
 
-      * Those invoices are GST records. India requires them kept for years
-        after the financial year they belong to, and a delete that quietly
-        took the bills with it would remove evidence the business is required
-        to be able to produce.
-      * The totals on every report are built from invoices and payments.
-        Deleting them silently changes last month's collection figure, which
-        somebody has already reconciled.
+      * Invoices are GST records. Deleting them removes evidence the business
+        may be required to produce, and it changes the totals on every report
+        that has already been reconciled - last month's collection figure
+        included.
+      * ``deactivate`` remains the operation for a customer who has simply
+        left: the connection stops, the history stays, the account can come
+        back. The response says so, so the UI can offer it.
 
-    Deactivating is the operation for a customer who has left: the line stops,
-    the history stays, and the account can be brought back. That is offered in
-    the refusal so the operator is not left with a dead end.
+    The username is NOT released. It stays in the reservation ledger, or the
+    next customer to be given it inherits this one's identity in every log
+    that still names them.
     """
     customer, missing = _customer_or_404(cid)
     if missing:
         return missing
 
-    invoices, payments = _customer_history(customer)
-    if invoices or payments:
-        parts = []
-        if invoices:
-            parts.append(f'{invoices} invoice' + ('s' if invoices != 1 else ''))
-        if payments:
-            parts.append(f'{payments} payment' + ('s' if payments != 1 else ''))
-        return fail('customer_has_history', 400,
-                    detail=f'{customer.full_name} has {" and ".join(parts)} on '
-                           f'file, which are accounting records the business '
-                           f'has to keep. Deactivate this customer instead - '
-                           f'the connection stops and the history stays.',
-                    invoices=invoices, payments=payments,
-                    can_deactivate=bool(customer.is_active))
-
     name = customer.full_name
-    try:
-        # Rows that belong to the customer and carry no accounting weight. Each
-        # is deleted explicitly rather than left to a cascade, because the
-        # cascade rules differ per table and a missing one would abort the
-        # whole delete with a foreign-key error and no explanation.
-        CustomerPlan.query.filter_by(customer_id=cid).delete(
-            synchronize_session=False)
-        for model_name in ('WalletEntry', 'CustomerDocument', 'ServiceRequest',
-                           'OnlinePaymentOrder', 'MessageLog', 'Notification'):
-            try:
-                model = getattr(__import__('models', fromlist=[model_name]),
-                                model_name, None)
-                if model is not None and hasattr(model, 'customer_id'):
-                    model.query.filter_by(customer_id=cid).delete(
-                        synchronize_session=False)
-            except Exception:
-                # A table this build does not have is not a reason to stop.
-                continue
+    invoices, payments = _customer_history(customer)
 
-        db.session.delete(customer)
+    try:
+        removed = purge_customer(customer)
         db.session.commit()
     except Exception as exc:
         db.session.rollback()
@@ -576,5 +547,13 @@ def customer_delete(cid):
                     detail=f'{name} could not be removed, so nothing was '
                            f'changed. {str(exc)[:160]}')
 
-    _audit('Delete Customer', f'{name} (id {cid}) removed - no billing history')
-    return ok({'deleted': True, 'id': cid, 'name': name})
+    _audit('Delete Customer',
+           f'{name} (id {cid}) permanently deleted with {invoices} invoice(s) '
+           f'and {payments} payment(s). Removed: '
+           + ', '.join(f'{table} x{count}'
+                       for table, count in sorted(removed.items())))
+    return ok({
+        'deleted': True, 'id': cid, 'name': name,
+        'invoices': invoices, 'payments': payments,
+        'removed': removed,
+    })

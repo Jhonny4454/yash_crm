@@ -374,11 +374,12 @@ body.portal-mode {
   font-size: .82rem;
 }
 
-/* ------------------------------------------- bills, as cards on a phone */
+/* ------------------------------------------ tables, as cards on a phone */
 
 /* `table.data.cards-sm` (see AdminResponsive.css) does the stacking; these
-   rules give the portal's version its own spacing and put the amount and the
-   pay button where a thumb expects them. */
+   rules give the portal's version its own spacing. The bills no longer use
+   it - they are their own list now, in PortalPay.css - but the payments
+   history still is a table, and it still has to be readable on a phone. */
 .portal-shell .table-wrap { padding: 0; }
 
 @media (max-width: 720px) {
@@ -392,14 +393,13 @@ body.portal-mode {
   }
   .portal-shell table.data.cards-sm td.row-actions::before { content: none; }
   .portal-shell table.data.cards-sm td.row-actions .btn { flex: 1 1 auto; }
-  .portal-shell .portal-invoices .row-actions { flex-direction: row; }
 }
 
 /* ------------------------------------------------------------ pay panel */
 
-.portal-shell .pay-dues { border-radius: var(--pt-radius); padding: 16px; }
+.portal-shell .pay-dues { border-radius: var(--pt-radius); padding: 14px 16px; }
 .portal-shell .pay-dues-total { font-size: 1.5rem; }
-.portal-shell .pay-dues-row .btn { width: 100%; }
+.portal-shell .pay-dues-cta { width: auto; }
 
 .portal-shell .current-plan { border-radius: var(--pt-radius); }
 .portal-shell .section-title { margin-top: 4px; }
@@ -564,7 +564,11 @@ body.portal-mode {
   .portal-shell .detail-grid span { flex: none; }
   .portal-shell .detail-grid strong { text-align: left; }
   .portal-shell .btn { width: auto; }
-  .portal-shell .pay-dues-row .btn { width: auto; }
+  .portal-shell .pay-dues-cta { width: auto; }
+  /* The panel gains 4px of padding at this width; the bill list has to gain
+     it too or the dividers stop short of the panel edge. */
+  .portal-shell .bill-list { margin-left: -20px; margin-right: -20px; }
+  .portal-shell .bill-row { padding-right: 20px; padding-left: 17px; }
   .portal-shell input, .portal-shell select,
   .portal-shell textarea, .portal-shell .input { font-size: .93rem; }
 }

@@ -102,11 +102,11 @@ export default function CustomerDetail() {
       // sure?" is a question people answer yes to without reading.
       delete: {
         title: `Delete ${customer?.full_name || "this customer"} permanently?`,
-        message: "The customer record, their plan and their login are removed "
-          + "and cannot be restored. This only works while the account has no "
-          + "invoices and no payments — if it has any, nothing is deleted and "
-          + "you will be told why. To close a customer who has been billed, "
-          + "use Terminate instead.",
+        message: "The customer record, their plan, their login and every bill, "
+          + "receipt and message on the account are removed and cannot be "
+          + "restored. Invoices are GST records, so this also changes totals "
+          + "that may already have been reported. To close a customer who has "
+          + "been billed but keep the history, use Terminate instead.",
         confirmLabel: "Delete permanently",
         tone: "danger",
       },

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { get, post } from "../api/client";
+import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { inr, readableError } from "./ui";
 
@@ -36,6 +37,21 @@ export function usePayConfig() {
       .catch(() => setGateway({ enabled: false, detail: "" }));
   }, []);
   return gateway;
+}
+
+/**
+ * Who the customer is paying, in their own words.
+ *
+ * The company name is already on the session (it is what the top bar and the
+ * footer print), so this is a read, not a request. The gateway config carries
+ * it too and is used as the fallback for a session saved before branding was
+ * returned; the literal last resort matches the name the shell falls back to,
+ * so the two can never disagree on screen.
+ */
+export function usePayee(gateway) {
+  const { company } = useAuth();
+  return (company?.name || gateway?.offline?.company || "").trim()
+    || "Yash Internet Services";
 }
 
 export function loadCheckoutSdk(url) {
@@ -177,18 +193,26 @@ const STAGE_LABEL = {
   confirming: "Confirming…",
 };
 
-/** Settle one bill. */
-export function PayButton({ invoice, gateway, onPaid }) {
+/**
+ * Settle one bill.
+ *
+ * `compact` is for a row that already prints the amount two centimetres to
+ * the left: repeating it in the button costs the width of a phone screen and
+ * tells the customer nothing they are not looking at.
+ */
+export function PayButton({ invoice, gateway, onPaid, compact = false }) {
   const { stage, busy, pay } = usePayNow({ gateway, onPaid });
 
   return (
-    <button type="button" className="btn sm primary pay-btn" disabled={busy}
+    <button type="button"
+            className={`btn sm primary pay-btn${compact ? " is-compact" : ""}`}
+            disabled={busy}
             onClick={() => pay({
               invoiceId: invoice.id,
               amount: Number(invoice.balance),
               describe: invoice.invoice_no,
             })}>
-      {STAGE_LABEL[stage] || `Pay ${inr(invoice.balance)}`}
+      {STAGE_LABEL[stage] || (compact ? "Pay" : `Pay ${inr(invoice.balance)}`)}
     </button>
   );
 }
@@ -206,25 +230,46 @@ export function PayButton({ invoice, gateway, onPaid }) {
 export function PayDuesPanel({ outstanding, invoiceCount, gateway, onPaid }) {
   const due = Number(outstanding || 0);
   const { stage, busy, pay } = usePayNow({ gateway, onPaid });
+  const payee = usePayee(gateway);
 
   if (due <= 0) return null;
 
   return (
     <section className="panel pay-dues">
+      {/* The heading names the payee rather than the action. "Pay your dues"
+          told the customer what they already knew from the amount above it;
+          who the money is going to is the thing this screen alone can say,
+          and the thing a customer hesitates over at a payment window that
+          carries the gateway's branding instead of ours. */}
       <div className="pay-dues-head">
-        <div>
-          <h2>Pay your dues</h2>
+        <div className="pay-dues-lede">
+          <h2>Pay {payee}</h2>
+          {/* Two flex children rather than one string: the amount and the
+              note wrap onto separate lines on a narrow phone, and a string
+              would leave the separator stranded at the start of the second
+              line. */}
           <p>
-            {inr(due)} outstanding
-            {invoiceCount > 1
-              ? ` across ${invoiceCount} bills. Your payment is applied to the oldest first.`
-              : " on your account."}
+            <strong className="pay-dues-total">{inr(due)}</strong>
+            <span>
+              {invoiceCount > 1
+                ? `${invoiceCount} bills, oldest cleared first`
+                : "outstanding"}
+            </span>
           </p>
         </div>
-        <strong className="pay-dues-total">{inr(due)}</strong>
+
+        {gateway?.enabled && (
+          <button type="button" className="btn primary pay-dues-cta" disabled={busy}
+                  onClick={() => pay({ amount: due, describe: "your account" })}>
+            {STAGE_LABEL[stage] || `Pay ${inr(due)}`}
+          </button>
+        )}
       </div>
 
-      {!gateway?.enabled ? (
+      {/* The Pay button lives in the head, beside the amount, so the panel is
+          one band on a desktop instead of three stacked rows. Only the
+          offline instructions need the space below it. */}
+      {!gateway?.enabled && (
         /* No card gateway is not the same as no way to pay.
          *
          * This used to be one sentence ending "contact us for the bank
@@ -256,19 +301,6 @@ export function PayDuesPanel({ outstanding, invoiceCount, gateway, onPaid }) {
             Quote your account name when you transfer, so we can match the
             payment to your bill.
           </p>
-        </div>
-      ) : (
-        /* One button, for the whole amount. The customer does not type a
-           figure: an editable box invites a typo at the exact moment money
-           moves, and it made the customer responsible for arithmetic the
-           server had already done. Somebody who genuinely can only pay part
-           of it rings the office, which is a conversation the business wants
-           to have anyway. */
-        <div className="pay-dues-row">
-          <button type="button" className="btn primary" disabled={busy}
-                  onClick={() => pay({ amount: due, describe: "your account" })}>
-            {STAGE_LABEL[stage] || `Pay ${inr(due)}`}
-          </button>
         </div>
       )}
     </section>

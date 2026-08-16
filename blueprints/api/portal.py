@@ -46,6 +46,14 @@ bp = Blueprint('api_portal', __name__)
 RECENT_INVOICES = 5
 RECENT_PAYMENTS = 4
 
+#: Bills per page on the customer's Bills screen.
+#:
+#: Twelve, not the API-wide default of 25, because the screen is read on a
+#: phone: twelve compact rows are about one screenful, and a year of monthly
+#: bills is twelve of them - so the common case is one page with no paging at
+#: all. ``?per_page=`` still overrides it for anything that wants more.
+BILLS_PER_PAGE = 12
+
 
 def _setting_value(key):
     """One settings row, without importing the whole messaging module.
@@ -196,7 +204,8 @@ def portal_invoices():
         joinedload(Invoice.customer), selectinload(Invoice.payments)
     ).filter_by(customer_id=cid)
     rows, meta = paginate(query.order_by(Invoice.issue_date.desc(),
-                                         Invoice.id.desc()))
+                                         Invoice.id.desc()),
+                          default_per_page=BILLS_PER_PAGE)
     # The account total, not the total of this page. A customer on page 2 of
     # their bills still owes the same amount, and a "pay everything" button
     # that quietly meant "pay the four bills you can currently see" would take
