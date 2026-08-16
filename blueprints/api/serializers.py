@@ -424,6 +424,10 @@ def payment_dict(p):
         'status': p.status,
         'source': p.source or 'admin',
         'source_label': p.source_label,
+        # The number on the receipt itself - the manual book number when
+        # there is one, `R<id>` when there is not. The portal's Payments
+        # screen has a column for it.
+        'receipt_no': p.receipt_no,
         'book_receipt_no': p.book_receipt_no or '',
         'gateway_transaction_id': p.gateway_transaction_id or '',
         'remarks': p.remarks or '',

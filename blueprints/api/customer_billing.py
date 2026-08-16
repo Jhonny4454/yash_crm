@@ -550,7 +550,9 @@ def payment_entry(cid):
         'settled': settled,
         'invoices': [invoice_dict(i) for i in invoices],
         'remaining_due': float(round(sum(i.balance for i in invoices))),
-        'receipt_no': receipt_no or (f'R{created[0].id}' if created else ''),
+        # Payment.receipt_no already prefers the book number the operator
+        # typed, so this is the same answer the receipt PDF will print.
+        'receipt_no': created[0].receipt_no if created else '',
     }), 201
 
 
@@ -802,7 +804,7 @@ def payment_ledger(cid):
             'date': pay.payment_date,
             'sort': (pay.payment_date, 1, pay.id),
             'type': 'payment',
-            'reference': pay.book_receipt_no or f'R{pay.id}',
+            'reference': pay.receipt_no,
             'description': f'{pay.payment_mode or "Payment"}'
                            + (f' - {pay.reference}' if pay.reference else ''),
             'debit': 0.0,
@@ -1094,7 +1096,7 @@ def payment_cancel(pid):
     db.session.commit()
 
     _audit('Cancel Payment',
-           f'Rs.{int(round(float(payment.amount))):,} receipt R{payment.id} '
+           f'Rs.{int(round(float(payment.amount))):,} receipt {payment.receipt_no} '
            f'cancelled: {reason}',
            customer_id=payment.customer_id)
 
@@ -1179,7 +1181,7 @@ def payment_sales_return(pid):
 
     _audit('Sales Return',
            f'Rs.{int(round(float(amount))):,} returned against receipt '
-           f'R{original.id}: {reason}',
+           f'{original.receipt_no}: {reason}',
            customer_id=original.customer_id)
 
     return ok({
@@ -1210,7 +1212,7 @@ def payment_receipt(pid):
     except Exception as exc:
         return fail('pdf_failed', 500, detail=str(exc)[:200])
 
-    name = payment.book_receipt_no or f'R{payment.id}'
+    name = payment.receipt_no
     return Response(pdf, mimetype='application/pdf', headers={
         'Content-Disposition': f'inline; filename="receipt-{name}.pdf"',
     })
@@ -1244,10 +1246,15 @@ def public_payment_receipt(pid):
         from .invoices import _logo_path
         pdf = build_receipt_pdf(payment, logo_path=_logo_path())
     except Exception as exc:
+        # `current_app` is imported here rather than at module scope, matching
+        # the rest of this file - and it was not imported at all, so this
+        # handler raised NameError and replaced the real PDF error with a
+        # traceback about logging it.
+        from flask import current_app
         current_app.logger.exception('Public receipt PDF failed')
         return fail('pdf_failed', 500, detail=str(exc)[:200])
 
-    name = payment.book_receipt_no or f'R{payment.id}'
+    name = payment.receipt_no
     return Response(pdf, mimetype='application/pdf', headers={
         'Content-Disposition': f'inline; filename="receipt-{name}.pdf"',
         'Cache-Control': 'private, max-age=300',

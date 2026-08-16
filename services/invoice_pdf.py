@@ -187,7 +187,7 @@ def _payment_breakdown(invoice, W, small, heading, grid):
             Paragraph(_date(payment.payment_date), small),
             Paragraph(payment.payment_mode or '-', small),
             Paragraph(reference, small),
-            Paragraph(payment.book_receipt_no or f'R{payment.id}', small),
+            Paragraph(payment.receipt_no, small),
             Paragraph(_fmt(amount), small),
         ])
 
@@ -461,7 +461,7 @@ def build_receipt_pdf(payment, logo_path=None):
                   f"<b>Email:</b> {company.get('email', '')}", small),
     ]]], colWidths=[W * 0.34, W * 0.66], style=grid))
 
-    receipt_no = payment.book_receipt_no or f'R{payment.id}'
+    receipt_no = payment.receipt_no
     story.append(Table([[
         Paragraph(f"Receipt No: {receipt_no}", small),
         Paragraph(f"Receipt Date: {_date(payment.payment_date)}", small),

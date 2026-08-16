@@ -335,6 +335,24 @@ class Payment(db.Model):
     discount_reason = db.Column(db.String(100))
 
     @property
+    def receipt_no(self):
+        """What this payment is called on a receipt.
+
+        The manual book number when the counter wrote one, otherwise ``R``
+        and the row id - so a payment taken online, which never goes near a
+        receipt book, still has a reference the customer can quote.
+
+        The expression was copied into the receipt PDF, the WhatsApp receipt
+        message, the ledger and two download filenames, while the customer
+        portal's Payments screen asked the API for a ``receipt_no`` no
+        serializer ever sent - so that column was blank for a payment that
+        had a number on every other document. One property now, so the
+        receipt a customer is shown and the receipt they are sent cannot
+        disagree.
+        """
+        return self.book_receipt_no or f'R{self.id}'
+
+    @property
     def is_authorized(self):
         """True once an admin has signed this entry off."""
         return self.status == 'approved' and self.authorized_at is not None

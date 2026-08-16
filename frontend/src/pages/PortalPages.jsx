@@ -692,9 +692,14 @@ export function PortalProfile() {
  * A short list of invoices or payments.
  *
  * Invoice rows open the bill; payment rows do not, because there is no
- * document behind a payment row to open. Same component, and the difference is
- * decided per row by whether it carries an invoice_no - a row that looks
- * clickable and is not is worse than one that plainly is not.
+ * document behind a payment row to open. A row that looks clickable and is
+ * not is worse than one that plainly is not.
+ *
+ * Telling the two apart by invoice_no alone was wrong: a payment carries the
+ * number of the bill it settled, so every payment row here was treated as a
+ * bill - it looked clickable, and opening it asked for the invoice whose id
+ * matched the PAYMENT's id, which is somebody else's bill or nothing at all.
+ * A payment_date is the thing only a payment has.
  */
 function Rows({ title, rows, empty, limit }) {
   const bill = useBillActions();
@@ -706,12 +711,16 @@ function Rows({ title, rows, empty, limit }) {
       {!shown?.length ? <Empty title="Nothing to show" hint={empty} /> : (
         <div className="list-cards">
           {shown.map((row) => {
-            const isBill = Boolean(row.invoice_no);
+            const isBill = Boolean(row.invoice_no) && !row.payment_date;
             return (
               <article key={row.id}
                        {...(isBill ? billRowProps(row, bill.ask) : {})}>
                 <div>
-                  <strong>{row.invoice_no || row.receipt_no || row.payment_mode}</strong>
+                  <strong>
+                    {isBill
+                      ? row.invoice_no
+                      : row.receipt_no || row.payment_mode || "Payment"}
+                  </strong>
                   <p>{fmtDate(row.issue_date || row.payment_date)}</p>
                 </div>
                 <div>

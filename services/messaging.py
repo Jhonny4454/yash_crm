@@ -413,7 +413,7 @@ def build_context(customer=None, plan=None, customer_plan=None,
 
     if payment is not None:
         ctx['paid_amount'] = _fmt_money(payment.amount)
-        ctx['receipt_no'] = payment.book_receipt_no or f"R{payment.id}"
+        ctx['receipt_no'] = payment.receipt_no
         # The receipt PDF, as a link Meta can fetch for a document header.
         try:
             from services.signed_links import receipt_pdf_link
