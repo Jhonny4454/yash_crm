@@ -247,7 +247,9 @@ body.sidebar-collapsed .app-footer { left: var(--sidebar-w-collapsed); }
 
 /* ============================================================= TABLES ==== */
 
-.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+/* Opaque, and no touch-scrolling promotion - see the note in
+   AdminResponsive.css: a bare composited scroller paints white on Android. */
+.table-wrap { overflow-x: auto; background: var(--surface, #fff); }
 
 table.data { width: 100%; border-collapse: collapse; font-size: .88rem; }
 table.data th {

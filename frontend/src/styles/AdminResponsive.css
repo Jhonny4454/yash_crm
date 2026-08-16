@@ -69,10 +69,26 @@ input[type="number"] {
    appears only while there is more table to the right. */
 .table-wrap {
   overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
+  /* An OPAQUE background of its own, and no `-webkit-overflow-scrolling`.
+   *
+   * Touch scrolling promotes a scroller to its own composited layer, and on
+   * Android that layer is painted opaque WHITE underneath whatever the
+   * contents draw. A table paints its cells, not its box, so the strip of
+   * layer the cells do not cover showed through as white - at the right edge
+   * of the content, which is the panel edge until the table is scrolled
+   * sideways and then somewhere across the middle of the screen. Desktop
+   * Chrome composites differently, which is why it only ever appeared on a
+   * phone.
+   *
+   * `-webkit-overflow-scrolling` has been a no-op since iOS 13 and was never
+   * needed on Android, so it goes; the background is what guarantees the
+   * layer is never bare. */
+  background: var(--surface, #fff);
 }
+
+.scroll-y { background: var(--surface, #fff); }
 .table-wrap::-webkit-scrollbar { height: 8px; }
 .table-wrap::-webkit-scrollbar-thumb {
   background: #cbd5e1;

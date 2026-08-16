@@ -307,8 +307,11 @@ small.ok { color: #15803d; }
    it and cannot be scrolled back to independently. */
 .table-wrap {
   overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
   max-width: 100%;
+  /* Third copy of this rule in the project, and the same reason as the other
+     two: a composited scroller with no background of its own paints white
+     under its contents on Android. See AdminResponsive.css. */
+  background: var(--surface, #fff);
 }
 
 .panel-card,

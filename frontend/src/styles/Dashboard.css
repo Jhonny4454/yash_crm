@@ -254,7 +254,10 @@ body.sidebar-collapsed .app-footer { left: var(--sidebar-w-collapsed); }
 
 /* ============================================================= TABLES ==== */
 
-.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+/* Duplicate of the rule in index.css - see the note in AdminResponsive.css.
+   Both have to carry the background or which one wins decides whether the
+   white strip appears. */
+.table-wrap { overflow-x: auto; background: var(--surface, #fff); }
 
 table.data { width: 100%; border-collapse: collapse; font-size: .88rem; }
 table.data th {
