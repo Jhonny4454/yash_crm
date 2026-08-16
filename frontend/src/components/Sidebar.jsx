@@ -489,6 +489,18 @@ export default function Sidebar({
             className="brand-logo"
             src={company?.logo_url || logoImage}
             alt={company?.name || "YASH Internet Services"}
+            /* A logo_url that 404s - an upload the server no longer has -
+               used to render as a broken-image glyph with the company name
+               beside it in a white box. `onError` swaps in the copy that
+               ships with this bundle, which cannot 404 because it is part of
+               the build. Cleared afterwards so a failing fallback cannot
+               loop. */
+            onError={(event) => {
+              if (event.currentTarget.src !== logoImage) {
+                event.currentTarget.onerror = null;
+                event.currentTarget.src = logoImage;
+              }
+            }}
           />
           {onCloseMobile && (
             <button type="button" className="drawer-close" onClick={onCloseMobile}

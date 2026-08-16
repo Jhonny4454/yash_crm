@@ -84,7 +84,16 @@ export default function PortalShell() {
       {/* ---------------------------------------------------- desktop rail */}
       <aside className="pt-rail" aria-label="Portal navigation">
         <NavLink to="/customer" className="pt-brand" end>
-          <img src={company?.logo_url || logoImage} alt="" />
+          {/* Same fallback as the admin sidebar: an upload the server has
+              lost 404s, and a broken-image glyph in the customer's header is
+              the first thing they see of this company. */}
+          <img src={company?.logo_url || logoImage} alt=""
+               onError={(event) => {
+                 if (event.currentTarget.src !== logoImage) {
+                   event.currentTarget.onerror = null;
+                   event.currentTarget.src = logoImage;
+                 }
+               }} />
           <span>{company?.name || "YASH Internet"}</span>
         </NavLink>
 

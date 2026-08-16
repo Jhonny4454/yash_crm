@@ -29,8 +29,14 @@ DEFAULTS = {
     'address': 'K-47, Sector-4, Opp SDV College, Airoli, Navi Mumbai, Maharashtra - 400708.',
     'mobile': '9029508777',
     'email': 'yashinternetservices9@gmail.com',
-    'state': 'Airoli, Sector-4, Navi Mumbai.',
-    'state_code': '400708',
+    # The STATE, not the locality. This read "Airoli, Sector-4, Navi Mumbai."
+    # - which is the street address again, printed under a heading that on a
+    # tax invoice means the state of supply.
+    'state': 'Maharashtra',
+    # GST state code, which is what this box is for: Maharashtra is 27. It
+    # held 400708, the PIN code, which is a different number entirely and
+    # matches no state.
+    'state_code': '27',
 }
 
 TERMS = [
@@ -104,8 +110,31 @@ def _company():
             value = getattr(row, key, None)
             if value:
                 out[key] = value
+
+        # Settings owns these two, and the bill never read them: whatever an
+        # administrator typed into Place of Supply and State Code was ignored
+        # and the constants above printed instead.
+        place = getattr(row, 'place_of_supply', None)
+        if place:
+            out['state'] = place
+        code = getattr(row, 'state_code', None)
+        # A PIN code is six digits; a GST state code is two. Printing the PIN
+        # under "State Code" is the mistake this whole block is here to stop
+        # repeating, so it is not carried over from the record either.
+        if code and len(str(code).strip()) <= 3:
+            out['state_code'] = str(code).strip()
+
         out['logo'] = getattr(row, 'company_logo', None)
     return out
+
+
+def _root():
+    """The application directory, whether or not there is an app context."""
+    try:
+        from flask import current_app
+        return current_app.root_path
+    except Exception:                                       # noqa: BLE001
+        return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def _logo_path(explicit=None):
@@ -127,17 +156,17 @@ def _logo_path(explicit=None):
         return explicit
 
     stored = str(_company().get('logo') or '').replace('\\', '/').strip()
-    if not stored or stored.startswith(('http://', 'https://')):
+    if not stored:
+        # Nothing uploaded at all. The application ships a logo, so a company
+        # that never used the Settings upload still gets a letterhead rather
+        # than a blank box - this returned None and printed nothing.
+        return _bundled_logo(_root())
+    if stored.startswith(('http://', 'https://')):
         # A remote URL cannot be handed to ReportLab as a local file.
-        return None
+        return _bundled_logo(_root())
 
     bare = stored.lstrip('/').split('/')[-1]
-
-    try:
-        from flask import current_app
-        root = current_app.root_path
-    except Exception:
-        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    root = _root()
 
     # Current layout first, then the places older uploads landed.
     for candidate in (

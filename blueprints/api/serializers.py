@@ -57,13 +57,42 @@ def static_url(name):
         return '/static/' + name
 
 
+#: The logo that ships with the application, relative to /static.
+BUNDLED_LOGO = 'images/logo.jpg'
+
+
+def _static_file_exists(relative):
+    """Is this actually on disk under static/, right now?"""
+    import os
+    try:
+        from flask import current_app
+        root = current_app.root_path
+    except Exception:                                       # noqa: BLE001
+        root = os.path.dirname(os.path.dirname(
+            os.path.dirname(os.path.abspath(__file__))))
+    return os.path.exists(os.path.join(root, 'static', *relative.split('/')))
+
+
 def logo_url(filename):
     """
     Resolve whatever is stored in ``Company.company_logo`` into a URL the
     browser / app can actually load.
+
+    "Can actually load" is the part that was missing. This built a URL from
+    the stored filename without ever asking whether that file is on this
+    server, and uploads live on the web container's own disk - which the host
+    rebuilds on every deploy. So the Company row goes on naming a file that no
+    longer exists, the URL 404s, and every screen that prints the logo shows a
+    broken-image icon with the company name beside it: the admin sidebar, the
+    customer portal header, the mobile app.
+
+    A missing upload therefore falls back to the logo the repository ships,
+    which is the same mark. Uploading a new one still works and still wins -
+    until the next deploy takes it away again, which is a hosting problem
+    (see the note in services/invoice_pdf.py) rather than one this can solve.
     """
     if not filename:
-        return None
+        return static_url(BUNDLED_LOGO) if _static_file_exists(BUNDLED_LOGO) else None
 
     name = str(filename).replace('\\', '/').strip()
     if name.startswith('http://') or name.startswith('https://'):
@@ -78,7 +107,68 @@ def logo_url(filename):
     if not name.startswith('uploads/'):
         name = 'uploads/logos/' + name.split('/')[-1]
 
-    return static_url(name)
+    # The places an upload has landed across the life of this application.
+    bare = name.split('/')[-1]
+    for candidate in (name, f'uploads/{bare}', f'images/{bare}', bare):
+        if _static_file_exists(candidate):
+            return static_url(candidate)
+
+    if _static_file_exists(BUNDLED_LOGO):
+        return static_url(BUNDLED_LOGO)
+    # Nothing to point at. None, not a broken URL - the clients all fall back
+    # to their own bundled asset when this is empty.
+    return None
+
+
+def company_name():
+    """The trading name, cached for the life of the request.
+
+    Serializers call this per ROW - a page of 25 plans would otherwise be 25
+    `SELECT * FROM company LIMIT 1`, which is how a display fallback turns
+    into a performance bug.
+    """
+    try:
+        from flask import g
+        cached = getattr(g, '_company_name', None)
+        if cached is not None:
+            return cached
+    except Exception:                                       # noqa: BLE001
+        g = None
+
+    name = ''
+    try:
+        row = Company.query.first()
+        name = (row.name or '') if row else ''
+    except Exception:                                       # noqa: BLE001
+        name = ''
+
+    try:
+        if g is not None:
+            g._company_name = name
+    except Exception:                                       # noqa: BLE001
+        pass
+    return name
+
+
+def provider_name(record):
+    """Who provides this service, as a customer would answer it.
+
+    `service_provider_id` names the UPSTREAM provider, and nothing has ever
+    filled it in: no seed creates a ServiceProvider row, so the dropdowns on
+    the plan and customer forms open empty, so every plan and every customer
+    carries NULL - and every screen that prints a provider has been showing a
+    dash. The Plan tab, Plan History, the plan master, the plan picker and
+    the customer's own portal, all blank, on a field the business plainly has
+    an answer to.
+
+    So the answer, when nothing more specific is recorded, is this company:
+    the customer's provider is whoever sells them the connection. An upstream
+    provider that IS recorded still wins.
+    """
+    provider = getattr(record, 'service_provider', None)
+    if provider is not None and getattr(provider, 'name', ''):
+        return provider.name
+    return company_name()
 
 
 def company_branding(company=None):
@@ -204,8 +294,7 @@ def customer_dict(c, detail=False):
             'ip_address': getattr(c, 'ip_address', '') or '',
             'ipacct_id': getattr(c, 'ipacct_id', '') or '',
             'service_provider_id': getattr(c, 'service_provider_id', None),
-            'service_provider': (c.service_provider.name
-                                 if getattr(c, 'service_provider', None) else ''),
+            'service_provider': provider_name(c),
             'invoice_date': iso(getattr(c, 'invoice_date', None)),
             'latitude': getattr(c, 'latitude', '') or '',
             'longitude': getattr(c, 'longitude', '') or '',
@@ -282,8 +371,7 @@ def plan_dict(p):
         'isp_amount': money(p.isp_amount),
         'validity_days': p.validity_days or 30,
         'service_provider_id': p.service_provider_id,
-        'service_provider': (p.service_provider.name
-                             if p.service_provider else ''),
+        'service_provider': provider_name(p),
         'is_active': bool(p.is_active),
         'created_at': iso(p.created_at),
     }

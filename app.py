@@ -2999,14 +2999,11 @@ def invoice_detailed(id):
 def invoice_delete(id):
     invoice = Invoice.query.get_or_404(id)
     customer_id = invoice.customer_id
-    # Payment rows are the record - keep them and detach the bill link, so the
-    # receipts survive the invoice. Previously this deleted every payment on
-    # the bill, which erased the money's trace entirely.
-    from services.payments import detach_payment_records
-    if not detach_payment_records(invoice):
-        flash('This invoice has a sales return / credit note against it. '
-              'Delete the return first.', 'danger')
+    if any(p.status == 'approved' for p in invoice.payments):
+        flash('Cannot delete an invoice that already has authorized payments.', 'danger')
         return redirect(url_for('customer_view', id=customer_id))
+    for p in list(invoice.payments):
+        db.session.delete(p)
     db.session.delete(invoice)
     db.session.commit()
     log_audit('Delete Invoice', f"Deleted invoice #{id}")
@@ -4805,6 +4802,27 @@ def init_database(flask_app=None):
                 flask_app.logger.info("Seeded %s notification templates.", created)
         except Exception as exc:
             flask_app.logger.warning("Could not seed notification templates: %s", exc)
+
+        # One service provider, named after this company.
+        #
+        # Nothing ever created one, so the Service Provider dropdown on the
+        # plan and customer forms opened with nothing in it - which meant
+        # `service_provider_id` could never be set, and every screen that
+        # prints a provider printed a dash. A single row makes the field
+        # usable; resellers can add their upstream providers beside it under
+        # Masters.
+        try:
+            from models import Company, ServiceProvider
+            if not ServiceProvider.query.first():
+                company = Company.query.first()
+                name = (company.name if company and company.name
+                        else 'YASH Internet Services')
+                db.session.add(ServiceProvider(name=name, is_active=True))
+                db.session.commit()
+                flask_app.logger.info('Seeded service provider "%s".', name)
+        except Exception as exc:                            # noqa: BLE001
+            db.session.rollback()
+            flask_app.logger.warning('Could not seed service provider: %s', exc)
 
         admin = User.query.filter_by(username='admin').first()
         if not admin:
