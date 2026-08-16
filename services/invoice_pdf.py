@@ -149,7 +149,70 @@ def _logo_path(explicit=None):
     ):
         if os.path.exists(candidate):
             return candidate
+
+    return _bundled_logo(root, missing=stored)
+
+
+def _bundled_logo(root, missing=''):
+    """The logo that ships with the application.
+
+    Uploads live on the web server's local disk. On a platform that rebuilds
+    that disk on every deploy - Render, which is what this runs on - the
+    Company row keeps pointing at a file the new container has never had, so
+    `_logo_path` finds nothing and every bill and receipt prints with an empty
+    letterhead. The file the repository ships is the same logo, so use it
+    rather than printing a blank box.
+
+    The miss is logged: a bill silently losing its letterhead is exactly the
+    kind of fault nobody reports and everybody notices.
+    """
+    if missing:
+        try:
+            from flask import current_app
+            current_app.logger.warning(
+                'Company logo %s is not on disk (uploads do not survive a '
+                'deploy on this host) - falling back to the bundled logo.',
+                missing)
+        except Exception:                                   # noqa: BLE001
+            pass
+
+    for name in ('logo.jpg', 'logo.png', 'logo.jpeg'):
+        for candidate in (os.path.join(root, 'static', 'images', name),
+                          os.path.join(root, 'static', name)):
+            if os.path.exists(candidate):
+                return candidate
     return None
+
+
+def _logo_flowable(explicit=None, width=30, height=18):
+    """The letterhead image, or '' when there is genuinely no logo to print.
+
+    One helper for both documents: the invoice and the receipt each had their
+    own copy of resolve-then-guard, which is how one of them can quietly stop
+    printing a letterhead while the other keeps working.
+    """
+    resolved = _logo_path(explicit)
+    if not resolved:
+        return ''
+    try:
+        return Image(resolved, width=width * mm, height=height * mm,
+                     kind='proportional')
+    except Exception:                                       # noqa: BLE001
+        # A corrupt or unreadable image must not take the whole bill down.
+        return ''
+
+
+def _gst_label(base, tax):
+    """`18%` when the numbers say so, otherwise just `GST`.
+
+    Read back from the invoice's own figures rather than from the current
+    setting: a reprint of an old bill has to describe the tax that bill
+    carries, not the rate the company happens to charge today.
+    """
+    if base <= 0 or tax <= 0:
+        return 'GST'
+    rate = round(tax / base * 100, 2)
+    return f'{rate:g}%'
 
 
 def _payment_breakdown(invoice, W, small, heading, grid):
@@ -240,39 +303,44 @@ def build_invoice_pdf(invoice, logo_path=None, detailed=False):
     term = ParagraphStyle('term', parent=small, fontSize=7.5, leading=11,
                           alignment=TA_LEFT)
 
+    # Long unbroken strings - an email address, a plan code - have nowhere to
+    # wrap, so in a narrow cell they run over the rule beside them. CJK word
+    # wrapping breaks anywhere, which is the lesser evil on a bill.
+    wrap = ParagraphStyle('wrap', parent=small, wordWrap='CJK')
+
     story = [Paragraph('INVOICE', heading), Spacer(1, 4)]
     W = doc.width
 
     # ---- letterhead: logo | company block ------------------------------
-    logo_cell = ''
-    # Resolved here rather than trusted from the caller: every route that
-    # builds a document used to reimplement this, and the portal's version
-    # looked in the wrong directory.
-    resolved_logo = _logo_path(logo_path)
-    if resolved_logo:
-        try:
-            logo_cell = Image(resolved_logo, width=32 * mm, height=20 * mm,
-                              kind='proportional')
-        except Exception:
-            logo_cell = ''
+    logo_cell = _logo_flowable(logo_path)
 
     company_block = [
         Paragraph(f"<b>{company['name']}</b>", small),
-        Paragraph(f"<b>Address:</b> {company.get('address', '')}", small),
-        Paragraph(
-            f"<b>Contact No. :</b> {company.get('mobile', '')}, "
-            f"<b>Email:</b> {company.get('email', '')} "
-            f"<b>PAN No:</b> {company.get('pan', '') or ''}", small),
+        Paragraph(f"<b>Address:</b> {company.get('address', '')}", wrap),
+        Paragraph(f"<b>Contact No.:</b> {company.get('mobile', '')} &nbsp;"
+                  f"<b>Email:</b> {company.get('email', '')}", wrap),
     ]
+    # Only when there is one. The line read "PAN No:" followed by nothing on
+    # every bill this company has ever sent, because the label was printed
+    # whether or not the field was filled in - and an empty label on an
+    # invoice reads as a number somebody forgot to enter.
+    if company.get('pan'):
+        company_block.append(
+            Paragraph(f"<b>PAN No:</b> {company['pan']}", small))
+
+    letterhead = TableStyle([
+        ('GRID', (0, 0), (-1, -1), 0.6, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+    ])
+    # No logo means no empty box: a third of the letterhead ruled off around
+    # nothing looks like a missing image, which is precisely what it was.
     story.append(Table([[logo_cell, company_block]],
-                       colWidths=[W * 0.34, W * 0.66],
-                       style=TableStyle([
-                           ('GRID', (0, 0), (-1, -1), 0.6, colors.black),
-                           ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                           ('LEFTPADDING', (0, 0), (-1, -1), 5),
-                           ('TOPPADDING', (0, 0), (-1, -1), 5),
-                           ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-                       ])))
+                       colWidths=[W * 0.28, W * 0.72], style=letterhead)
+                 if logo_cell else
+                 Table([[company_block]], colWidths=[W], style=letterhead))
 
     # ---- GSTIN / state row ---------------------------------------------
     grid = TableStyle([
@@ -283,32 +351,44 @@ def build_invoice_pdf(invoice, logo_path=None, detailed=False):
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
     ])
 
-    story.append(Table([[
-        Paragraph(f"GSTIN: {company.get('gstin', '') or ''}", small),
-        Paragraph(f"State: {company.get('state', DEFAULTS['state'])}", small),
-        Paragraph(f"State Code : {company.get('state_code', DEFAULTS['state_code'])}", small),
-    ]], colWidths=[W * 0.40, W * 0.36, W * 0.24], style=grid))
+    # The seller's tax identity. GSTIN only when the company has one - a
+    # business that is not registered should not print an empty GSTIN box on
+    # a bill it hands to a customer.
+    seller = [Paragraph(f"State: {company.get('state', DEFAULTS['state'])}", wrap),
+              Paragraph(f"State Code: {company.get('state_code', DEFAULTS['state_code'])}",
+                        small)]
+    if company.get('gstin'):
+        gstin_row = [Paragraph(f"GSTIN: {company['gstin']}", small)] + seller
+        story.append(Table([gstin_row],
+                           colWidths=[W * 0.40, W * 0.36, W * 0.24], style=grid))
+    else:
+        story.append(Table([seller], colWidths=[W * 0.62, W * 0.38], style=grid))
 
     story.append(Table([[
-        Paragraph(f"Customer Name:{customer.full_name if customer else ''}", small),
-        Paragraph(f"Tel: {getattr(customer, 'mobile', '') or ''}", small),
-        Paragraph(f"Email : {getattr(customer, 'email', '') or ''}", small),
-    ]], colWidths=[W * 0.40, W * 0.28, W * 0.32], style=grid))
+        Paragraph(f"<b>Customer Name:</b> {customer.full_name if customer else ''}", wrap),
+        Paragraph(f"<b>Tel:</b> {getattr(customer, 'mobile', '') or ''}", small),
+        Paragraph(f"<b>Email:</b> {getattr(customer, 'email', '') or ''}", wrap),
+    ]], colWidths=[W * 0.38, W * 0.24, W * 0.38], style=grid))
 
     address = ', '.join(filter(None, [
         getattr(customer, 'flat_no', None), getattr(customer, 'building', None),
         getattr(customer, 'locality', None), getattr(customer, 'area', None),
     ])) if customer else ''
+    # `Address:, 1008, Rabale...` - that comma was hard-coded, so every bill
+    # for a customer with no flat number opened its address with a comma.
     story.append(Table([[Paragraph(
-        f"Address:, {address}<br/>Contact No. : {getattr(customer, 'mobile', '') or ''} "
-        f"Email: {getattr(customer, 'email', '') or ''}", small)]],
-        colWidths=[W], style=grid))
+        f"<b>Address:</b> {address or '-'}", wrap)]], colWidths=[W], style=grid))
 
-    story.append(Table([[
-        Paragraph(f"Invoice No:{invoice.invoice_no}", small),
-        Paragraph(f"Invoice Date : {_date(invoice.issue_date)}", small),
-        Paragraph(f"Customer GSTIN: {getattr(customer, 'gstin', '') or ''}", small),
-    ]], colWidths=[W * 0.40, W * 0.32, W * 0.28], style=grid))
+    invoice_row = [
+        Paragraph(f"<b>Invoice No:</b> {invoice.invoice_no}", wrap),
+        Paragraph(f"<b>Invoice Date:</b> {_date(invoice.issue_date)}", small),
+    ]
+    if getattr(customer, 'gstin', ''):
+        invoice_row.append(Paragraph(f"<b>Customer GSTIN:</b> {customer.gstin}", wrap))
+        widths = [W * 0.40, W * 0.32, W * 0.28]
+    else:
+        widths = [W * 0.58, W * 0.42]
+    story.append(Table([invoice_row], colWidths=widths, style=grid))
 
     story.append(Table([[Paragraph('INVOICE SUMMARY', heading)]],
                        colWidths=[W], style=grid))
@@ -332,16 +412,23 @@ def build_invoice_pdf(invoice, logo_path=None, detailed=False):
     if start and end:
         period = f"{start.strftime('%d-%m-%Y')} to {end.strftime('%d-%m-%Y')}"
 
-    base = float(invoice.total_amount or 0)
+    # `total_amount` is what the customer owes, GST included; `tax_amount` is
+    # the tax sitting inside it. The bill printed the gross figure as "Base
+    # Amount" and never mentioned GST at all, so a taxable customer got an
+    # invoice that could not be reconciled with their own books - and their
+    # accountant could not see what tax had been charged.
+    gross = float(invoice.total_amount or 0)
+    tax = float(getattr(invoice, 'tax_amount', 0) or 0)
+    base = gross - tax
     discount = float(getattr(invoice, 'discount_amount', 0) or 0)
-    net = base - discount
+    net = gross - discount
 
     items = [[
         Paragraph('<b>Sr.no</b>', small), Paragraph('<b>Description of services</b>', small),
         Paragraph('<b>No.of Service</b>', small), Paragraph('<b>Period</b>', small),
         Paragraph('<b>Base Amount</b>', small),
     ], [
-        Paragraph('1', small), Paragraph(caption, small), Paragraph('1', small),
+        Paragraph('1', small), Paragraph(caption, wrap), Paragraph('1', small),
         Paragraph(period, small), Paragraph(_fmt(base), small),
     ]]
     story.append(Table(items,
@@ -357,27 +444,37 @@ def build_invoice_pdf(invoice, logo_path=None, detailed=False):
                        ])))
 
     # ---- totals ---------------------------------------------------------
-    totals = [['Sub Amount:', _fmt(base)], ['Discount:', _fmt(discount)],
-              ['Net Amount:', _fmt(net)], ['Total Amount:', _fmt(net)]]
+    totals = [['Sub Amount:', _fmt(base)]]
+    if tax > 0:
+        totals.append([f'GST ({_gst_label(base, tax)}):', _fmt(tax)])
+    totals.extend([['Discount:', _fmt(discount)],
+                   ['Net Amount:', _fmt(net)], ['Total Amount:', _fmt(net)]])
+
+    # The amount in words goes in the space beside the figures rather than in
+    # a row of its own underneath. It is the same information a printed bill
+    # puts there, and it fills what was a third of a page of ruled-off blank.
     story.append(Table(
-        [[ '', Table(totals, colWidths=[W * 0.20, W * 0.16], style=TableStyle([
-            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
-            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('TOPPADDING', (0, 0), (-1, -1), 2),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-        ]))]],
+        [[Paragraph(f"<b>Rupees in words:</b> {amount_in_words(net)}", wrap),
+          Table(totals, colWidths=[W * 0.20, W * 0.16], style=TableStyle([
+              ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+              ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+              ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+              ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+              ('FONTSIZE', (0, 0), (-1, -1), 8),
+              ('LINEABOVE', (0, -1), (-1, -1), 0.6, colors.black),
+              ('TOPPADDING', (0, 0), (-1, -1), 2),
+              ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+          ]))]],
         colWidths=[W * 0.64, W * 0.36],
         style=TableStyle([
             ('GRID', (0, 0), (-1, -1), 0.6, colors.black),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('VALIGN', (0, 0), (0, 0), 'MIDDLE'),
+            ('VALIGN', (1, 0), (1, 0), 'TOP'),
+            ('LEFTPADDING', (0, 0), (0, 0), 5),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
             ('RIGHTPADDING', (1, 0), (1, 0), 5),
         ])))
-
-    story.append(Table([[Paragraph(
-        f"<b>Rupees in words:</b> {amount_in_words(net)}", small)]],
-        colWidths=[W], style=grid))
 
     if detailed:
         story.extend(_payment_breakdown(invoice, W, small, heading, grid))
@@ -442,24 +539,18 @@ def build_receipt_pdf(payment, logo_path=None):
     story = [Paragraph('PAYMENT RECEIPT', heading), Spacer(1, 4)]
     W = doc.width
 
-    logo_cell = ''
-    # Resolved here rather than trusted from the caller: every route that
-    # builds a document used to reimplement this, and the portal's version
-    # looked in the wrong directory.
-    resolved_logo = _logo_path(logo_path)
-    if resolved_logo:
-        try:
-            logo_cell = Image(resolved_logo, width=32 * mm, height=20 * mm,
-                              kind='proportional')
-        except Exception:
-            logo_cell = ''
-
-    story.append(Table([[logo_cell, [
+    wrap = ParagraphStyle('wrap', parent=small, wordWrap='CJK')
+    logo_cell = _logo_flowable(logo_path)
+    company_block = [
         Paragraph(f"<b>{company['name']}</b>", small),
-        Paragraph(f"<b>Address:</b> {company.get('address', '')}", small),
-        Paragraph(f"<b>Contact No. :</b> {company.get('mobile', '')}, "
-                  f"<b>Email:</b> {company.get('email', '')}", small),
-    ]]], colWidths=[W * 0.34, W * 0.66], style=grid))
+        Paragraph(f"<b>Address:</b> {company.get('address', '')}", wrap),
+        Paragraph(f"<b>Contact No.:</b> {company.get('mobile', '')} &nbsp;"
+                  f"<b>Email:</b> {company.get('email', '')}", wrap),
+    ]
+    story.append(Table([[logo_cell, company_block]],
+                       colWidths=[W * 0.28, W * 0.72], style=grid)
+                 if logo_cell else
+                 Table([[company_block]], colWidths=[W], style=grid))
 
     receipt_no = payment.receipt_no
     story.append(Table([[

@@ -413,6 +413,20 @@ body.portal-mode {
   font-size: .86rem;
 }
 
+/* A card's title line, with room for the hint that says a row can be
+   opened. Without it the affordance is invisible and a tappable row reads as
+   a read-out. */
+.portal-shell .rows-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.portal-shell .rows-head h2 { margin: 0; }
+.portal-shell .rows-hint { font-size: .74rem; color: var(--pt-muted); }
+
 .portal-shell .current-plan { border-radius: var(--pt-radius); }
 .portal-shell .section-title { margin-top: 4px; }
 

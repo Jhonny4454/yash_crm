@@ -674,6 +674,47 @@ def portal_invoice_pdf(iid):
     })
 
 
+@bp.get('/portal/payments/<int:pid>/receipt')
+@customer_required
+def portal_payment_receipt(pid):
+    """A customer's own receipt as a PDF.
+
+    The bills list has let a customer print or save any bill for a while; the
+    money they actually PAID had no such document on their side, only on the
+    office's. So a customer wanting proof of payment - for a landlord, an
+    employer, their own file - had to ring and ask for it.
+
+    Same shape as the bill route above, and separate from the staff one for
+    the same reason: the ownership check is the whole point, and it belongs on
+    a route that can only be reached with a customer token.
+    """
+    payment = db.session.get(Payment, pid)
+    if not payment or payment.customer_id != current_customer_id():
+        return fail('not_found', 404)
+
+    try:
+        from services.invoice_pdf import build_receipt_pdf
+    except ImportError as exc:
+        current_app.logger.error('Portal receipt PDF unavailable: %s', exc)
+        return fail('pdf_unavailable', 503,
+                    detail='Receipt downloads are temporarily unavailable. '
+                           'Please contact the office.')
+
+    try:
+        from .invoices import _logo_path
+        pdf = build_receipt_pdf(payment, logo_path=_logo_path())
+    except Exception:
+        current_app.logger.exception('Portal receipt PDF failed')
+        return fail('pdf_failed', 500,
+                    detail='That receipt could not be generated. '
+                           'Please contact us.')
+
+    return Response(pdf, mimetype='application/pdf', headers={
+        'Content-Disposition':
+            f'inline; filename="receipt-{payment.receipt_no}.pdf"',
+    })
+
+
 _PRIVATE_HOST = re.compile(
     r'^(localhost|127\.|0\.0\.0\.0|::1|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)')
 

@@ -79,6 +79,7 @@ export function PortalDashboard() {
         cannot answer higher up: did my last payment land. The rest of the
         receipts are on the Payments screen. */}
     <Rows title="Recent payments" rows={data?.recent_payments} limit={4}
+          hint="Tap a payment for its receipt"
           empty="Your approved payments will appear here." />
   </section>;
 }
@@ -91,10 +92,18 @@ function PortalList({ endpoint, title, columns }) {
   const [page, setPage] = useState(1);
   const { data, meta, loading, error, refetch } = useFetch(endpoint, { page });
   const label = (key) => key.replaceAll("_", " ");
+  // The same Print / Download sheet the Bills screen uses. A customer looking
+  // at their payment history is usually looking for the one they need a
+  // receipt for.
+  const bill = useBillActions();
 
   return <section className="page">
     <div className="page-heading">
-      <div><h1>{title}</h1><p>Your account history is always available here.</p></div>
+      <div>
+        <h1>{title}</h1>
+        <p>Your account history is always available here. Tap a row to print
+           or save its receipt.</p>
+      </div>
     </div>
 
     <ErrorNote error={error} onRetry={refetch} />
@@ -110,7 +119,9 @@ function PortalList({ endpoint, title, columns }) {
               </thead>
               <tbody>
                 {data.map((row) => (
-                  <tr key={row.id}>
+                  <tr key={row.id}
+                      {...(row.status === "approved"
+                        ? billRowProps(row, bill.ask) : {})}>
                     {columns.map((key) => (
                       <td key={key} data-label={label(key)}>
                         {renderValue(key, row[key])}
@@ -124,6 +135,8 @@ function PortalList({ endpoint, title, columns }) {
     </section>
 
     <Pager meta={meta} onPage={setPage} />
+
+    <BillActions {...bill} />
   </section>;
 }
 
@@ -710,32 +723,40 @@ export function PortalProfile() {
 }
 
 /**
- * A short list of invoices or payments.
+ * A short list of invoices or payments. Every row opens its own document.
  *
- * Invoice rows open the bill; payment rows do not, because there is no
- * document behind a payment row to open. A row that looks clickable and is
- * not is worse than one that plainly is not.
+ * A bill opens the bill; a payment opens its receipt - the same Print /
+ * Download sheet the Bills screen uses, so proof of payment is a tap away
+ * instead of a phone call to the office.
  *
- * Telling the two apart by invoice_no alone was wrong: a payment carries the
- * number of the bill it settled, so every payment row here was treated as a
- * bill - it looked clickable, and opening it asked for the invoice whose id
- * matched the PAYMENT's id, which is somebody else's bill or nothing at all.
- * A payment_date is the thing only a payment has.
+ * Which document is decided by `docFor`, on the payment_date: a payment also
+ * carries the invoice_no of the bill it settled, so the invoice number cannot
+ * tell them apart. Getting that wrong once meant every payment row here asked
+ * for the INVOICE whose id matched the payment's - somebody else's bill, or
+ * nothing at all.
+ *
+ * A payment still waiting to be checked is not offered: there is no receipt
+ * for money the office has not confirmed, and a document that says otherwise
+ * would be worse than none.
  */
-function Rows({ title, rows, empty, limit }) {
+function Rows({ title, rows, empty, limit, hint }) {
   const bill = useBillActions();
   const shown = limit ? (rows || []).slice(0, limit) : rows;
 
   return (
     <section className="panel">
-      <h2>{title}</h2>
+      <div className="rows-head">
+        <h2>{title}</h2>
+        {hint && <span className="rows-hint">{hint}</span>}
+      </div>
       {!shown?.length ? <Empty title="Nothing to show" hint={empty} /> : (
         <div className="list-cards">
           {shown.map((row) => {
-            const isBill = Boolean(row.invoice_no) && !row.payment_date;
+            const isBill = !row.payment_date;
+            const openable = isBill || row.status === "approved";
             return (
               <article key={row.id}
-                       {...(isBill ? billRowProps(row, bill.ask) : {})}>
+                       {...(openable ? billRowProps(row, bill.ask) : {})}>
                 <div>
                   <strong>
                     {isBill
