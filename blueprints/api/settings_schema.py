@@ -37,7 +37,7 @@ GROUPS = [
      'Where outgoing WhatsApp messages are sent. Use the tester below after '
      'changing anything here.'),
     ('email', 'Outgoing email',
-     'SMTP or the Resend HTTP API for emailed invoices and receipts. With '
+     'SMTP or the Brevo HTTP API for emailed invoices and receipts. With '
      'neither configured, the mailer reports "dry-run" instead of pretending '
      'a message was delivered.'),
     ('payment', 'Online payments',
@@ -217,17 +217,17 @@ FIELDS = {
              'invoice was delivered.'),
     'mail_provider': dict(
         group='email', order=5, input='select', label='Delivery method',
-        help='Resend uses a plain HTTPS API - no SMTP port to open, so it '
+        help='Brevo uses a plain HTTPS API - no SMTP port to open, so it '
              'keeps working on Render free instances. The SMTP fields are '
-             'ignored while Resend is selected.',
+             'ignored while Brevo is selected.',
         options=[_opt('smtp', 'SMTP'),
-                 _opt('resend', 'Resend API')]),
-    'resend_api_key': dict(
-        group='email', order=12, input='password', label='Resend API key',
+                 _opt('brevo', 'Brevo API')]),
+    'brevo_api_key': dict(
+        group='email', order=12, input='password', label='Brevo API key',
         secret=True,
-        help='Create one at resend.com → API Keys. The From address must be a '
-             'domain verified in Resend (or onboarding@resend.dev while '
-             'testing, which only delivers to your own inbox).'),
+        help='Create one at brevo.com → SMTP & API → API Keys. Verify the '
+             'From address under Senders & IP → Senders first; a verified '
+             'email address works without owning a domain.'),
     'mail_host': dict(
         group='email', order=20, input='text', label='SMTP host',
         placeholder='smtp.gmail.com'),

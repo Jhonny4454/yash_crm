@@ -171,7 +171,7 @@ SETTING_DEFAULTS = [
     ('mail_use_tls',            'True',   'bool'),
     ('mail_use_ssl',            'False',  'bool'),
     ('mail_provider',           'smtp',   'str'),
-    ('resend_api_key',          '',       'str'),
+    ('brevo_api_key',           '',       'str'),
 
     # Cloudinary cloud image storage. When enabled, logo, banner and customer
     # document uploads go to Cloudinary instead of the server's local disk,

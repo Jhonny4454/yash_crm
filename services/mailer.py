@@ -9,10 +9,10 @@ Two delivery paths are supported:
 
   * SMTP  - a mail host over port 587 (STARTTLS) or 465 (SSL). Requires the
     host to accept connections from where the app runs.
-  * Resend - a plain HTTPS POST to https://api.resend.com/emails. No SMTP port
-    to open, so it keeps working on hosts that block outbound SMTP (free
-    Render instances in particular). A free resend.com account is enough for
-    the volumes this app sends.
+  * Brevo - a plain HTTPS POST to https://api.brevo.com/v3/smtp/email. No SMTP
+    port to open, so it keeps working on hosts that block outbound SMTP (free
+    Render instances in particular). A free brevo.com account allows verifying
+    a single email address as sender - no domain needed - for 300 emails/day.
 
 Why this exists: ``send_email()`` in app.py is a stub that writes a line to the
 application log and returns. Anything calling it reported success while the
@@ -38,7 +38,7 @@ from email.message import EmailMessage
 #: setting key -> default. Mirrors messaging.DEFAULTS in shape and lookup order.
 DEFAULTS = {
     'mail_enabled': '0',
-    'mail_provider': 'smtp',       # smtp | resend
+    'mail_provider': 'smtp',       # smtp | brevo
     'mail_host': '',
     'mail_port': '587',
     'mail_username': '',
@@ -48,10 +48,10 @@ DEFAULTS = {
     'mail_use_tls': '1',
     'mail_use_ssl': '0',
     'mail_timeout': '20',
-    'resend_api_key': '',
+    'brevo_api_key': '',
 }
 
-RESEND_ENDPOINT = 'https://api.resend.com/emails'
+BREVO_ENDPOINT = 'https://api.brevo.com/v3/smtp/email'
 
 
 class MailResult:
@@ -97,8 +97,8 @@ def is_configured():
     """True when there is enough to attempt a real send."""
     if not _flag('mail_enabled'):
         return False
-    if _provider() == 'resend':
-        return bool((_setting('resend_api_key') or '').strip())
+    if _provider() == 'brevo':
+        return bool((_setting('brevo_api_key') or '').strip())
     return bool((_setting('mail_host') or '').strip())
 
 
@@ -108,17 +108,34 @@ def _from_address():
     return f'{name} <{address}>' if name and address else address
 
 
-def _send_via_resend(to, subject, body, html, attachments, sender):
-    """One HTTPS POST to the Resend API. Never raises."""
-    api_key = (_setting('resend_api_key') or '').strip()
+def _split_sender(sender):
+    """Turn 'Name <addr>' (or plain 'addr') into Brevo's sender object."""
+    sender = (sender or '').strip()
+    if ' <' in sender and sender.endswith('>'):
+        name, addr = sender.rsplit(' <', 1)
+        out = {'email': addr[:-1].strip()}
+        if name.strip():
+            out['name'] = name.strip()
+        return out
+    return {'email': sender}
+
+
+def _send_via_brevo(to, subject, body, html, attachments, sender):
+    """One HTTPS POST to the Brevo API. Never raises."""
+    api_key = (_setting('brevo_api_key') or '').strip()
     if not api_key:
         return MailResult(True, 'dry-run',
-                          'Resend is selected but no API key is set, so the '
+                          'Brevo is selected but no API key is set, so the '
                           'message was not sent.', to, subject)
 
-    payload = {'from': sender, 'to': [to], 'subject': subject, 'text': body or ''}
+    payload = {
+        'sender': _split_sender(sender),
+        'to': [{'email': to}],
+        'subject': subject,
+        'textContent': body or '',
+    }
     if html:
-        payload['html'] = html
+        payload['htmlContent'] = html
 
     attached = []
     for item in attachments or []:
@@ -129,18 +146,19 @@ def _send_via_resend(to, subject, body, html, attachments, sender):
         if not data:
             continue
         attached.append({
-            'filename': filename or 'attachment',
+            'name': filename or 'attachment',
             'content': base64.b64encode(data).decode('ascii'),
         })
     if attached:
-        payload['attachments'] = attached
+        payload['attachment'] = attached
 
     req = urllib.request.Request(
-        RESEND_ENDPOINT,
+        BREVO_ENDPOINT,
         data=json.dumps(payload).encode('utf-8'),
         headers={
-            'Authorization': f'Bearer {api_key}',
+            'api-key': api_key,
             'Content-Type': 'application/json',
+            'Accept': 'application/json',
         },
         method='POST',
     )
@@ -150,7 +168,7 @@ def _send_via_resend(to, subject, body, html, attachments, sender):
         return MailResult(True, 'sent', '', to, subject)
     except urllib.error.HTTPError as exc:
         raw = exc.read().decode('utf-8', 'replace')[:500]
-        detail = f'Resend refused the request (HTTP {exc.code}).'
+        detail = f'Brevo refused the request (HTTP {exc.code}).'
         try:
             message = json.loads(raw).get('message') or \
                 json.loads(raw).get('error', '')
@@ -177,8 +195,8 @@ def send_email(to, subject, body, attachments=None, html=None):
 
     if not is_configured():
         provider = _provider()
-        if provider == 'resend':
-            hint = 'Add the Resend API key under Settings → Outgoing email.'
+        if provider == 'brevo':
+            hint = 'Add the Brevo API key under Settings → Outgoing email.'
         else:
             hint = 'Add the mail settings under Settings.'
         return MailResult(True, 'dry-run',
@@ -214,8 +232,8 @@ def send_email(to, subject, body, attachments=None, html=None):
                                subtype=subtype or 'octet-stream',
                                filename=filename or 'attachment')
 
-    if _provider() == 'resend':
-        return _send_via_resend(to, subject, body, html, attachments, sender)
+    if _provider() == 'brevo':
+        return _send_via_brevo(to, subject, body, html, attachments, sender)
 
     host = _setting('mail_host')
     port = int(_setting('mail_port') or 587)
