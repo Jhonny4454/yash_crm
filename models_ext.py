@@ -162,15 +162,8 @@ SETTING_DEFAULTS = [
     # Outgoing mail. Off by default: with no SMTP host the mailer reports
     # 'dry-run' rather than pretending an invoice was delivered.
     ('mail_enabled',            'False',  'bool'),
-    ('mail_host',               '',       'str'),
-    ('mail_port',               '587',    'int'),
-    ('mail_username',           '',       'str'),
-    ('mail_password',           '',       'str'),
     ('mail_from',               '',       'str'),
     ('mail_from_name',          '',       'str'),
-    ('mail_use_tls',            'True',   'bool'),
-    ('mail_use_ssl',            'False',  'bool'),
-    ('mail_provider',           'smtp',   'str'),
     ('brevo_api_key',           '',       'str'),
 
     # Cloudinary cloud image storage. When enabled, logo, banner and customer

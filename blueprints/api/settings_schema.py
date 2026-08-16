@@ -37,9 +37,10 @@ GROUPS = [
      'Where outgoing WhatsApp messages are sent. Use the tester below after '
      'changing anything here.'),
     ('email', 'Outgoing email',
-     'SMTP or the Brevo HTTP API for emailed invoices and receipts. With '
-     'neither configured, the mailer reports "dry-run" instead of pretending '
-     'a message was delivered.'),
+     'Brevo sends emailed invoices and receipts over a plain HTTPS API - no '
+     'SMTP port to open, so it keeps working on Render. With no API key set, '
+     'the mailer reports "dry-run" instead of pretending a message was '
+     'delivered.'),
     ('payment', 'Online payments',
      'Cashfree credentials for the customer portal. Leave the App ID blank to '
      'hide the Pay button entirely.'),
@@ -215,39 +216,12 @@ FIELDS = {
         group='email', order=10, input='switch', label='Send email',
         help='Off means the mailer reports "dry-run" rather than pretending an '
              'invoice was delivered.'),
-    'mail_provider': dict(
-        group='email', order=5, input='select', label='Delivery method',
-        help='Brevo uses a plain HTTPS API - no SMTP port to open, so it '
-             'keeps working on Render free instances. The SMTP fields are '
-             'ignored while Brevo is selected.',
-        options=[_opt('smtp', 'SMTP'),
-                 _opt('brevo', 'Brevo API')]),
     'brevo_api_key': dict(
         group='email', order=12, input='password', label='Brevo API key',
         secret=True,
         help='Create one at brevo.com → SMTP & API → API Keys. Verify the '
              'From address under Senders & IP → Senders first; a verified '
              'email address works without owning a domain.'),
-    'mail_host': dict(
-        group='email', order=20, input='text', label='SMTP host',
-        placeholder='smtp.gmail.com'),
-    'mail_port': dict(
-        group='email', order=21, input='select', label='SMTP port',
-        options=[_opt('587', '587 - STARTTLS (most common)'),
-                 _opt('465', '465 - SSL'),
-                 _opt('25', '25 - unencrypted'),
-                 _opt('2525', '2525 - alternate')]),
-    'mail_use_tls': dict(
-        group='email', order=22, input='switch', label='Use STARTTLS',
-        help='On for port 587. Do not switch this on together with SSL.'),
-    'mail_use_ssl': dict(
-        group='email', order=23, input='switch', label='Use SSL',
-        help='On for port 465 only.'),
-    'mail_username': dict(
-        group='email', order=30, input='text', label='SMTP username'),
-    'mail_password': dict(
-        group='email', order=31, input='password', label='SMTP password',
-        secret=True),
     'mail_from': dict(
         group='email', order=40, input='email', label='From address',
         placeholder='billing@yashinternetservices.in'),
