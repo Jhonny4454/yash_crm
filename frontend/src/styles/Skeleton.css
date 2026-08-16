@@ -68,15 +68,29 @@
   .is-refreshing { transition: none; }
 }
 
-@media (prefers-color-scheme: dark) {
-  .skeleton {
-    background: #374151;
-    background-image: linear-gradient(
-      90deg,
-      rgba(55, 65, 81, 0) 0%,
-      rgba(255, 255, 255, 0.12) 50%,
-      rgba(55, 65, 81, 0) 100%);
-  }
-  .skeleton-head { border-bottom-color: #374151; }
-  .skeleton-card { background: #111827; }
+/* Dark follows THE APP's theme, not the operating system's.
+ *
+ * This was `@media (prefers-color-scheme: dark)`, which asks the phone what
+ * colour scheme it is set to - not what the user chose in this app. A phone
+ * on the light system theme running the panel in dark therefore kept the
+ * LIGHT skeleton: a pale grey block with a 75%-white highlight sweeping
+ * across it, which on a dark panel is a bright white band travelling over
+ * the content. It sits at a different place in every screenshot because it
+ * is mid-animation, and it only showed on the phone because that is where
+ * the system theme and the app theme disagreed.
+ *
+ * `[data-theme]` is always set - index.html writes it before first paint -
+ * so keying on it is exact rather than a guess about the device. */
+:root[data-theme="dark"] .skeleton {
+  background: #273449;
+  background-image: linear-gradient(
+    90deg,
+    rgba(39, 52, 73, 0) 0%,
+    rgba(148, 163, 184, 0.18) 50%,
+    rgba(39, 52, 73, 0) 100%);
+}
+:root[data-theme="dark"] .skeleton-head { border-bottom-color: #32405a; }
+:root[data-theme="dark"] .skeleton-card {
+  background: #1b2537;
+  border-color: #32405a;
 }

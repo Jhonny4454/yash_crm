@@ -69,6 +69,16 @@ input[type="number"] {
    appears only while there is more table to the right. */
 .table-wrap {
   overflow-x: auto;
+  /* Explicitly hidden, not left to compute.
+   *
+   * `overflow-x: auto` alone makes the browser compute `overflow-y` to
+   * `auto` as well, so the element gets a VERTICAL scrollbar it never needs -
+   * drawn at the right edge of the scrollable content, which is the panel
+   * edge until the table is scrolled sideways and then partway across the
+   * screen. Nothing here is ever taller than its box, so hiding it costs
+   * nothing and takes the scrollbar - and whatever the platform paints it
+   * with - out of the picture entirely. */
+  overflow-y: hidden;
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
   /* An OPAQUE background of its own, and no `-webkit-overflow-scrolling`.

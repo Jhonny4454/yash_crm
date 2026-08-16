@@ -257,7 +257,7 @@ body.sidebar-collapsed .app-footer { left: var(--sidebar-w-collapsed); }
 /* Duplicate of the rule in index.css - see the note in AdminResponsive.css.
    Both have to carry the background or which one wins decides whether the
    white strip appears. */
-.table-wrap { overflow-x: auto; background: var(--surface, #fff); }
+.table-wrap { overflow-x: auto; overflow-y: hidden; background: var(--surface, #fff); }
 
 table.data { width: 100%; border-collapse: collapse; font-size: .88rem; }
 table.data th {

@@ -307,6 +307,9 @@ small.ok { color: #15803d; }
    it and cannot be scrolled back to independently. */
 .table-wrap {
   overflow-x: auto;
+  /* See AdminResponsive.css: `overflow-x: auto` computes overflow-y to auto
+     too, which is where the stray vertical scrollbar came from. */
+  overflow-y: hidden;
   max-width: 100%;
   /* Third copy of this rule in the project, and the same reason as the other
      two: a composited scroller with no background of its own paints white
