@@ -209,8 +209,17 @@ def log_audit(action, details):
     try:
         user_id = None
         try:
-            if current_user and current_user.is_authenticated:
-                user_id = current_user.id
+            if has_request_context():
+                claims = getattr(request, 'jwt', None) or {}
+                account = getattr(request, 'jwt_account', None)
+                if claims.get('kind') == 'staff' and account is not None:
+                    # The React app authenticates with a JWT, not flask_login.
+                    # Without this, every API-driven action - which is almost
+                    # all of them - would be recorded with no user and the
+                    # Customer Log "By" column would read "—" everywhere.
+                    user_id = account.id
+                elif current_user and current_user.is_authenticated:
+                    user_id = current_user.id
         except Exception:                                # noqa: BLE001
             user_id = None
 
