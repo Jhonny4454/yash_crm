@@ -156,6 +156,73 @@
   background: linear-gradient(90deg, #223049, #2c3c58, #223049);
 }
 
+/* ---- the surfaces the first pass missed -------------------------------
+ *
+ * Found the honest way: every `background: #fff` left in the staff
+ * stylesheets, rather than by looking at one screen and stopping. A dark
+ * theme retrofitted onto a light one fails one white box at a time, and each
+ * one that is left reads as a rendering fault rather than a theme.
+ */
+:root[data-theme="dark"] body:not(.portal-mode) .chip-day,
+:root[data-theme="dark"] body:not(.portal-mode) .panel-card,
+:root[data-theme="dark"] body:not(.portal-mode) .cd-panel,
+:root[data-theme="dark"] body:not(.portal-mode) .cd-options-menu,
+:root[data-theme="dark"] body:not(.portal-mode) .cd-bell,
+:root[data-theme="dark"] body:not(.portal-mode) .rcp-menu,
+:root[data-theme="dark"] body:not(.portal-mode) .rcp-more-btn,
+:root[data-theme="dark"] body:not(.portal-mode) .life-all,
+:root[data-theme="dark"] body:not(.portal-mode) .list-cards > article,
+:root[data-theme="dark"] body:not(.portal-mode) .addon-field select,
+:root[data-theme="dark"] body:not(.portal-mode) .renew-grid select,
+:root[data-theme="dark"] body:not(.portal-mode) .pay-grid select {
+  background: var(--surface);
+  color: var(--text-main);
+  border-color: var(--border-light);
+}
+
+/* The day chips carry their own light border and slate text as well as the
+   white fill, so all three have to move or they read as cut-outs. */
+:root[data-theme="dark"] body:not(.portal-mode) .chip-day {
+  border-color: #3d4c66;
+  background: var(--surface-2);
+}
+:root[data-theme="dark"] body:not(.portal-mode) .chip-day:hover,
+:root[data-theme="dark"] body:not(.portal-mode) .chip-day:focus-visible {
+  background: #2b3b56;
+  border-color: var(--primary-color);
+  color: var(--primary-hover);
+}
+:root[data-theme="dark"] body:not(.portal-mode) .cd-tabs button.is-active {
+  background: var(--surface);
+  color: var(--primary-hover);
+}
+
+/* Empty and loading states. `.state` prints a dark slate heading, which on a
+   dark panel is the message nobody can read - "No outstanding invoices" was
+   charcoal on charcoal. */
+:root[data-theme="dark"] body:not(.portal-mode) .state,
+:root[data-theme="dark"] body:not(.portal-mode) .state p { color: var(--text-muted); }
+:root[data-theme="dark"] body:not(.portal-mode) .state h3,
+:root[data-theme="dark"] body:not(.portal-mode) .state h4 { color: var(--text-main); }
+
+/* Scrollbars. `color-scheme: dark` handles the browser's own, but a rule
+   that names a colour outranks it - and there is one: a pale grey thumb,
+   which on a dark table is the bright bar down the right-hand side. */
+:root[data-theme="dark"] body:not(.portal-mode) .table-wrap::-webkit-scrollbar-thumb,
+:root[data-theme="dark"] body:not(.portal-mode) .scroll-y::-webkit-scrollbar-thumb,
+:root[data-theme="dark"] body:not(.portal-mode) ::-webkit-scrollbar-thumb {
+  background: #3d4c66;
+}
+:root[data-theme="dark"] body:not(.portal-mode) ::-webkit-scrollbar-track {
+  background: transparent;
+}
+:root[data-theme="dark"] body:not(.portal-mode) * { scrollbar-color: #3d4c66 transparent; }
+
+/* Pages.css defines a second, paler table header than index.css does; which
+   one wins depends on load order, so both are covered. */
+:root[data-theme="dark"] body:not(.portal-mode) .data th { background: var(--surface-2); }
+:root[data-theme="dark"] body:not(.portal-mode) .data tbody tr:hover { background: var(--surface-2); }
+
 /* ---- the toggle itself ------------------------------------------------- */
 
 .theme-toggle {

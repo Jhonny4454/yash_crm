@@ -495,16 +495,39 @@ def plan_update(pid):
 @bp.delete('/plans/<int:pid>')
 @admin_required
 def plan_delete(pid):
+    """Remove a plan nobody is on.
+
+    A plan somebody IS on cannot be deleted: their customer_plan rows and
+    every invoice raised from them point at it, and removing it would leave
+    that billing history describing a package that no longer exists.
+
+    This used to answer that case by quietly switching the plan off and
+    returning 200. That was defensible while the screen had one button whose
+    label changed - it is not now that Retire is its own button, because an
+    operator who presses Delete and is told "done" has been told the wrong
+    thing. It refuses, says how many customers are in the way, and leaves
+    them to press the other button.
+    """
     plan = db.session.get(Plan, pid)
     if not plan:
         return fail('not_found', 404)
-    if CustomerPlan.query.filter_by(plan_id=pid).first():
-        plan.is_active = False
-        db.session.commit()
-        return ok({'status': 'deactivated'})
+
+    subscribers = CustomerPlan.query.filter_by(plan_id=pid).count()
+    if subscribers:
+        return fail('plan_in_use', 409,
+                    detail=f'{subscribers} customer plan'
+                           f'{"" if subscribers == 1 else "s"} reference '
+                           f'{plan.name}, including past ones whose invoices '
+                           f'still name it. Retire it instead - it stops being '
+                           f'offered and everything already billed stays '
+                           f'readable.',
+                    customers=subscribers,
+                    can_retire=bool(plan.is_active))
+
+    name = plan.name
     db.session.delete(plan)
     db.session.commit()
-    return ok({'status': 'deleted'})
+    return ok({'status': 'deleted', 'id': pid, 'name': name})
 
 
 @bp.get('/service-providers')
@@ -693,17 +716,6 @@ def payment_create():
     if invoice.balance <= 0:
         invoice.status = 'paid'
     db.session.commit()
-
-    # The counter entry (customer_billing.payment_entry) confirms every payment
-    # over WhatsApp; this older API route recorded the money in silence. Same
-    # message, same guard: messaging must never be able to fail the payment.
-    try:
-        from app import send_template_message
-        send_template_message(invoice.customer, 'payment_received',
-                              invoice=invoice, payment=payment)
-    except Exception:
-        pass
-
     return ok(payment_dict(payment)), 201
 
 

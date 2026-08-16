@@ -17,7 +17,8 @@ export default function Plans() {
   const { toast, confirm } = useToast();
   const { data, loading, error, refetch } = useFetch("/plans");
   const [editing, setEditing] = useState(null);
-  const [removing, setRemoving] = useState(null);
+  // { id, what } - which row is working, and which of its buttons.
+  const [busy, setBusy] = useState(null);
 
   /* Plan type was a free text box, so "Prepaid", "prepaid" and "Prepaid "
    * were three different plan types anywhere the column is grouped or
@@ -30,44 +31,85 @@ export default function Plans() {
     return [...new Set(["Prepaid", "Postpaid", ...used])];
   }, [data]);
 
-  /* Remove a plan - or retire it, depending on whether anyone is on it.
+  /* Two different endings for a plan, and they are not the same decision.
    *
-   * The API deliberately refuses to actually delete a plan that customers
-   * are subscribed to: doing so would orphan their billing history. It
-   * deactivates it instead. That is the right behaviour and the wrong thing
-   * to hide, so the confirmation says which of the two is about to happen,
-   * using the subscriber count the list now carries. */
-  async function removePlan(plan) {
+   * Retire stops a plan being sold. Everyone already on it keeps it, every
+   * invoice ever raised from it still reads correctly, and it can be brought
+   * back. It is the answer for a package the business has stopped offering,
+   * which is nearly always what somebody means.
+   *
+   * Delete removes the row. Only possible while nothing points at it - a plan
+   * with subscribers, past or present, cannot go without taking the meaning
+   * of their billing history with it, and the server refuses.
+   *
+   * They used to be one button whose label changed with the subscriber count,
+   * so retiring a live plan meant pressing something that said Delete on a
+   * different row a moment earlier. Two buttons, each doing only what it
+   * says. */
+  async function retirePlan(plan) {
     const count = Number(plan.customer_count || 0);
-    const inUse = count > 0;
+    const bringingBack = !plan.is_active;
 
-    const confirmed = await confirm({
-      title: inUse ? `Retire ${plan.name}?` : `Delete ${plan.name}?`,
-      message: inUse
-        ? `${count} customer${count === 1 ? " is" : "s are"} on this plan, so it `
-          + "cannot be deleted without losing their billing history. It will be "
-          + "switched off instead: existing customers keep it, and it stops "
-          + "being offered to new ones."
-        : "Nobody is on this plan, so it will be removed completely. "
-          + "This cannot be undone.",
-      confirmLabel: inUse ? "Switch it off" : "Delete",
-      tone: "danger",
-    });
-    if (!confirmed) return;
+    if (!bringingBack) {
+      const confirmed = await confirm({
+        title: `Retire ${plan.name}?`,
+        message: "It stops being offered on the Assign Plan and Add Customer "
+          + (count > 0
+            ? `screens. The ${count} customer${count === 1 ? "" : "s"} already `
+              + "on it keep it, and every bill raised from it is untouched. "
+            : "screens. ")
+          + "You can bring it back at any time.",
+        confirmLabel: "Retire",
+        tone: "danger",
+      });
+      if (!confirmed) return;
+    }
 
-    setRemoving(plan.id);
+    setBusy({ id: plan.id, what: "retire" });
     try {
-      const response = await del(`/plans/${plan.id}`);
-      const status = (response?.data ?? response)?.status;
-      toast.success(status === "deleted"
-        ? `${plan.name} deleted.`
-        : `${plan.name} switched off. The ${count} customer`
-          + `${count === 1 ? "" : "s"} already on it are unaffected.`);
+      await put(`/plans/${plan.id}`, { is_active: bringingBack });
+      toast.success(bringingBack
+        ? `${plan.name} is available again.`
+        : `${plan.name} retired. It is no longer offered to new customers.`);
       await refetch();
     } catch (err) {
       toast.error(err.detail || readableError(err));
     } finally {
-      setRemoving(null);
+      setBusy(null);
+    }
+  }
+
+  async function deletePlan(plan) {
+    const count = Number(plan.customer_count || 0);
+    if (count > 0) {
+      // The button is disabled in this case; this is the keyboard path.
+      toast.error(`${plan.name} cannot be deleted - ${count} customer plan`
+        + `${count === 1 ? "" : "s"} reference it. Retire it instead.`);
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: `Delete ${plan.name} permanently?`,
+      message: "Nobody is on this plan and nothing has been billed from it, "
+        + "so the row is removed completely. This cannot be undone. To stop "
+        + "offering a plan while keeping it on old bills, retire it instead.",
+      confirmLabel: "Delete permanently",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+
+    setBusy({ id: plan.id, what: "delete" });
+    try {
+      await del(`/plans/${plan.id}`);
+      toast.success(`${plan.name} deleted.`);
+      await refetch();
+    } catch (err) {
+      // 409 from the server: the count on screen was stale - somebody was
+      // assigned this plan between the page loading and the click.
+      toast.error(err.detail || readableError(err));
+      await refetch();
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -110,13 +152,28 @@ export default function Plans() {
                       {isAdmin && (
                         <td className="right row-actions">
                           <button className="btn sm" onClick={() => setEditing({ ...p })}>Edit</button>
-                          {/* Labelled for what it will actually do. A button
-                              that says Delete and quietly deactivates teaches
-                              the operator not to trust the screen. */}
-                          <button className="btn sm danger" disabled={removing === p.id}
-                                  onClick={() => removePlan(p)}>
-                            {removing === p.id ? "…"
-                              : Number(p.customer_count || 0) > 0 ? "Retire" : "Delete"}
+
+                          <button className="btn sm" disabled={busy?.id === p.id}
+                                  onClick={() => retirePlan(p)}
+                                  title={p.is_active
+                                    ? "Stop offering this plan. Existing customers keep it."
+                                    : "Offer this plan again."}>
+                            {busy?.id === p.id && busy.what === "retire" ? "…"
+                              : p.is_active ? "Retire" : "Restore"}
+                          </button>
+
+                          {/* Disabled rather than hidden: an operator looking
+                              for Delete needs to find it and be told why it
+                              is unavailable, not wonder where it went. */}
+                          <button className="btn sm danger"
+                                  disabled={busy?.id === p.id
+                                            || Number(p.customer_count || 0) > 0}
+                                  onClick={() => deletePlan(p)}
+                                  title={Number(p.customer_count || 0) > 0
+                                    ? `${p.customer_count} customer plan(s) reference `
+                                      + "this plan, so it cannot be deleted. Retire it instead."
+                                    : "Remove this plan completely."}>
+                            {busy?.id === p.id && busy.what === "delete" ? "…" : "Delete"}
                           </button>
                         </td>
                       )}

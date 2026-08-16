@@ -283,16 +283,34 @@ def _payment_breakdown(invoice, W, small, heading, grid):
             Paragraph(_fmt(amount), small),
         ])
 
-    rows.append([Paragraph('', small), Paragraph('', small), Paragraph('', small),
-                 Paragraph('', small),
+    # The total row spans the columns it has nothing to say about. Four empty
+    # ruled boxes followed by a figure reads as a row that failed to render -
+    # on a document about money, the wrong thing to make somebody wonder
+    # about.
+    rows.append(['', '', '', '',
                  Paragraph('<b>Total Paid</b>', small),
                  Paragraph(f'<b>{_fmt(total)}</b>', small)])
+    last = len(rows) - 1
 
     widths = [W * 0.07, W * 0.15, W * 0.16, W * 0.32, W * 0.16, W * 0.14]
+    payments_style = TableStyle([
+        ('GRID', (0, 0), (-1, -1), 0.6, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        # One box across the four columns that carry no total.
+        ('SPAN', (0, last), (3, last)),
+        ('BACKGROUND', (0, last), (-1, last), colors.Color(.96, .96, .96)),
+    ])
+
     out = [
         Table([[Paragraph('PAYMENT DETAILS', heading)]],
               colWidths=[W], style=grid),
-        Table(rows, colWidths=widths, style=grid),
+        # repeatRows: a customer with a long payment history spills onto a
+        # second page, and a column of figures with no headings above it is
+        # not a table anybody can read.
+        Table(rows, colWidths=widths, style=payments_style, repeatRows=1),
     ]
 
     balance = float(invoice.balance or 0)
@@ -482,9 +500,13 @@ def build_invoice_pdf(invoice, logo_path=None, detailed=False):
     # The amount in words goes in the space beside the figures rather than in
     # a row of its own underneath. It is the same information a printed bill
     # puts there, and it fills what was a third of a page of ruled-off blank.
+    # The inner table has to fit INSIDE its cell, padding included: at
+    # 0.20 + 0.16 it was exactly as wide as the 0.36 column holding it, so
+    # every figure and the rule above the total pushed out through the right
+    # border of the bill. 0.19 + 0.145 leaves room for the 5pt padding.
     story.append(Table(
         [[Paragraph(f"<b>Rupees in words:</b> {amount_in_words(net)}", wrap),
-          Table(totals, colWidths=[W * 0.20, W * 0.16], style=TableStyle([
+          Table(totals, colWidths=[W * 0.19, W * 0.145], style=TableStyle([
               ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
               ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
               ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),

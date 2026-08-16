@@ -415,7 +415,13 @@ function MonthlySummary() {
         ) : !rows.length ? (
           <Empty title="No billing data yet" hint="Invoices raised will be summarised here." />
         ) : (
-          <table className="tbl">
+          /* `data cards-sm`: eight money columns is 620px of table, so on a
+             phone this scrolled sideways with the first and last columns half
+             off the screen and a scrollbar down the middle of the panel.
+             Below 720px each month becomes a labelled card instead - the
+             treatment the other admin tables already get. Every cell carries
+             a data-label, which is what those cards print as their headings. */
+          <table className="data cards-sm">
             <thead>
               <tr>
                 <th>Month</th><th className="num">New clients</th>
@@ -435,33 +441,33 @@ function MonthlySummary() {
 
                 return (
                   <tr key={m.month}>
-                    <td>{m.label}</td>
-                    <td className="num">
+                    <td data-label="Month">{m.label}</td>
+                    <td className="num" data-label="New clients">
                       <Drill to={`/customers?${range}&label=${encodeURIComponent(`new customers in ${m.label}`)}`}
                              value={m.new_clients} />
                     </td>
-                    <td className="num">
+                    <td className="num" data-label="Total bills">
                       <Drill to={`/invoices?${range}&label=${encodeURIComponent(`all bills for ${m.label}`)}`}
                              value={m.total_bills} />
                     </td>
                     {/* A month with no billing is a month of zero, not a
                         month of nothing - a blank cell reads as missing data
                         and makes a column of figures impossible to scan. */}
-                    <td className="num">{inrShort(m.total_amount || 0)}</td>
-                    <td className="num">
+                    <td className="num" data-label="Total amount">{inrShort(m.total_amount || 0)}</td>
+                    <td className="num" data-label="Pending bills">
                       <Drill to={`/invoices?status=pending&${range}&label=${encodeURIComponent(`pending bills for ${m.label}`)}`}
                              value={m.pending_bills} tone="due" />
                     </td>
-                    <td className="num">
+                    <td className="num" data-label="Pending amount">
                       {Number(m.pending_amount) > 0
                         ? <strong className="due">{inrShort(m.pending_amount)}</strong>
                         : inrShort(0)}
                     </td>
-                    <td className="num">
+                    <td className="num" data-label="Paid bills">
                       <Drill to={`/invoices?status=paid&${range}&label=${encodeURIComponent(`paid bills for ${m.label}`)}`}
                              value={m.paid_bills} />
                     </td>
-                    <td className="num">{inrShort(m.paid_amount || 0)}</td>
+                    <td className="num" data-label="Paid amount">{inrShort(m.paid_amount || 0)}</td>
                   </tr>
                 );
               })}
