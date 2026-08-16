@@ -111,7 +111,12 @@ export default function Customers() {
             hint={search ? "Try a different search." : "Add your first customer to get started."}
           />
         ) : (
-          <table className="data">
+          /* `cards-sm`: eight columns is far wider than a phone, so this
+             scrolled sideways with the name column clipped and a scrollbar
+             drawn through the middle of the panel. Below 720px each customer
+             becomes a labelled card - every cell carries the data-label those
+             cards print as headings. */
+          <table className="data cards-sm">
             <thead>
               <tr>
                 <th>#</th>
@@ -127,10 +132,10 @@ export default function Customers() {
             <tbody>
               {data.map((c, i) => (
                 <tr key={c.id}>
-                  <td className="num">
+                  <td className="num" data-label="#">
                     {((meta?.page || 1) - 1) * (meta?.per_page || 25) + i + 1}
                   </td>
-                  <td>
+                  <td data-label="Name">
                     <Link to={`/customers/${c.id}`}>
                       <strong>{c.full_name}</strong>
                     </Link>
@@ -140,20 +145,20 @@ export default function Customers() {
                       </div>
                     )}
                   </td>
-                  <td className="num">{c.mobile || "-"}</td>
-                  <td>{c.email || "-"}</td>
-                  <td>{c.zone || "-"}</td>
-                  <td>
+                  <td className="num" data-label="Mobile">{c.mobile || "-"}</td>
+                  <td data-label="Email">{c.email || "-"}</td>
+                  <td data-label="Zone">{c.zone || "-"}</td>
+                  <td data-label="Plan">
                     {c.active_plan_name || (
                       <span style={{ color: "var(--text-muted)" }}>None</span>
                     )}
                   </td>
-                  <td>
+                  <td data-label="Status">
                     <span className={`pill ${c.is_active ? "ok" : "danger"}`}>
                       {c.is_active ? "Active" : "Inactive"}
                     </span>
                   </td>
-                  <td className="actions-cell">
+                  <td className="actions-cell row-actions" data-label="">
                     <Link to={`/customers/${c.id}`} className="btn-icon-sm" title="View">
                       <i className="fas fa-eye" />
                     </Link>

@@ -52,6 +52,17 @@ input[type="number"] {
   appearance: textfield;
 }
 
+/* Panels stop being their own scrollers on a phone.
+ *
+ * `.scroll-y` caps a panel at 330px and scrolls inside it. On a desktop that
+ * keeps a long dashboard tidy; on a phone it puts a scroller inside a page
+ * that already scrolls - two-finger territory, and the inner one draws a
+ * scrollbar down the middle of the panel. The page is the scroller here. */
+@media (max-width: 720px) {
+  .scroll-y,
+  .panel-card .scroll-y { max-height: none; overflow-y: visible; }
+}
+
 /* ------------------------------------------------------------ data tables */
 
 /* Wide tables still scroll sideways on a tablet, so say so: a soft edge that
@@ -122,6 +133,14 @@ input[type="number"] {
     text-align: right;
   }
   table.data.cards-sm td:last-child { border-bottom: 0; }
+
+  /* An email address has no spaces to wrap at, so in a stacked cell it runs
+     past the card and drags a horizontal scrollbar back onto a layout that
+     exists precisely to avoid one. */
+  table.data.cards-sm td {
+    overflow-wrap: anywhere;
+    min-width: 0;
+  }
   table.data.cards-sm td::before {
     content: attr(data-label);
     flex: 0 0 40%;

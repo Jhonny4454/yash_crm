@@ -139,8 +139,21 @@
   color: #06121f;
 }
 
-:root[data-theme="dark"] body:not(.portal-mode) .btn-icon-sm:hover {
+/* The row action buttons - view, edit, delete - are pale chips in the light
+   theme, so on a dark row they were three white squares. */
+:root[data-theme="dark"] body:not(.portal-mode) .btn-icon-sm {
   background: var(--surface-2);
+  border-color: var(--border-light);
+  color: var(--text-muted);
+}
+:root[data-theme="dark"] body:not(.portal-mode) .btn-icon-sm:hover {
+  background: #2b3b56;
+  border-color: var(--primary-color);
+  color: var(--primary-hover);
+}
+:root[data-theme="dark"] body:not(.portal-mode) .btn-icon-sm.danger:hover {
+  border-color: #f87171;
+  color: #fca5a5;
 }
 
 /* ------------------------------------------------------------- misc ----- */
@@ -205,18 +218,45 @@
 :root[data-theme="dark"] body:not(.portal-mode) .state h3,
 :root[data-theme="dark"] body:not(.portal-mode) .state h4 { color: var(--text-main); }
 
-/* Scrollbars. `color-scheme: dark` handles the browser's own, but a rule
-   that names a colour outranks it - and there is one: a pale grey thumb,
-   which on a dark table is the bright bar down the right-hand side. */
-:root[data-theme="dark"] body:not(.portal-mode) .table-wrap::-webkit-scrollbar-thumb,
-:root[data-theme="dark"] body:not(.portal-mode) .scroll-y::-webkit-scrollbar-thumb,
-:root[data-theme="dark"] body:not(.portal-mode) ::-webkit-scrollbar-thumb {
-  background: #3d4c66;
-}
-:root[data-theme="dark"] body:not(.portal-mode) ::-webkit-scrollbar-track {
+/* Scrollbars, and the white bar down the middle of every scrollable panel.
+ *
+ * `AdminResponsive.css` declares `.table-wrap::-webkit-scrollbar { height: 8px }`
+ * for the horizontal bar. Declaring ANY ::-webkit-scrollbar rule opts that
+ * element out of the browser's overlay scrollbars and into classic ones - for
+ * BOTH axes - and the classic scrollbar's own gutter defaults to white. So
+ * the vertical scrollbar of a table nobody asked to scroll vertically painted
+ * a white strip at the right edge of the scrollable CONTENT: at the panel
+ * edge normally, and halfway across the screen once the table was scrolled
+ * sideways, which is where the screenshots show it.
+ *
+ * `color-scheme: dark` cannot fix it because an explicit rule outranks it.
+ * The gutter itself has to be painted. */
+:root[data-theme="dark"] body:not(.portal-mode) ::-webkit-scrollbar,
+:root[data-theme="dark"] body:not(.portal-mode) .table-wrap::-webkit-scrollbar,
+:root[data-theme="dark"] body:not(.portal-mode) .scroll-y::-webkit-scrollbar {
+  width: 8px;
   background: transparent;
 }
+:root[data-theme="dark"] body:not(.portal-mode) ::-webkit-scrollbar-track,
+:root[data-theme="dark"] body:not(.portal-mode) ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+:root[data-theme="dark"] body:not(.portal-mode) ::-webkit-scrollbar-thumb,
+:root[data-theme="dark"] body:not(.portal-mode) .table-wrap::-webkit-scrollbar-thumb,
+:root[data-theme="dark"] body:not(.portal-mode) .scroll-y::-webkit-scrollbar-thumb {
+  background: #3d4c66;
+  border-radius: 4px;
+}
 :root[data-theme="dark"] body:not(.portal-mode) * { scrollbar-color: #3d4c66 transparent; }
+
+/* The search box is a pale pill with a transparent input inside it, so
+   theming the input alone left a white capsule around a dark field. */
+:root[data-theme="dark"] body:not(.portal-mode) .search-wrapper,
+:root[data-theme="dark"] body:not(.portal-mode) .search-wrapper:focus-within {
+  background: var(--surface-2);
+  border-color: var(--border-light);
+}
+:root[data-theme="dark"] body:not(.portal-mode) .search-wrapper input { color: var(--text-main); }
 
 /* Pages.css defines a second, paler table header than index.css does; which
    one wins depends on load order, so both are covered. */
