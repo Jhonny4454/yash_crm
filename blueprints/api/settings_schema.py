@@ -37,8 +37,9 @@ GROUPS = [
      'Where outgoing WhatsApp messages are sent. Use the tester below after '
      'changing anything here.'),
     ('email', 'Outgoing email',
-     'SMTP for emailed invoices and receipts. With no host set, the mailer '
-     'reports "dry-run" instead of pretending a message was delivered.'),
+     'SMTP or the Resend HTTP API for emailed invoices and receipts. With '
+     'neither configured, the mailer reports "dry-run" instead of pretending '
+     'a message was delivered.'),
     ('payment', 'Online payments',
      'Cashfree credentials for the customer portal. Leave the App ID blank to '
      'hide the Pay button entirely.'),
@@ -214,6 +215,19 @@ FIELDS = {
         group='email', order=10, input='switch', label='Send email',
         help='Off means the mailer reports "dry-run" rather than pretending an '
              'invoice was delivered.'),
+    'mail_provider': dict(
+        group='email', order=5, input='select', label='Delivery method',
+        help='Resend uses a plain HTTPS API - no SMTP port to open, so it '
+             'keeps working on Render free instances. The SMTP fields are '
+             'ignored while Resend is selected.',
+        options=[_opt('smtp', 'SMTP'),
+                 _opt('resend', 'Resend API')]),
+    'resend_api_key': dict(
+        group='email', order=12, input='password', label='Resend API key',
+        secret=True,
+        help='Create one at resend.com → API Keys. The From address must be a '
+             'domain verified in Resend (or onboarding@resend.dev while '
+             'testing, which only delivers to your own inbox).'),
     'mail_host': dict(
         group='email', order=20, input='text', label='SMTP host',
         placeholder='smtp.gmail.com'),
