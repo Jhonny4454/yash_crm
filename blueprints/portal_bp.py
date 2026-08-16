@@ -7,7 +7,6 @@ in app.py (login / dashboard / profile / checkout).
 
 Adds:
 
-    /customer/register              Activate a portal account (ref-id + OTP)
     /customer/forgot-password       Request an OTP
     /customer/reset-password        Set a new password with the OTP
     /customer/invoices              Invoice list + filters
@@ -185,85 +184,6 @@ def _find_customer(identifier):
 def _mask_mobile(mobile):
     m = (mobile or '').strip()
     return ('*' * max(0, len(m) - 4)) + m[-4:] if len(m) > 4 else m
-
-
-# --------------------------------------------------------------------------- #
-#  Account activation (first-time portal signup)
-# --------------------------------------------------------------------------- #
-@portal_bp.route('/register', methods=['GET', 'POST'])
-def register():
-    """
-    Customers are created by the office. This screen lets them claim the
-    portal login for an existing connection using their reference ID or
-    registered mobile number, verified by a one-time code.
-    """
-    if session.get('customer_id'):
-        return redirect(url_for('customer_dashboard'))
-
-    step = request.form.get('step') or request.args.get('step') or 'identify'
-
-    if request.method == 'POST' and step == 'identify':
-        identifier = request.form.get('identifier', '')
-        customer = _find_customer(identifier)
-        if not customer:
-            flash('We could not find a connection with those details. '
-                  'Please check your reference ID or registered mobile number.',
-                  'danger')
-            return render_template('customer/register.html', step='identify')
-        if customer.password_hash:
-            flash('A portal login already exists for this connection. '
-                  'Please sign in, or use "Forgot password".', 'info')
-            return redirect(url_for('customer_login'))
-
-        delivered = _issue_otp(customer, 'register')
-        if not delivered:
-            flash('We could not send the verification code right now. '
-                  'Please contact the office to activate your portal login.',
-                  'warning')
-            return render_template('customer/register.html', step='identify')
-
-        flash(f'A verification code has been sent to '
-              f'{_mask_mobile(customer.mobile)}.', 'success')
-        return render_template('customer/register.html', step='verify',
-                               masked=_mask_mobile(customer.mobile))
-
-    if request.method == 'POST' and step == 'verify':
-        customer, error = _verify_otp(request.form.get('otp'), 'register')
-        if error:
-            flash(error, 'danger')
-            return render_template('customer/register.html', step='verify')
-
-        username = (request.form.get('username') or '').strip()
-        password = request.form.get('password') or ''
-        confirm = request.form.get('confirm_password') or ''
-
-        if len(username) < 4:
-            flash('Please choose a username of at least 4 characters.', 'danger')
-            return render_template('customer/register.html', step='identify')
-        if password != confirm:
-            flash('The two passwords do not match.', 'danger')
-            return render_template('customer/register.html', step='identify')
-        if len(password) < 6:
-            flash('Please use a password of at least 6 characters.', 'danger')
-            return render_template('customer/register.html', step='identify')
-        if Customer.query.filter(Customer.username == username,
-                                 Customer.id != customer.id).first():
-            flash('That username is already taken. Please pick another.',
-                  'danger')
-            return render_template('customer/register.html', step='identify')
-
-        customer.username = username
-        customer.set_password(password)
-        db.session.commit()
-        _log('Portal Activation',
-             f'{customer.full_name} activated their portal login')
-
-        session['customer_id'] = customer.id
-        session.permanent = True
-        flash('Your portal account is ready. Welcome!', 'success')
-        return redirect(url_for('customer_dashboard'))
-
-    return render_template('customer/register.html', step='identify')
 
 
 # --------------------------------------------------------------------------- #

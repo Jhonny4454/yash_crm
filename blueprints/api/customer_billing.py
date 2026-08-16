@@ -296,6 +296,44 @@ def invoice_delete(iid):
     return ok({'status': 'deleted', 'invoice_no': number})
 
 
+@bp.post('/invoices/<int:iid>/cancel')
+@staff_required
+def invoice_cancel(iid):
+    """
+    Void a bill without losing the trace of money that touched it.
+
+    The right answer to a bill raised in error is to cancel it, not delete it:
+    a deleted bill disappears from the ledger, while a cancelled one stays
+    visible with any payment records still linked to it.
+
+    Cancelling is refused once money has actually been paid (an approved
+    payment): that bill is settled history and has to go through a payment
+    reversal instead. Rejected or pending payment rows are fine - they never
+    counted, and keeping them attached to the cancelled bill is exactly the
+    record we want to keep.
+    """
+    invoice = db.session.get(Invoice, iid)
+    if invoice is None:
+        return fail('not_found', 404)
+
+    if invoice.status == 'cancelled':
+        return fail('invoice_already_cancelled', 409,
+                    detail=f'{invoice.invoice_no} is already cancelled.')
+
+    if invoice.paid_amount > 0:
+        return fail('invoice_has_payments', 409,
+                    detail=f'{money(invoice.paid_amount):.2f} has been paid '
+                           f'against {invoice.invoice_no}. Reverse those '
+                           f'payments before cancelling the bill.')
+
+    invoice.status = 'cancelled'
+    db.session.commit()
+
+    _audit('Cancel Invoice', f'Cancelled {invoice.invoice_no}',
+           customer_id=invoice.customer_id)
+    return ok({'status': 'cancelled', 'invoice_no': invoice.invoice_no})
+
+
 @bp.put('/invoices/<int:iid>')
 @staff_required
 def invoice_update(iid):

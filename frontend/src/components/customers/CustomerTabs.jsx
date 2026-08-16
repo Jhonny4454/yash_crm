@@ -394,8 +394,10 @@ export function PendingInvoiceTab({ customer, onRefresh }) {
   async function remove(row) {
     const confirmed = await confirm({
       title: `Delete ${row.invoice_no}?`,
-      message: `${row.caption} — ${inr(row.balance)}. Nothing has been paid `
-        + "against it, so it can be withdrawn cleanly. This cannot be undone.",
+      message: `${row.caption} — ${inr(row.total_amount)}. Deleting removes `
+        + "the bill from the ledger entirely. If any payment entry is linked "
+        + "to it, that entry is detached and stops counting — prefer Cancel "
+        + "so the trace of money stays visible. This cannot be undone.",
       confirmLabel: "Delete invoice",
       tone: "danger",
     });
@@ -404,6 +406,28 @@ export function PendingInvoiceTab({ customer, onRefresh }) {
     try {
       await del(`/invoices/${row.id}`);
       toast.success(`${row.invoice_no} deleted.`);
+      await load();
+      await onRefresh?.();
+    } catch (error) {
+      toast.error(error.detail || readableError(error));
+    }
+  }
+
+  async function cancel(row) {
+    const confirmed = await confirm({
+      title: `Cancel ${row.invoice_no}?`,
+      message: `${row.caption} — ${inr(row.total_amount)}. The bill stays on `
+        + "the record marked cancelled, with any payment entries still "
+        + "visible against it. This cannot be undone.",
+      confirmLabel: "Cancel invoice",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+
+    try {
+      const response = await post(`/invoices/${row.id}/cancel`, {});
+      const payload = response?.data ?? response;
+      toast.success(`${payload.invoice_no || row.invoice_no} cancelled.`);
       await load();
       await onRefresh?.();
     } catch (error) {
@@ -545,6 +569,8 @@ export function PendingInvoiceTab({ customer, onRefresh }) {
                         <InvoiceActions invoice={row} compact only={["pdf", "whatsapp"]} />
                         <button type="button" className="link-edit"
                                 onClick={() => setEditing(row)}>Edit</button>
+                        <button type="button" className="link-danger"
+                                onClick={() => cancel(row)}>Cancel</button>
                         {row.can_delete ? (
                           <button type="button" className="link-danger"
                                   onClick={() => remove(row)}>Delete</button>

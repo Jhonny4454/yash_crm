@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { useParams } from "react-router-dom";
+import { post } from "../api/client";
 import { useFetch } from "../api/useFetch";
-import { ErrorNote, Loading, StatusPill, fmtDate, inr } from "../components/ui";
+import { useToast } from "../context/ToastContext";
+import { ErrorNote, Loading, StatusPill, fmtDate, inr, readableError } from "../components/ui";
 
 /**
  * Printable bill. The company block (name, logo, GSTIN, bank details) comes
@@ -9,6 +12,8 @@ import { ErrorNote, Loading, StatusPill, fmtDate, inr } from "../components/ui";
  */
 export default function InvoiceView() {
   const { id } = useParams();
+  const { toast, confirm } = useToast();
+  const [cancelling, setCancelling] = useState(false);
   const { data, loading, error, refetch } = useFetch(`/invoices/${id}`);
 
   if (loading) return <Loading label="Loading invoice" />;
@@ -19,10 +24,43 @@ export default function InvoiceView() {
   const co = inv.company || {};
   const cust = inv.customer || {};
 
+  async function cancelInvoice() {
+    const confirmed = await confirm({
+      title: `Cancel ${inv.invoice_no}?`,
+      message: `${inv.caption || "This bill"} — ${inr(inv.total_amount)}. The `
+        + "bill stays on the record marked cancelled, with any payment "
+        + "entries still visible against it. This cannot be undone.",
+      confirmLabel: "Cancel invoice",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    setCancelling(true);
+    try {
+      const response = await post(`/invoices/${inv.id}/cancel`, {});
+      toast.success(`${(response?.data ?? response).invoice_no} cancelled.`);
+      refetch();
+    } catch (err) {
+      toast.error(err.detail || readableError(err));
+      setCancelling(false);
+    }
+  }
+
+  const cancelled = inv.status === "cancelled";
+  const hasPaid = Number(inv.paid_amount || 0) > 0;
+
   return (
     <>
       <div className="toolbar no-print">
         <button className="btn primary" onClick={() => window.print()}>Print / Save as PDF</button>
+        {!cancelled && (
+          <button className="btn danger" disabled={cancelling || hasPaid}
+                  title={hasPaid
+                    ? "Money has been paid against this bill — reverse those payments first."
+                    : "Void this bill. It stays on the record, marked cancelled."}
+                  onClick={cancelInvoice}>
+            {cancelling ? "Cancelling…" : "Cancel invoice"}
+          </button>
+        )}
         <StatusPill value={inv.status} />
       </div>
 
