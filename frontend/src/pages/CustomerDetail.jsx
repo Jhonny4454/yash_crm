@@ -14,7 +14,7 @@ import {
   OverviewTab, PaymentHistoryTab, PendingInvoiceTab, PlanHistoryTab, PlanTab,
   
 } from "../components/customers/CustomerTabs";
-import { ErrorNote, inr, Loading, readableError } from "../components/ui";
+import { currentPlan, ErrorNote, inr, Loading, readableError } from "../components/ui";
 import "../styles/CustomerDetail.css";
 
 /**
@@ -69,10 +69,10 @@ export default function CustomerDetail() {
   const payments = useMemo(() => data?.payments || [], [data]);
   const outstanding = Number(data?.outstanding || 0);
 
-  const activePlan = useMemo(
-    () => plans.find((plan) => plan.status === "active") || plans[0] || null,
-    [plans],
-  );
+  // The same row the Plan tab prints. The dialogs fall back to this when
+  // they are opened from the Options menu rather than from a table row, so
+  // "Renew" from the menu has to mean the plan the operator can see.
+  const activePlan = useMemo(() => currentPlan(plans), [plans]);
 
   /** One place for the fire-and-confirm actions the Options menu triggers. */
   const runAction = useCallback(async (key) => {

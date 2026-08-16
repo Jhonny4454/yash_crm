@@ -4,8 +4,8 @@ import { del, get, post, put } from "../../api/client";
 import { useFetch } from "../../api/useFetch";
 import { useToast } from "../../context/ToastContext";
 import {
-  Empty, ErrorNote, fmtDate, inr, rupees, Loading, Pager, railFor, readableError,
-  StatusPill,
+  currentPlan, Empty, ErrorNote, fmtDate, inr, rupees, Loading, Pager, railFor,
+  readableError, StatusPill,
 } from "../ui";
 import { InvoiceActions, ReceiptActions } from "./DocumentActions";
 import AddonInvoice from "./AddonInvoice";
@@ -159,9 +159,19 @@ function NotesPanel({ customer, onRefresh }) {
 
 const EMPTY_ADJUSTMENT = { kind: "credit", amount: "", reason: "", invoice_id: "" };
 
+/**
+ * The Plan tab shows THE plan - one row, never a list.
+ *
+ * A customer is on one service at a time, so this printed every row with
+ * status "active" and, on an account that had picked up a second open row,
+ * showed two live plans side by side with two Renew buttons - and which one
+ * the operator hit decided which expiry date moved. Everything this account
+ * has ever been on is on the Plan History tab, which is where the rest of
+ * the rows belong.
+ */
 export function PlanTab({ customer, plans, onAssign, onRenew, onEdit }) {
-  const active = plans.filter((plan) => plan.status === "active");
-  const rows = active.length ? active : plans.slice(0, 1);
+  const current = currentPlan(plans);
+  const rows = current ? [current] : [];
 
   return (
     <section className="panel-card">
@@ -221,7 +231,7 @@ export function PlanTab({ customer, plans, onAssign, onRenew, onEdit }) {
 
       {plans.length > rows.length && (
         <p className="hint padded">
-          {plans.length - rows.length} earlier plan(s) are on the Plan History tab.
+          {plans.length - rows.length} other plan(s) are on the Plan History tab.
         </p>
       )}
     </section>

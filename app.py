@@ -2767,9 +2767,10 @@ def assign_plan(customer_id):
     plan = Plan.query.get_or_404(plan_id)
     start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
     end_date = start_date + timedelta(days=plan.validity_days)
-    active = CustomerPlan.query.filter_by(customer_id=customer_id, status='active').first()
-    if active:
-        active.status = 'terminated'
+    # Same rule as the REST endpoint: every open row closes, so this screen
+    # cannot leave a customer on two plans either.
+    from services.plans import close_active_plans
+    close_active_plans(customer_id)
     new_plan = CustomerPlan(
         customer_id=customer_id,
         plan_id=plan.id,

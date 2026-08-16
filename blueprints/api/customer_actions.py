@@ -21,6 +21,7 @@ from datetime import date, datetime, timedelta
 from flask import Blueprint
 
 from models import Customer, CustomerPlan, Invoice, Plan, db
+from services.plans import close_active_plans, current_plan
 
 from .serializers import customer_dict, customer_plan_dict, invoice_dict
 from .utils import admin_required, body, fail, ok
@@ -94,16 +95,17 @@ def customer_disable(cid):
 @bp.post('/customers/<int:cid>/terminate')
 @admin_required
 def customer_terminate(cid):
-    """Deactivate the customer and terminate their active plan."""
+    """Deactivate the customer and terminate their plan.
+
+    Every open row, not one of them: closing the service has to leave nothing
+    behind that the billing run would still treat as live.
+    """
     customer, missing = _customer_or_404(cid)
     if missing:
         return missing
 
     customer.is_active = False
-    active_plan = CustomerPlan.query.filter_by(
-        customer_id=cid, status='active').first()
-    if active_plan:
-        active_plan.status = 'terminated'
+    terminated = close_active_plans(cid)
     db.session.commit()
 
     network_ok = True
@@ -116,7 +118,8 @@ def customer_terminate(cid):
     _audit('Terminate Customer', f"Terminated customer {customer.full_name}")
     return ok({
         'customer': customer_dict(customer),
-        'terminated_plan_id': active_plan.id if active_plan else None,
+        'terminated_plan_id': terminated[0].id if terminated else None,
+        'terminated_plan_ids': [cp.id for cp in terminated],
         'network_synced': network_ok,
     })
 
@@ -346,10 +349,11 @@ def customer_assign_plan(cid):
     except ValueError:
         return fail('invalid_start_date', 400)
 
-    active = CustomerPlan.query.filter_by(
-        customer_id=cid, status='active').first()
-    if active:
-        active.status = 'terminated'
+    # Every open row is closed, not just the first one the database returns.
+    # Assigning a plan is what makes it THE plan; leaving another row open
+    # would put two live plans on the customer's Plan tab, each with its own
+    # expiry date and its own Renew button.
+    replaced = close_active_plans(cid)
 
     new_plan = CustomerPlan(
         customer_id=cid,
@@ -367,7 +371,8 @@ def customer_assign_plan(cid):
            f"Assigned plan {plan.name} to {customer.full_name}")
     return ok({
         'plan': customer_plan_dict(new_plan),
-        'replaced_plan_id': active.id if active else None,
+        'replaced_plan_id': replaced[0].id if replaced else None,
+        'replaced_plan_ids': [cp.id for cp in replaced],
     }), 201
 
 
@@ -383,8 +388,7 @@ def customer_renew_plan(cid):
     if missing:
         return missing
 
-    active_plan = CustomerPlan.query.filter_by(
-        customer_id=cid, status='active').first()
+    active_plan = current_plan(cid)
     if not active_plan:
         return fail('no_active_plan', 400,
                     detail='Assign a plan before renewing.')

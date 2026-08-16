@@ -17,6 +17,7 @@ web invoice view, the PDF, and the mobile app all call it.
 from flask import url_for
 
 from models import Company, Customer, CustomerPlan, Invoice, Payment, Plan, User
+from services.plans import current_plan_of
 
 from . import permissions as _permissions
 from .utils import iso, money
@@ -153,7 +154,10 @@ def customer_dict(c, detail=False):
     if not c:
         return None
 
-    active = next((cp for cp in c.plans if cp.status == 'active'), None)
+    # Whichever row the Plan tab is showing - the picker is shared, so the
+    # header's Bill Upto date cannot come from a different plan than the one
+    # printed underneath it.
+    active = current_plan_of(c)
 
     data = {
         'id': c.id,

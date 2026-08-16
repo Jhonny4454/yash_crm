@@ -41,6 +41,34 @@ export function fmtDate(value) {
   });
 }
 
+/**
+ * The one plan a customer is on, out of every plan row the API returned.
+ *
+ * A customer is on a single service at a time, but the plan rows are a
+ * history: assigning or changing a plan closes the old row and writes a new
+ * one. So "the plan" is the open row, and picking it has to be done the same
+ * way everywhere - the Plan tab, the header's Bill Upto date and the dialog
+ * the Renew button opens must all be talking about the same line, or an
+ * operator renews one thing while reading the dates of another.
+ *
+ * When more than one row is open - which older records can be, from before
+ * assign/renew closed every open row - the longest-running one wins, because
+ * that is the date the customer's service actually runs to. A customer whose
+ * plan has lapsed has no open row at all; the newest row on record is
+ * returned so the tab still shows what they were last on.
+ */
+export function currentPlan(plans) {
+  const rows = Array.isArray(plans) ? plans : [];
+  const open = rows.filter((plan) => plan?.status === "active");
+  if (!open.length) return rows[0] || null;
+  return open.reduce((best, plan) => {
+    const a = plan.end_date || "";
+    const b = best.end_date || "";
+    if (a !== b) return a > b ? plan : best;         // ISO dates sort as text
+    return Number(plan.id || 0) > Number(best.id || 0) ? plan : best;
+  });
+}
+
 /** The old centred spinner. Kept for anything genuinely inline. */
 export function Spinner({ label = "Loading" }) {
   return <div className="state loading"><span className="spinner" />{label}…</div>;

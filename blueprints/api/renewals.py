@@ -28,6 +28,7 @@ from sqlalchemy.orm import joinedload
 from models import (Customer, CustomerPlan, Invoice, Payment, Plan, User, db)
 from models_ext import InvoiceItem, RenewalRequest
 from services import renewals as renewal_service
+from services.plans import close_active_plans, current_plan
 
 from .utils import (admin_required, body, current_staff_id, fail, iso, money,
                     ok, paginate, staff_required)
@@ -587,8 +588,7 @@ def renew_quote(cid):
     if customer is None:
         return fail('not_found', 404)
 
-    active = CustomerPlan.query.filter_by(customer_id=cid,
-                                          status='active').first()
+    active = current_plan(cid)
     plans = Plan.query.filter_by(is_active=True).order_by(Plan.name).all()
 
     open_invoices = [i for i in Invoice.query.filter(
@@ -670,8 +670,7 @@ def renew_at_counter(cid):
         return fail('not_found', 404)
 
     data = body()
-    active = CustomerPlan.query.filter_by(customer_id=cid,
-                                          status='active').first()
+    active = current_plan(cid)
 
     plan_id = data.get('plan_id')
     plan = db.session.get(Plan, int(plan_id)) if plan_id else (
@@ -730,7 +729,9 @@ def renew_at_counter(cid):
         if is_change:
             # A plan change closes the old row rather than editing it, so the
             # customer's plan history still shows what they used to be on.
-            active.status = 'cancelled'
+            # Any other row that was left open is closed with it - the plan
+            # being written here is the one the customer is on.
+            close_active_plans(cid, status='cancelled')
             db.session.flush()
             customer_plan = CustomerPlan(
                 customer_id=customer.id, plan_id=plan.id,
@@ -741,6 +742,9 @@ def renew_at_counter(cid):
                 suspension_review_status='none')
             db.session.add(customer_plan)
         elif active:
+            # Renewing settles which row is the live one: this is the plan
+            # that was just paid for, so anything else still open is closed.
+            close_active_plans(cid, keep=active, status='cancelled')
             customer_plan = active
             customer_plan.start_date = start_date
             customer_plan.end_date = end_date

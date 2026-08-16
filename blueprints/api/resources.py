@@ -16,6 +16,7 @@ from sqlalchemy.exc import DataError, IntegrityError
 
 from models import (Customer, CustomerPlan, Invoice, Payment, Plan,
                     ServiceProvider, User, db)
+from services.plans import close_active_plans
 
 from .serializers import (customer_dict, customer_plan_dict, invoice_dict,
                           payment_dict, plan_dict, user_dict)
@@ -325,6 +326,12 @@ def _assign_initial_plan(customer, data):
                       if start_raw else date.today())
     except ValueError:
         return None, 'The plan start date was not understood, so no plan was assigned.'
+
+    # Normally there is nothing to close here - this runs on a customer that
+    # was created seconds ago. It is here because every path that assigns a
+    # plan has to leave exactly one row open, and a resubmitted Add Customer
+    # form that got as far as the plan the first time is the case it catches.
+    close_active_plans(customer.id)
 
     customer_plan = CustomerPlan(
         customer_id=customer.id,
