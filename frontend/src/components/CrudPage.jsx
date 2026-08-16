@@ -370,10 +370,14 @@ function renderCell(value, col) {
   if (col.type === "checkbox") {
     return <span className={`pill ${value ? "ok" : "idle"}`}>{value ? "yes" : "no"}</span>;
   }
-  if (value === null || value === undefined || value === "") return "—";
-  if (col.type === "money") return inr(value);
+  const blank = value === null || value === undefined || value === "";
+  // A missing NUMBER is zero, and says so. The dash belongs to text that was
+  // never filled in - an empty amount column made a rate of nothing look like
+  // a column the system had failed to calculate.
+  if (col.type === "money") return inr(blank ? 0 : value);
+  if (col.type === "number") return `${blank ? 0 : value}${col.suffix || ""}`;
+  if (blank) return "—";
   if (col.type === "date") return fmtDate(value);
-  if (col.type === "number") return `${value}${col.suffix || ""}`;
   return String(value);
 }
 

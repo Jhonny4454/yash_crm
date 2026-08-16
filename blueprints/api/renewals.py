@@ -524,6 +524,27 @@ def _configured_tax_mode():
     return 'notax'
 
 
+def _tax_mode_for(customer):
+    """What the Tax dropdown should open on for THIS customer.
+
+    ``Customer.tax_type`` is the per-account switch the office sets on the
+    customer form, and until now nothing read it when money was calculated -
+    a customer marked Non-Taxable was quoted GST at the counter and in the
+    portal alike. Same rule as the portal's ``_customer_tax_mode``, so a
+    renewal costs the same figure whichever door the customer comes through.
+
+    Still only a DEFAULT here: the operator can override the dropdown for a
+    single invoice, which is the point of having it on the form.
+    """
+    if _gst_percent() <= 0:
+        return 'notax'
+    tax_type = str(getattr(customer, 'tax_type', '') or '').strip().lower()
+    if tax_type.startswith('non'):
+        return 'notax'
+    company = _configured_tax_mode()
+    return company if company != 'notax' else 'exclude'
+
+
 def _setting(key, default=None):
     try:
         from models_ext import Setting
@@ -643,8 +664,10 @@ def renew_quote(cid):
         'referenced_modes': sorted(REFERENCED_MODES),
         'gst_percent': money(_gst_percent()),
         # What the Tax dropdown should open on, so the counter and the
-        # customer portal bill the same plan the same way by default.
-        'tax_default': _configured_tax_mode(),
+        # customer portal bill the same plan the same way by default - and so
+        # a customer the office marked Non-Taxable is not quoted GST here
+        # either.
+        'tax_default': _tax_mode_for(customer),
         'due_days': _due_days(),
         'today': iso(date.today()),
     })

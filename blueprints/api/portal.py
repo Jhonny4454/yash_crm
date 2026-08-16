@@ -251,9 +251,10 @@ def portal_plans():
     phone call.
     """
     rows = Plan.query.filter_by(is_active=True).order_by(Plan.price_monthly).all()
+    customer = db.session.get(Customer, current_customer_id())
     active = CustomerPlan.query.filter_by(customer_id=current_customer_id(),
                                           status='active').first()
-    return ok([{**plan_dict(p), **_price_breakdown(p, active),
+    return ok([{**plan_dict(p), **_price_breakdown(p, active, customer),
                 'is_current': bool(active and active.plan_id == p.id)}
                for p in rows])
 
@@ -292,7 +293,7 @@ def portal_renew_quote():
             'end_date': iso(active.end_date),
             'days_left': (active.end_date - date.today()).days,
         },
-        **_price_breakdown(plan, active),
+        **_price_breakdown(plan, active, customer),
         'extends_from': iso(extends_from),
         'new_end_date': iso(extends_from + timedelta(days=validity)),
         # A renewal reuses an unpaid bill rather than stacking a second one on
@@ -321,15 +322,13 @@ def _gst_percent():
         return Decimal('18')
 
 
-def _tax_mode():
-    """How the plan price relates to tax, from the `tax_type` setting.
+def _company_tax_mode():
+    """How the company expresses GST on a price, from the `tax_type` setting.
 
-    Deliberately NOT something the customer chooses. Whether a bill carries
-    GST is a property of the business, not a preference of the person paying
-    it, and a portal that let a customer tick "non-taxable" would quietly
-    produce invoices that do not match the ones the office raises for the
-    same renewal. Staff still get the full three-way choice on the admin
-    renewal dialog.
+    Deliberately NOT something the customer chooses. Whether a price includes
+    tax or has it added is a property of the business, and a portal that let
+    a customer tick "non-taxable" would quietly produce invoices that do not
+    match the ones the office raises for the same renewal.
     """
     value = (_setting_value('tax_type') or '').strip().lower()
     if _gst_percent() <= 0:
@@ -341,12 +340,40 @@ def _tax_mode():
     return 'notax'
 
 
+def _customer_tax_mode(customer):
+    """How GST applies to THIS customer's bill.
+
+    Two switches, read in order:
+
+    * ``Customer.tax_type`` - set in the admin panel, per account - decides
+      whether GST applies at all. A customer marked Non-Taxable there was
+      still being quoted and invoiced GST when they renewed themselves from
+      the portal, because this file only ever read the company setting. Same
+      customer, two prices, depending on which door they came through.
+    * The company setting then decides how it is expressed - included in the
+      plan price, or added on top.
+
+    A taxable customer falls back to `exclude` when the company setting has
+    never been filled in: the account is flagged for tax, a GST rate is
+    configured, so the rate is added to the plan price. `gst_percent = 0`
+    still means no tax for anybody - that is the switch that turns GST off
+    for the business as a whole.
+    """
+    if _gst_percent() <= 0:
+        return 'notax'
+    tax_type = str(getattr(customer, 'tax_type', '') or '').strip().lower()
+    if tax_type.startswith('non'):
+        return 'notax'
+    company = _company_tax_mode()
+    return company if company != 'notax' else 'exclude'
+
+
 def _rupees(value):
     """Whole rupees, half up - the only precision this business bills in."""
     return _dec(value).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
 
 
-def _apply_tax(amount, mode=None):
+def _apply_tax(amount, mode):
     """(grand_total, tax_amount) for include / exclude / notax.
 
     Rounded to whole rupees, unlike the counter's version in
@@ -361,7 +388,7 @@ def _apply_tax(amount, mode=None):
     """
     amount = _dec(amount)
     rate = _gst_percent()
-    mode = (mode or _tax_mode()).strip().lower()
+    mode = (mode or 'notax').strip().lower()
 
     if amount <= 0 or rate <= 0 or mode == 'notax':
         return _rupees(amount), Decimal('0')
@@ -384,10 +411,14 @@ def _plan_price(plan, customer_plan=None):
     )
 
 
-def _price_breakdown(plan, customer_plan=None):
-    """Price, tax and total for one plan, ready to show before committing."""
+def _price_breakdown(plan, customer_plan=None, customer=None):
+    """Price, tax and total for one plan, ready to show before committing.
+
+    `customer` decides whether there is any tax to show at all - a
+    Non-Taxable account sees the plan price and nothing else.
+    """
     price = _plan_price(plan, customer_plan)
-    mode = _tax_mode()
+    mode = _customer_tax_mode(customer)
     total, tax = _apply_tax(price, mode)
     return {
         'price': money(price),
@@ -415,7 +446,8 @@ def _raise_invoice(customer, plan, caption, customer_plan=None):
 
     due_days = int(current_app.config.get('INVOICE_DUE_DAYS', 15) or 15)
     unit_price = _plan_price(plan, customer_plan)
-    grand_total, tax_amount = _apply_tax(unit_price)
+    grand_total, tax_amount = _apply_tax(unit_price,
+                                         _customer_tax_mode(customer))
 
     invoice = Invoice(
         customer_id=customer.id,
@@ -464,7 +496,7 @@ def portal_renew():
     return ok({'invoice': invoice_dict(invoice, detail=True),
                'plan': plan_dict(active.plan),
                'reused_open_invoice': reused,
-               **_price_breakdown(active.plan, active)})
+               **_price_breakdown(active.plan, active, customer)})
 
 
 @bp.post('/portal/change-plan')
@@ -496,7 +528,7 @@ def portal_change_plan():
 
     return ok({'invoice': invoice_dict(invoice, detail=True),
                'plan': plan_dict(plan),
-               **_price_breakdown(plan)})
+               **_price_breakdown(plan, None, customer)})
 
 
 # --------------------------------------------------------------------------- #
@@ -781,7 +813,8 @@ def _intent_quote(intent):
     else:
         return None, None, fail('bad_intent', 400)
 
-    total, _tax = _apply_tax(_plan_price(plan, held))
+    total, _tax = _apply_tax(_plan_price(plan, held),
+                             _customer_tax_mode(customer))
     if total <= 0:
         return None, None, fail('nothing_to_pay', 400)
     return plan, float(total), None

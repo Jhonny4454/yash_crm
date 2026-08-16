@@ -469,7 +469,8 @@ export function PendingInvoiceTab({ customer, onRefresh }) {
                       <td>{fmtDate(row.issue_date)}</td>
                       <td>{fmtDate(row.due_date)}</td>
                       <td className="num">{inr(row.total_amount)}</td>
-                      <td className="num">{row.paid_amount ? inr(row.paid_amount) : "—"}</td>
+                      {/* Nothing paid on a bill is zero paid, not unknown. */}
+                      <td className="num">{inr(row.paid_amount || 0)}</td>
                       <td className="num"><strong>{inr(row.balance)}</strong></td>
                       <td className="pending-actions">
                         <InvoiceActions invoice={row} compact only={["pdf", "whatsapp"]} />
@@ -933,8 +934,11 @@ export function LedgerTab({ customerId }) {
               <td className="cap">{row.type}</td>
               <td className="mono">{row.reference || "—"}</td>
               <td>{row.description || "—"}</td>
-              <td className="num">{row.debit ? inr(row.debit) : "—"}</td>
-              <td className="num credit">{row.credit ? inr(row.credit) : "—"}</td>
+              {/* Both sides always print a figure. A ledger where one column
+                  is a dash and the other a number cannot be added up by eye,
+                  and a reader cannot tell a nil movement from a missing one. */}
+              <td className="num">{inr(row.debit || 0)}</td>
+              <td className="num credit">{inr(row.credit || 0)}</td>
               <td className={`num ${row.balance > 0 ? "due" : ""}`}>{inr(row.balance)}</td>
             </tr>
           ))}

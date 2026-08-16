@@ -444,19 +444,24 @@ function MonthlySummary() {
                       <Drill to={`/invoices?${range}&label=${encodeURIComponent(`all bills for ${m.label}`)}`}
                              value={m.total_bills} />
                     </td>
-                    <td className="num">{m.total_amount ? inrShort(m.total_amount) : ""}</td>
+                    {/* A month with no billing is a month of zero, not a
+                        month of nothing - a blank cell reads as missing data
+                        and makes a column of figures impossible to scan. */}
+                    <td className="num">{inrShort(m.total_amount || 0)}</td>
                     <td className="num">
                       <Drill to={`/invoices?status=pending&${range}&label=${encodeURIComponent(`pending bills for ${m.label}`)}`}
                              value={m.pending_bills} tone="due" />
                     </td>
                     <td className="num">
-                      {m.pending_amount ? <strong className="due">{inrShort(m.pending_amount)}</strong> : ""}
+                      {Number(m.pending_amount) > 0
+                        ? <strong className="due">{inrShort(m.pending_amount)}</strong>
+                        : inrShort(0)}
                     </td>
                     <td className="num">
                       <Drill to={`/invoices?status=paid&${range}&label=${encodeURIComponent(`paid bills for ${m.label}`)}`}
                              value={m.paid_bills} />
                     </td>
-                    <td className="num">{m.paid_amount ? inrShort(m.paid_amount) : ""}</td>
+                    <td className="num">{inrShort(m.paid_amount || 0)}</td>
                   </tr>
                 );
               })}
@@ -473,12 +478,15 @@ function MonthlySummary() {
 /**
  * A count that opens the matching filtered list.
  *
- * Zero is rendered as a dash rather than a link - there is nothing to drill
- * into, and a clickable 0 that lands on an empty table reads as a bug.
+ * Zero is not a link - there is nothing to drill into, and a clickable 0 that
+ * lands on an empty table reads as a bug. It is still printed as 0: a dash in
+ * a column of counts reads as "not measured", and an operator checking how
+ * many customers signed up last month needs to see that the answer is none,
+ * not that the row is broken.
  */
 function Drill({ to, value, tone }) {
   const n = Number(value || 0);
-  if (!n) return <span className="muted">—</span>;
+  if (!n) return <span className="muted">0</span>;
   return (
     <Link className={`drill${tone ? ` ${tone}` : ""}`} to={to} title="Open this list">
       {n}
