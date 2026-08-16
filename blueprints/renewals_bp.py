@@ -681,9 +681,13 @@ def addon_delete(id):
         return redirect(request.referrer or url_for('dashboard'))
 
     invoice = Invoice.query.get_or_404(id)
-    if invoice.paid_amount > 0:
-        flash('This invoice has payments against it and cannot be deleted. '
-              'Reverse the payment first.', 'warning')
+    if invoice.payments:
+        # Not `paid_amount > 0` - that only counts approved payments, so an
+        # invoice with a pending or rejected payment slipped through and the
+        # delete then made the ORM null that row's invoice_id, which the
+        # NOT NULL column rejects.
+        flash('This invoice has payment records against it and cannot be '
+              'deleted. Reverse the payment first.', 'warning')
         return redirect(url_for('customer_view', id=invoice.customer_id))
 
     customer_id = invoice.customer_id

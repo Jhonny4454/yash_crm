@@ -1191,11 +1191,15 @@ def portal_discard_invoice(iid):
         return fail('not_discardable', 400,
                     detail='This bill has already been processed.')
 
-    settled = sum(float(p.amount or 0) for p in (invoice.payments or [])
-                  if getattr(p, 'status', '') != 'rejected')
-    if settled > 0:
+    # The guard below is stated in the docstring as "no payment of any kind".
+    # It must be exactly that: the `settled` sum excluded rejected rows, so a
+    # rejected payment could sit on the bill and the delete then made the ORM
+    # null that row's invoice_id - which the NOT NULL column rejects with an
+    # IntegrityError. Any payment row, in any state, is a record of something
+    # happening to this bill; keep the bill.
+    if (invoice.payments or []):
         return fail('not_discardable', 400,
-                    detail='A payment has already been recorded against this bill.')
+                    detail='A payment of any kind is recorded against this bill.')
 
     # The browser cannot be the authority on whether money moved. A customer
     # who paid and then closed the tab before the confirmation landed must not

@@ -278,11 +278,15 @@ def invoice_delete(iid):
     if invoice is None:
         return fail('not_found', 404)
 
-    if invoice.paid_amount > 0:
+    if invoice.payments:
+        # Not `invoice.paid_amount > 0`: that only counts approved payments, so
+        # an invoice with a pending or rejected payment row slipped through,
+        # and deleting it made the ORM try to null that row's invoice_id -
+        # which the NOT NULL column rejects with an IntegrityError.
         return fail('invoice_has_payments', 409,
-                    detail=f'{money(invoice.paid_amount):.2f} has been paid '
-                           f'against {invoice.invoice_no}. Cancel it instead '
-                           f'of deleting it, so the payment record survives.')
+                    detail=f'{invoice.invoice_no} has payment records against '
+                           f'it. Cancel them instead of deleting the invoice, '
+                           f'so the payment records survive.')
 
     number = invoice.invoice_no
     customer_id = invoice.customer_id
