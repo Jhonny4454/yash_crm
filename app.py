@@ -527,10 +527,16 @@ def server_error(e):
     # the actual reason visible only in the Flask console.
     if request.path.startswith('/api/'):
         original = getattr(e, 'original_exception', None) or e
+        # In production, never expose exception type or message — they leak
+        # SQL fragments, internal paths, and library versions.
+        if _is_production_env():
+            detail = 'An internal error occurred. It has been logged.'
+        else:
+            detail = f'{type(original).__name__}: {original}'[:400]
         payload = {
             'ok': False,
             'error': 'server_error',
-            'detail': f'{type(original).__name__}: {original}'[:400],
+            'detail': detail,
         }
         # The traceback is a development aid. Never in production - it names
         # file paths and can echo query values back to the browser.
@@ -571,10 +577,14 @@ def api_exception(exc):
     except Exception:
         pass
 
+    if _is_production_env():
+        detail = 'An internal error occurred. It has been logged.'
+    else:
+        detail = f'{type(exc).__name__}: {exc}'[:400]
     payload = {
         'ok': False,
         'error': 'server_error',
-        'detail': f'{type(exc).__name__}: {exc}'[:400],
+        'detail': detail,
     }
     if os.environ.get('DEBUG_TRACEBACK'):
         payload['traceback'] = traceback.format_exc()[-3000:]
@@ -4893,7 +4903,13 @@ def init_database(flask_app=None):
 
         admin = User.query.filter_by(username='admin').first()
         if not admin:
-            default_pw = os.environ.get('ADMIN_PASSWORD', 'admin123')
+            default_pw = os.environ.get('ADMIN_PASSWORD')
+            if not default_pw:
+                import secrets as _secrets
+                default_pw = _secrets.token_urlsafe(12)
+                flask_app.logger.warning(
+                    'ADMIN_PASSWORD env var not set. Generated a random '
+                    'password for the admin account: %s', default_pw)
             admin = User(
                 username='admin',
                 full_name='Administrator',

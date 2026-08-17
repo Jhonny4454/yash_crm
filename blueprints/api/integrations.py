@@ -751,10 +751,14 @@ def backup_download(bid):
     log = db.session.get(BackupLog, bid)
     if not log or not log.filename:
         return fail('not_found', 404)
-    path = os.path.join(_backup_dir(), log.filename)
+    from werkzeug.utils import secure_filename as _sf
+    safe_name = _sf(log.filename)
+    if not safe_name:
+        return fail('not_found', 404)
+    path = os.path.join(_backup_dir(), safe_name)
     if not os.path.exists(path):
         return fail('file_missing', 404)
-    return send_file(path, as_attachment=True, download_name=log.filename)
+    return send_file(path, as_attachment=True, download_name=safe_name)
 
 
 # --------------------------------------------------------------------------- #
@@ -770,6 +774,24 @@ EXPORT_FIELDS = {
                  'total_amount', 'discount_amount', 'status', 'invoice_type'),
     'payments': ('id', 'invoice_id', 'customer_id', 'amount', 'payment_date',
                  'payment_mode', 'mode_detail', 'status', 'source'),
+}
+
+#: Columns that can be written via CSV import per entity.  Keeps mass-assignment
+#: attacks out: even if the CSV header includes ``password_hash``, ``role`` or
+#: any other sensitive column, only whitelisted fields reach setattr().
+#: Fields listed here must also exist on the model.
+IMPORT_FIELDS = {
+    'customers': ('first_name', 'middle_name', 'last_name', 'mobile',
+                  'email', 'zone', 'area', 'locality',
+                  'connection_type', 'reference_id', 'is_active'),
+    'plans': ('name', 'plan_code', 'plan_type', 'speed_mbps',
+              'price_monthly', 'validity_days', 'is_active'),
+    'invoices': ('invoice_no', 'customer_id', 'issue_date', 'due_date',
+                 'total_amount', 'discount_amount', 'status', 'invoice_type'),
+    'payments': ('invoice_id', 'customer_id', 'amount', 'payment_date',
+                 'payment_mode', 'mode_detail', 'status', 'source'),
+    'products': ('name', 'sku', 'price', 'tax_rate', 'is_active'),
+    'expenses': ('description', 'amount', 'category', 'expense_date'),
 }
 
 ENTITY_MODELS = {
@@ -796,7 +818,10 @@ def export_csv():
                     allowed=sorted(ENTITY_MODELS.keys()))
 
     fields = EXPORT_FIELDS.get(
-        entity, tuple(c.key for c in model.__mapper__.columns))
+        entity, tuple(c.key for c in model.__mapper__.columns
+                      if c.key not in ('password_hash', 'password',
+                                       'created_at', 'updated_at',
+                                       'updated_by_id')))
 
     buffer = io.StringIO()
     writer = csv.writer(buffer)
@@ -837,18 +862,23 @@ def import_csv():
     except UnicodeDecodeError:
         return fail('bad_encoding', 400)
 
-    job = ImportJob(target=entity, filename=file.filename, status='running',
-                    created_by_id=current_staff_id())
+    from werkzeug.utils import secure_filename as _sf
+    job = ImportJob(target=entity, filename=_sf(file.filename or 'import.csv'),
+                    status='running', created_by_id=current_staff_id())
     db.session.add(job)
     db.session.commit()
 
     reader = csv.DictReader(io.StringIO(text))
     columns = {c.key for c in model.__mapper__.columns}
+    allowed = set(IMPORT_FIELDS.get(entity, ()))
+    if not allowed:
+        allowed = columns - {'password_hash', 'password', 'created_at',
+                             'updated_at', 'created_by_id'}
     errors, ok_rows, total = [], 0, 0
 
     for index, raw in enumerate(reader, start=2):
         total += 1
-        data = {k: v for k, v in raw.items() if k in columns and v != ''}
+        data = {k: v for k, v in raw.items() if k in columns and k in allowed and v != ''}
         try:
             row_id = data.pop('id', None)
             row = db.session.get(model, int(row_id)) if row_id else None

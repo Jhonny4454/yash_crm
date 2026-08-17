@@ -78,6 +78,10 @@ class Config:
     # Used by blueprints/api - the React admin panel and the React Native app.
     # Falls back to SECRET_KEY when JWT_SECRET_KEY is not set separately.
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or SECRET_KEY
+    if not os.environ.get('JWT_SECRET_KEY') and IS_PRODUCTION:
+        import sys
+        print('WARNING: JWT_SECRET_KEY not set; falling back to SECRET_KEY. '
+              'Set a separate JWT_SECRET_KEY for production.', file=sys.stderr)
     # Access tokens are deliberately short. The browser's idle sign-out only
     # clears localStorage on THAT machine - a token already copied off it keeps
     # working until it expires, so this is the setting that actually bounds
