@@ -18,6 +18,14 @@ from flask import current_app, jsonify, request
 
 ALGORITHM = 'HS256'
 ACCESS_MINUTES_KEY = 'JWT_ACCESS_MINUTES'
+
+
+def escape_like(value):
+    """Escape SQL LIKE metacharacters (``%``, ``_``) for use with ``ilike``."""
+    return (str(value or '')
+            .replace('\\', '\\\\')
+            .replace('%', '\\%')
+            .replace('_', '\\_'))
 ACCESS_HOURS_KEY = 'JWT_ACCESS_HOURS'
 REFRESH_DAYS_KEY = 'JWT_REFRESH_DAYS'
 

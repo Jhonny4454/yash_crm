@@ -143,8 +143,9 @@ def register(slug, model, search_fields=(), required=(), order_by=None,
         query = _model.query
         q = (request.args.get('q') or '').strip()
         if q and _search:
-            like = f'%{q}%'
-            query = query.filter(or_(*[getattr(_model, f).ilike(like)
+            from .utils import escape_like
+            like = f'%{escape_like(q)}%'
+            query = query.filter(or_(*[getattr(_model, f).ilike(like, escape='\\')
                                        for f in _search
                                        if hasattr(_model, f)]))
         for key, value in request.args.items():

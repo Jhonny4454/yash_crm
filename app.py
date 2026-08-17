@@ -1942,17 +1942,18 @@ def customer_list():
 @app.route('/customers/search')
 @login_required
 def customer_search():
+    from blueprints.api.utils import escape_like
     q = (request.args.get('q') or '').strip()
     if not q:
         return redirect(url_for('customer_list'))
-    like = f"%{q}%"
+    like = f"%{escape_like(q)}%"
     results = Customer.query.filter(
         db.or_(
-            Customer.first_name.ilike(like),
-            Customer.last_name.ilike(like),
-            Customer.mobile.ilike(like),
-            Customer.email.ilike(like),
-            Customer.reference_id.ilike(like),
+            Customer.first_name.ilike(like, escape='\\'),
+            Customer.last_name.ilike(like, escape='\\'),
+            Customer.mobile.ilike(like, escape='\\'),
+            Customer.email.ilike(like, escape='\\'),
+            Customer.reference_id.ilike(like, escape='\\'),
         )
     ).limit(50).all()
     return render_template('customers/list.html', customers=results, pagination=None, search_query=q)

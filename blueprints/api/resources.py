@@ -159,14 +159,15 @@ def customer_list():
         selectinload(Customer.plans).selectinload(CustomerPlan.plan))
     q = (request.args.get('q') or '').strip()
     if q:
-        like = f'%{q}%'
+        from .utils import escape_like
+        like = f'%{escape_like(q)}%'
         query = query.filter(or_(
-            Customer.first_name.ilike(like),
-            Customer.last_name.ilike(like),
-            Customer.mobile.ilike(like),
-            Customer.username.ilike(like),
-            Customer.reference_id.ilike(like),
-            Customer.email.ilike(like)))
+            Customer.first_name.ilike(like, escape='\\'),
+            Customer.last_name.ilike(like, escape='\\'),
+            Customer.mobile.ilike(like, escape='\\'),
+            Customer.username.ilike(like, escape='\\'),
+            Customer.reference_id.ilike(like, escape='\\'),
+            Customer.email.ilike(like, escape='\\')))
 
     status = request.args.get('status')
     if status == 'active':
@@ -619,7 +620,8 @@ def invoice_list():
         selectinload(Invoice.customer_plan).selectinload(CustomerPlan.plan))
     q = (request.args.get('q') or '').strip()
     if q:
-        query = query.filter(Invoice.invoice_no.ilike(f'%{q}%'))
+        from .utils import escape_like
+        query = query.filter(Invoice.invoice_no.ilike(f'%{escape_like(q)}%', escape='\\'))
 
     # 'pending' is not a stored status - it means anything still owing, which
     # is how the dashboard's Pending Bills column counts them.

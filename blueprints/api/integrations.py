@@ -922,7 +922,8 @@ def message_log():
     query = MessageLog.query
     q = (request.args.get('q') or '').strip()
     if q:
-        query = query.filter(MessageLog.phone.ilike(f'%{q}%'))
+        from .utils import escape_like
+        query = query.filter(MessageLog.phone.ilike(f'%{escape_like(q)}%', escape='\\'))
     status = request.args.get('status')
     if status:
         query = query.filter(MessageLog.status == status)

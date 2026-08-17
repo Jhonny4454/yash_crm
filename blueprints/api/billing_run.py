@@ -189,11 +189,12 @@ def _apply_filters(query):
 
     q = (args.get('q') or '').strip()
     if q:
-        like = f'%{q}%'
-        query = query.filter(or_(Customer.first_name.ilike(like),
-                                 Customer.last_name.ilike(like),
-                                 Customer.username.ilike(like),
-                                 Customer.mobile.ilike(like)))
+        from .utils import escape_like
+        like = f'%{escape_like(q)}%'
+        query = query.filter(or_(Customer.first_name.ilike(like, escape='\\'),
+                                 Customer.last_name.ilike(like, escape='\\'),
+                                 Customer.username.ilike(like, escape='\\'),
+                                 Customer.mobile.ilike(like, escape='\\')))
     return query
 
 

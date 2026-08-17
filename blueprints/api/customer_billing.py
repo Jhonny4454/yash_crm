@@ -1380,10 +1380,11 @@ def plan_picker():
 
     q = (request.args.get('q') or '').strip()
     if q:
-        like = f'%{q}%'
-        query = query.filter(or_(Plan.name.ilike(like),
-                                 Plan.plan_code.ilike(like),
-                                 Plan.plan_type.ilike(like)))
+        from .utils import escape_like
+        like = f'%{escape_like(q)}%'
+        query = query.filter(or_(Plan.name.ilike(like, escape='\\'),
+                                 Plan.plan_code.ilike(like, escape='\\'),
+                                 Plan.plan_type.ilike(like, escape='\\')))
 
     rows = query.order_by(Plan.name).all()
 

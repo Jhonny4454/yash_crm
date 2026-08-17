@@ -65,11 +65,12 @@ def staff_list():
     query = User.query
     q = (request.args.get('q') or '').strip()
     if q:
-        like = f'%{q}%'
-        query = query.filter(or_(User.username.ilike(like),
-                                 User.full_name.ilike(like),
-                                 User.email.ilike(like),
-                                 User.mobile.ilike(like)))
+        from .utils import escape_like
+        like = f'%{escape_like(q)}%'
+        query = query.filter(or_(User.username.ilike(like, escape='\\'),
+                                 User.full_name.ilike(like, escape='\\'),
+                                 User.email.ilike(like, escape='\\'),
+                                 User.mobile.ilike(like, escape='\\')))
     role = request.args.get('role')
     if role:
         query = query.filter(User.role == role)

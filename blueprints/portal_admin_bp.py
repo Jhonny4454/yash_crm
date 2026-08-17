@@ -236,8 +236,9 @@ def activity_log():
     if user_id:
         q = q.filter(AuditLog.user_id == user_id)
     if term:
-        like = f'%{term}%'
-        q = q.filter(AuditLog.action.ilike(like) | AuditLog.details.ilike(like))
+        from blueprints.api.utils import escape_like
+        like = f'%{escape_like(term)}%'
+        q = q.filter(AuditLog.action.ilike(like, escape='\\') | AuditLog.details.ilike(like, escape='\\'))
 
     rows = q.order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
     total = rows.count()
