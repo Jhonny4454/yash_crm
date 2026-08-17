@@ -1132,7 +1132,7 @@ def portal_pay_webhook():
     if not order_id:
         return fail('missing_order_id', 400)
 
-    order = OnlinePaymentOrder.query.filter_by(order_id=order_id).first()
+    order = db.session.query(OnlinePaymentOrder).with_for_update().filter_by(order_id=order_id).first()
     if not order:
         return fail('order_not_found', 404)
 
@@ -1232,7 +1232,7 @@ def portal_discard_invoice(iid):
 @bp.get('/portal/pay/status/<order_id>')
 @customer_required
 def portal_pay_status(order_id):
-    order = OnlinePaymentOrder.query.filter_by(order_id=order_id).first()
+    order = db.session.query(OnlinePaymentOrder).with_for_update().filter_by(order_id=order_id).first()
     if not order or order.customer_id != current_customer_id():
         return fail('not_found', 404)
 

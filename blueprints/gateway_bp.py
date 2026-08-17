@@ -140,7 +140,7 @@ def payment_callback():
               'Please check the Razorpay dashboard.', 'danger')
         return redirect(url_for('dashboard'))
 
-    record = OnlinePaymentOrder.query.filter_by(order_id=order_id).first()
+    record = db.session.query(OnlinePaymentOrder).with_for_update().filter_by(order_id=order_id).first()
     if not record:
         flash('We could not match that payment to an order.', 'warning')
         return redirect(url_for('dashboard'))
