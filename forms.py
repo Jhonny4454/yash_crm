@@ -35,13 +35,13 @@ class CustomerLoginForm(FlaskForm):
 
 class ChangePasswordForm(FlaskForm):
     current_password = PasswordField('Current Password', validators=[DataRequired()])
-    new_password = PasswordField('New Password', validators=[DataRequired(), Length(min=6)])
+    new_password = PasswordField('New Password', validators=[DataRequired(), Length(min=8)])
     confirm_password = PasswordField('Confirm New Password', validators=[DataRequired(), EqualTo('new_password')])
     submit = SubmitField('Change Password')
 
 class CustomerChangePasswordForm(FlaskForm):
     current_password = PasswordField('Current Password', validators=[DataRequired()])
-    new_password = PasswordField('New Password', validators=[DataRequired(), Length(min=6)])
+    new_password = PasswordField('New Password', validators=[DataRequired(), Length(min=8)])
     confirm_password = PasswordField('Confirm New Password', validators=[DataRequired(), EqualTo('new_password')])
     submit = SubmitField('Update Password')
 
@@ -113,7 +113,7 @@ class CustomerForm(FlaskForm):
     mobile = StringField('Mobile', validators=[DataRequired()])
     username = StringField('Username')
     
-    password = PasswordField('Password', validators=[Optional(), Length(min=6)])
+    password = PasswordField('Password', validators=[Optional(), Length(min=8)])
     confirm_password = PasswordField('Confirm Password', validators=[Optional(), EqualTo('password')])
     
     gstin = StringField('GSTIN')
@@ -167,7 +167,7 @@ class ServiceProviderForm(FlaskForm):
     is_active = BooleanField('Active (Enable)', default=True)
     api_url = StringField('API URL')
     api_username = StringField('API Username')
-    api_password = PasswordField('API Password', validators=[Optional(), Length(min=6)])
+    api_password = PasswordField('API Password', validators=[Optional(), Length(min=8)])
     confirm_password = PasswordField('Confirm API Password', validators=[Optional(), EqualTo('api_password')])
     submit = SubmitField('Save Provider')
 
@@ -230,7 +230,7 @@ class PaymentForm(FlaskForm):
 class StaffForm(FlaskForm):
     full_name = StringField('Full Name', validators=[DataRequired()])
     username = StringField('Username', validators=[DataRequired()])
-    password = PasswordField('Password', validators=[Optional(), Length(min=6)])
+    password = PasswordField('Password', validators=[Optional(), Length(min=8)])
     email = StringField('Email', validators=[Optional(), Email()])
     mobile = StringField('Mobile')
     role = SelectField('Role', choices=[

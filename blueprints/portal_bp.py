@@ -219,7 +219,7 @@ def reset_password():
     if password != confirm:
         flash('The two passwords do not match.', 'danger')
         return redirect(url_for('portal.forgot_password'))
-    if len(password) < 6:
+    if len(password) < 8:
         flash('Please use a password of at least 6 characters.', 'danger')
         return redirect(url_for('portal.forgot_password'))
 

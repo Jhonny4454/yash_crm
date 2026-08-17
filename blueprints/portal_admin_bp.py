@@ -100,7 +100,8 @@ def queue():
 @login_required
 @_admin_only
 def payment_approve(id):
-    payment = Payment.query.get_or_404(id)
+    from models import db as _db
+    payment = _db.session.query(Payment).with_for_update().get_or_404(id)
     ok, renewal_applied = payment_service.approve_payment(payment, current_user)
     if not ok:
         flash('That payment has already been dealt with.', 'info')
@@ -123,7 +124,8 @@ def payment_approve(id):
 @login_required
 @_admin_only
 def payment_reject(id):
-    payment = Payment.query.get_or_404(id)
+    from models import db as _db
+    payment = _db.session.query(Payment).with_for_update().get_or_404(id)
     reason = (request.form.get('reason') or '').strip()
     ok, _ = payment_service.reject_payment(payment, current_user, reason)
     if not ok:

@@ -236,7 +236,9 @@ LOGIN_PATHS = ('/api/v1/auth/staff/login', '/api/v1/auth/customer/login',
                '/login', '/customer/login')
 
 OTP_PATHS = ('/api/v1/auth/customer/forgot-password',
-             '/api/v1/auth/staff/forgot-password')
+             '/api/v1/auth/staff/forgot-password',
+             '/customer/forgot-password',
+             '/forgot-password')
 
 #: ip -> timestamps of recent OTP requests (separate counter).
 _OTP_REQUESTS = defaultdict(lambda: deque(maxlen=16))
@@ -333,6 +335,24 @@ def _install_rate_limit(app):
             elif 200 <= response.status_code < 300:
                 _FAILURES.pop(_key(), None)
         return response
+
+
+def record_web_login_failure(identifier):
+    """Call this from web form login routes when authentication fails.
+
+    The ``_record`` after-request hook only counts failures when the HTTP
+    status is 400/401/403, but Flask form logins return 200 + flash on
+    failure — so the hook never fires.  This function lets those routes
+    explicitly record the failure.
+    """
+    ip = ''
+    forwarded = request.headers.get('X-Forwarded-For', '')
+    if forwarded:
+        ip = forwarded.split(',')[0].strip()
+    else:
+        ip = request.remote_addr or 'unknown'
+    key = (ip, str(identifier or '').lower())
+    _FAILURES[key].append(time.time())
 
 
 # --------------------------------------------------------------------------- #

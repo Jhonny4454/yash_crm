@@ -102,7 +102,7 @@ def staff_change_password():
     new_password = data.get('new_password') or ''
     confirm = data.get('confirm_password')
 
-    if len(new_password) < 6:
+    if len(new_password) < 8:
         return fail('password_too_short', 400)
     if confirm is not None and confirm != new_password:
         return fail('passwords_do_not_match', 400)
@@ -187,7 +187,7 @@ def customer_change_password():
     old_password = data.get('old_password') or ''
     new_password = data.get('new_password') or ''
 
-    if len(new_password) < 6:
+    if len(new_password) < 8:
         return fail('password_too_short', 400)
 
     customer = db.session.get(Customer, current_customer_id())
@@ -225,7 +225,7 @@ def customer_forgot_password():
 def customer_reset_password():
     data = body()
     password = data.get('password') or ''
-    if len(password) < 6:
+    if len(password) < 8:
         return fail('password_too_short', 400)
 
     from blueprints.portal_bp import _verify_otp
@@ -379,9 +379,9 @@ def staff_reset_password():
     """Set a new password against the code sent to the staff member's phone."""
     data = body()
     password = data.get('password') or ''
-    if len(password) < 6:
+    if len(password) < 8:
         return fail('password_too_short', 400,
-                    detail='Use at least 6 characters.')
+                    detail='Use at least 8 characters.')
 
     user, error = _verify_staff_otp(data.get('otp'))
     if error:

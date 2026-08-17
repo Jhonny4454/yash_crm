@@ -379,12 +379,13 @@ def queue():
     if zone:
         query = query.filter(Customer.zone == zone)
     if search:
-        like = f'%{search}%'
-        query = query.filter(or_(Customer.first_name.ilike(like),
-                                 Customer.last_name.ilike(like),
-                                 Customer.mobile.ilike(like),
-                                 Customer.username.ilike(like),
-                                 Customer.reference_id.ilike(like)))
+        safe = search.replace('%', '\\%').replace('_', '\\_')
+        like = f'%{safe}%'
+        query = query.filter(or_(Customer.first_name.ilike(like, escape='\\'),
+                                 Customer.last_name.ilike(like, escape='\\'),
+                                 Customer.mobile.ilike(like, escape='\\'),
+                                 Customer.username.ilike(like, escape='\\'),
+                                 Customer.reference_id.ilike(like, escape='\\')))
 
     rows = query.order_by(CustomerPlan.end_date).all()
 

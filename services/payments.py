@@ -180,11 +180,12 @@ def search_by_reference(term):
     term = (term or '').strip()
     if not term:
         return []
-    like = f'%{term}%'
+    safe = term.replace('%', '\\%').replace('_', '\\_')
+    like = f'%{safe}%'
     return (Payment.query
-            .filter(db.or_(Payment.utr.ilike(like),
-                           Payment.gateway_transaction_id.ilike(like),
-                           Payment.book_receipt_no.ilike(like),
-                           Payment.mode_detail.ilike(like)))
+            .filter(db.or_(Payment.utr.ilike(like, escape='\\'),
+                           Payment.gateway_transaction_id.ilike(like, escape='\\'),
+                           Payment.book_receipt_no.ilike(like, escape='\\'),
+                           Payment.mode_detail.ilike(like, escape='\\')))
             .order_by(Payment.payment_date.desc(), Payment.id.desc())
             .limit(200).all())

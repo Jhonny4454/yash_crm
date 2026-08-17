@@ -818,6 +818,8 @@ def login():
                 return redirect(next_page)
             return redirect(url_for('dashboard'))
         # register_failed_attempt(client_ip, submitted_username)
+        from security import record_web_login_failure
+        record_web_login_failure(form.username.data or '')
         log_audit('Failed Login', f"Failed login attempt for username '{form.username.data}'")
         flash('Invalid username or password.', 'danger')
     return render_template('login.html', form=form)
@@ -1293,7 +1295,7 @@ def payment_authorizations():
 @login_required
 @admin_required
 def payment_reject(id):
-    payment = Payment.query.get_or_404(id)
+    payment = db.session.query(Payment).with_for_update().get_or_404(id)
     reason = (request.form.get('reason') or '').strip()
     ok, _ = payment_service.reject_payment(payment, current_user, reason)
     if not ok:
@@ -3140,7 +3142,7 @@ def add_payment(invoice_id):
 @login_required
 @admin_required
 def payment_approve(id):
-    payment = Payment.query.get_or_404(id)
+    payment = db.session.query(Payment).with_for_update().get_or_404(id)
     # Shared with the portal-activity screen so approving from either place
     # settles the invoice AND applies any renewal the payment was buying.
     ok, renewal_applied = payment_service.approve_payment(payment, current_user)
@@ -4467,6 +4469,8 @@ def customer_login():
                 return redirect(nxt)
             return redirect(url_for('customer_dashboard'))
         # register_failed_attempt(ip, uname)
+        from security import record_web_login_failure
+        record_web_login_failure(uname)
         flash('Invalid username or password.', 'danger')
     return render_template('customer/login.html', form=form)
 

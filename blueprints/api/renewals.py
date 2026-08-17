@@ -100,12 +100,13 @@ def renewal_list():
 
     q = (request.args.get('q') or '').strip()
     if q:
-        like = f'%{q}%'
+        safe = q.replace('%', '\\%').replace('_', '\\_')
+        like = f'%{safe}%'
         query = query.join(Customer, Customer.id == RenewalRequest.customer_id) \
-            .filter(or_(Customer.first_name.ilike(like),
-                        Customer.last_name.ilike(like),
-                        Customer.username.ilike(like),
-                        Customer.mobile.ilike(like)))
+            .filter(or_(Customer.first_name.ilike(like, escape='\\'),
+                        Customer.last_name.ilike(like, escape='\\'),
+                        Customer.username.ilike(like, escape='\\'),
+                        Customer.mobile.ilike(like, escape='\\')))
 
     query = query.order_by(RenewalRequest.created_at.desc())
     rows, meta = paginate(query, default_per_page=50)

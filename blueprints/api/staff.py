@@ -96,7 +96,7 @@ def staff_create():
 
     if not username:
         return fail('username_required', 400)
-    if len(password) < 6:
+    if len(password) < 8:
         return fail('password_too_short', 400)
     if User.query.filter_by(username=username).first():
         return fail('username_taken', 409)
@@ -159,7 +159,7 @@ def staff_update(uid):
 
     password = data.get('password')
     if password:
-        if len(password) < 6:
+        if len(password) < 8:
             return fail('password_too_short', 400)
         user.set_password(password)
 
