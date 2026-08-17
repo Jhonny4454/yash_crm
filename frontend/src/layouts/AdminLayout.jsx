@@ -23,6 +23,10 @@ export default function AdminLayout() {
   const [search, setSearch] = useState("");
   const searchRef = useRef(null);
 
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const quickAddRef = useRef(null);
+  const isAdmin = user?.role === "admin";
+
   useEffect(() => {
     document.body.classList.toggle("sidebar-collapsed", collapsed);
     localStorage.setItem("unicrm.sidebar", collapsed ? "1" : "0");
@@ -31,6 +35,7 @@ export default function AdminLayout() {
   useEffect(() => {
     setMobileOpen(false);
     setSearchOpen(false);
+    setQuickAddOpen(false);
   }, [pathname]);
 
   /* Stop the page behind the drawer from scrolling under your thumb. Android
@@ -73,6 +78,20 @@ export default function AdminLayout() {
   useEffect(() => {
     if (searchOpen && searchRef.current) searchRef.current.focus();
   }, [searchOpen]);
+
+  useEffect(() => {
+    if (!quickAddOpen) return undefined;
+    const onKey = (e) => { if (e.key === "Escape") setQuickAddOpen(false); };
+    const onPointer = (e) => {
+      if (quickAddRef.current && !quickAddRef.current.contains(e.target)) setQuickAddOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer, true);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+    };
+  }, [quickAddOpen]);
 
   const closeMobile = useCallback(() => setMobileOpen(false), []);
 
@@ -158,6 +177,31 @@ export default function AdminLayout() {
               the screen you are sitting at, and the person who wants it wants
               it now. */}
           <ThemeToggle />
+
+          {isAdmin && (
+            <div className="quick-add-wrap" ref={quickAddRef}>
+              <button
+                type="button"
+                className="sidebar-toggle quick-add-btn"
+                onClick={() => setQuickAddOpen((v) => !v)}
+                aria-label="Quick add"
+                aria-expanded={quickAddOpen}
+                aria-haspopup="menu"
+              >
+                <i className="fas fa-plus" />
+              </button>
+              {quickAddOpen && (
+                <div className="quick-add-menu" role="menu" aria-label="Quick add">
+                  <button type="button" role="menuitem" onClick={() => { setQuickAddOpen(false); navigate("/staff"); }}>
+                    <i className="fas fa-user-plus" /> Add Staff User
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => { setQuickAddOpen(false); navigate("/customers/add"); }}>
+                    <i className="fas fa-user" /> Add Customer
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="user-greeting">
             <span className="who">

@@ -656,3 +656,44 @@ table.data tr.rail-idle td:first-child { box-shadow: inset 3px 0 0 #cbd5e1; }
   .dash-head h2 { font-size: 1.5rem; }
   .dash-head .stamp .d { font-size: 1.2rem; }
 }
+
+/* ---- Quick-add dropdown (admin only) ---------------------------------- */
+.quick-add-wrap { position: relative; }
+.quick-add-btn { font-size: 14px; }
+.quick-add-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 6px;
+  background: #fff;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card);
+  min-width: 200px;
+  z-index: 1000;
+  padding: 4px 0;
+}
+.quick-add-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 16px;
+  border: none;
+  background: none;
+  font-size: 13px;
+  color: var(--text-main);
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+.quick-add-menu button:hover {
+  background: var(--bg-body);
+  color: var(--primary-color);
+}
+.quick-add-menu button i {
+  width: 16px;
+  text-align: center;
+  font-size: 13px;
+  opacity: 0.7;
+}
