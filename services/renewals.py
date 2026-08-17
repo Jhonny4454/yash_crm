@@ -192,12 +192,26 @@ def approve(req, user=None, note=None):
     if req is None or req.status != 'pending':
         return False
 
+    # Lock the request row to prevent two concurrent approvals from both
+    # seeing status='pending' and double-extending the plan.
+    req = db.session.query(RenewalRequest).with_for_update().get(req.id)
+    if req is None or req.status != 'pending':
+        return False
+
     customer = req.customer or db.session.get(Customer, req.customer_id)
     plan = req.requested_plan or db.session.get(Plan, req.requested_plan_id)
     if customer is None or plan is None:
         return False
 
-    cp = req.customer_plan or latest_plan(customer.id)
+    # Lock the CustomerPlan to prevent a concurrent renewal or payment
+    # approval from reading a stale end_date and overwriting our extension.
+    cp = req.customer_plan
+    if cp is not None:
+        cp = db.session.query(CustomerPlan).with_for_update().get(cp.id)
+    else:
+        cp = latest_plan(customer.id)
+        if cp is not None:
+            cp = db.session.query(CustomerPlan).with_for_update().get(cp.id)
     base = extension_base(cp)
     new_end = base + timedelta(days=int(req.days or days_for(plan, req.months)))
 

@@ -459,8 +459,9 @@ def payment_entry(cid):
     except (TypeError, ValueError):
         return fail('invalid_invoice_ids', 400)
 
-    invoices = (Invoice.query
+    invoices = (db.session.query(Invoice)
                 .filter(Invoice.id.in_(ids), Invoice.customer_id == cid)
+                .with_for_update()
                 .order_by(Invoice.issue_date.asc(), Invoice.id.asc())
                 .all())
     if len(invoices) != len(set(ids)):
@@ -1176,7 +1177,7 @@ def payment_cancel(pid):
 @admin_required
 def payment_sales_return(pid):
     """Refund some or all of a payment, keeping both halves on the ledger."""
-    original = db.session.get(Payment, pid)
+    original = db.session.query(Payment).with_for_update().get(pid)
     if not original:
         return fail('not_found', 404)
     if original.status != 'approved':
