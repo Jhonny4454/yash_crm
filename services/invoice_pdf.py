@@ -217,19 +217,25 @@ def _bundled_logo(root, missing=''):
     return None
 
 
-def _logo_flowable(explicit=None, width=30, height=18):
+def _logo_flowable(explicit=None, width=28, height=22):
     """The letterhead image, or '' when there is genuinely no logo to print.
 
     One helper for both documents: the invoice and the receipt each had their
     own copy of resolve-then-guard, which is how one of them can quietly stop
     printing a letterhead while the other keeps working.
+
+    The image is scaled proportionally within the given bounding box so it
+    never overflows its table cell. ``hAlign='CENTER'`` centres a
+    landscape image in a portrait cell (or vice-versa).
     """
     resolved = _logo_path(explicit)
     if not resolved:
         return ''
     try:
-        return Image(resolved, width=width * mm, height=height * mm,
+        img = Image(resolved, width=width * mm, height=height * mm,
                      kind='proportional')
+        img.hAlign = 'CENTER'
+        return img
     except Exception:                                       # noqa: BLE001
         # A corrupt or unreadable image must not take the whole bill down.
         return ''
@@ -385,19 +391,24 @@ def build_invoice_pdf(invoice, logo_path=None, detailed=False):
         ('LEFTPADDING', (0, 0), (-1, -1), 5),
         ('TOPPADDING', (0, 0), (-1, -1), 5),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
     ])
     # No logo means no empty box: a third of the letterhead ruled off around
     # nothing looks like a missing image, which is precisely what it was.
-    story.append(Table([[logo_cell, company_block]],
-                       colWidths=[W * 0.28, W * 0.72], style=letterhead)
-                 if logo_cell else
-                 Table([[company_block]], colWidths=[W], style=letterhead))
+    if logo_cell:
+        lt = Table([[logo_cell, company_block]],
+                    colWidths=[W * 0.28, W * 0.72], style=letterhead)
+        lt._argW[0] = W * 0.28
+        story.append(lt)
+    else:
+        story.append(Table([[company_block]], colWidths=[W], style=letterhead))
 
     # ---- GSTIN / state row ---------------------------------------------
     grid = TableStyle([
         ('GRID', (0, 0), (-1, -1), 0.6, colors.black),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
         ('TOPPADDING', (0, 0), (-1, -1), 4),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
     ])
@@ -504,13 +515,12 @@ def build_invoice_pdf(invoice, logo_path=None, detailed=False):
     # The amount in words goes in the space beside the figures rather than in
     # a row of its own underneath. It is the same information a printed bill
     # puts there, and it fills what was a third of a page of ruled-off blank.
-    # The inner table has to fit INSIDE its cell, padding included: at
-    # 0.20 + 0.16 it was exactly as wide as the 0.36 column holding it, so
-    # every figure and the rule above the total pushed out through the right
-    # border of the bill. 0.19 + 0.145 leaves room for the 5pt padding.
+    # The inner table must be NARROWER than the 0.36 outer column to leave
+    # room for padding (5pt each side = 10pt ≈ 3.5mm).  0.17 + 0.155 = 0.325
+    # which safely fits inside 0.36.
     story.append(Table(
         [[Paragraph(f"<b>Rupees in words:</b> {amount_in_words(net)}", wrap),
-          Table(totals, colWidths=[W * 0.19, W * 0.145], style=TableStyle([
+          Table(totals, colWidths=[W * 0.17, W * 0.155], style=TableStyle([
               ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
               ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
               ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
@@ -519,6 +529,7 @@ def build_invoice_pdf(invoice, logo_path=None, detailed=False):
               ('LINEABOVE', (0, -1), (-1, -1), 0.6, colors.black),
               ('TOPPADDING', (0, 0), (-1, -1), 2),
               ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+              ('RIGHTPADDING', (0, 0), (-1, -1), 3),
           ]))]],
         colWidths=[W * 0.64, W * 0.36],
         style=TableStyle([
@@ -542,7 +553,8 @@ def build_invoice_pdf(invoice, logo_path=None, detailed=False):
         body.append(Paragraph(f'{index}) {text}', term))
         body.append(Spacer(1, 5))
 
-    story.append(Table([[body]], colWidths=[W], style=grid))
+    terms_cell = Table([[body]], colWidths=[W - 10], style=grid)
+    story.append(terms_cell)
     story.append(Table([[Paragraph(
         '<b>This is a computer generated invoice and does not require any signature.</b>',
         heading)]], colWidths=[W], style=grid))
@@ -587,6 +599,7 @@ def build_receipt_pdf(payment, logo_path=None):
         ('GRID', (0, 0), (-1, -1), 0.6, colors.black),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
         ('TOPPADDING', (0, 0), (-1, -1), 4),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
     ])

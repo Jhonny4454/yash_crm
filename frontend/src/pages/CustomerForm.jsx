@@ -29,7 +29,6 @@ const TITLES = ["Mr.", "Mrs.", "Ms."];
 const CUSTOMER_TYPES = ["Residential", "Company", "Commercial", "Enterprise"];
 const CONNECTION_TYPES = ["Ethernet", "FTTH", "Lease Line"];
 const TAX_TYPES = ["Taxable", "Non-Taxable"];
-const BILLING_TYPES = ["Prepaid", "Postpaid"];
 
 //: Free text in the schema, so these are suggestions rather than a hard set -
 //: the operator can type anything the customer actually produced.
@@ -78,8 +77,6 @@ const EMPTY = {
   pan: "",
   aadhar: "",
   tax_type: "Taxable",
-  discount_amount: "",
-  notes: "",
   is_active: true,
   registration_date: today(),
   billing_type: "Prepaid",
@@ -87,8 +84,6 @@ const EMPTY = {
   ipacct_id: "",
   service_provider_id: "",
   invoice_date: today(),
-  latitude: "",
-  longitude: "",
   address_proof_type: "",
   id_proof_type: "",
 };
@@ -134,25 +129,9 @@ function validate(form) {
   if (form.ip_address.trim() && !IP_RE.test(form.ip_address.trim())) {
     errors.ip_address = "Enter a valid IPv4 address, e.g. 10.0.4.21.";
   }
-  // Latitude and longitude are stored as text, so validate the range here or
-  // a transposed pair silently produces a map pin in the wrong hemisphere.
-  if (form.latitude.trim() && !inRange(form.latitude, -90, 90)) {
-    errors.latitude = "Latitude must be between -90 and 90.";
-  }
-  if (form.longitude.trim() && !inRange(form.longitude, -180, 180)) {
-    errors.longitude = "Longitude must be between -180 and 180.";
-  }
-  if (Boolean(form.latitude.trim()) !== Boolean(form.longitude.trim())) {
-    const missing = form.latitude.trim() ? "longitude" : "latitude";
-    errors[missing] = "Enter both coordinates, or neither.";
-  }
   return errors;
 }
 
-function inRange(value, low, high) {
-  const number = Number(value);
-  return !Number.isNaN(number) && number >= low && number <= high;
-}
 
 export default function CustomerForm() {
   const { id } = useParams();
@@ -350,6 +329,7 @@ export default function CustomerForm() {
       payload[key] = typeof value === "string" && value.trim() === "" ? null : value;
     }
     payload.primary_address = primaryAddress?.trim() ? primaryAddress : null;
+    payload.billing_type = "Prepaid";
 
     // A plan is only assigned on create. Changing an existing customer's plan
     // goes through Assign/Change on the Plan tab, which terminates the old one
@@ -511,30 +491,6 @@ export default function CustomerForm() {
 
             {field("reference_id", "Refrence ID")}
             {field("connection_type", "Connection Type", { as: "select", options: CONNECTION_TYPES })}
-            {field("billing_type", "Billing Type", { as: "select", options: BILLING_TYPES })}
-
-            {field("latitude", "Latitude", { inputMode: "decimal", placeholder: "19.1543" })}
-            {field("longitude", "Longitude", { inputMode: "decimal", placeholder: "72.9986" })}
-            <div className="field">
-              <label htmlFor="f-geo-help">Location</label>
-              <button type="button" id="f-geo-help" className="btn sm"
-                      onClick={() => {
-                        if (!navigator.geolocation) {
-                          return toast.error("This browser cannot read a location.");
-                        }
-                        return navigator.geolocation.getCurrentPosition(
-                          (position) => setForm((prev) => ({
-                            ...prev,
-                            latitude: position.coords.latitude.toFixed(6),
-                            longitude: position.coords.longitude.toFixed(6),
-                          })),
-                          () => toast.error("Location permission was refused."),
-                        );
-                      }}>
-                Use my current location
-              </button>
-              <small>Handy when filling this in at the installation.</small>
-            </div>
           </div>
         </fieldset>
 
@@ -648,17 +604,6 @@ export default function CustomerForm() {
             </p>
           </fieldset>
         )}
-
-        <fieldset className="panel">
-          <legend>Discount &amp; notes</legend>
-          <div className="field-grid">
-            {/* Rupees only. A discount that was a percentage on one customer
-                and a flat amount on the next could not be totalled on any
-                screen, and the header chip showed two different units. */}
-            {field("discount_amount", "Discount (₹)", { as: "money" })}
-            {field("notes", "Internal notes", { as: "textarea", span: 2 })}
-          </div>
-        </fieldset>
 
         <fieldset className="panel">
           <legend>Status</legend>
