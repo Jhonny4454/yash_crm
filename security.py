@@ -206,11 +206,13 @@ def _install_cookies(app):
     """Cookie flags for a public deployment."""
     production = _is_production(app)
     app.config.update(
+        SESSION_COOKIE_NAME='yash_session',
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE='None' if production else 'Lax',
         SESSION_COOKIE_SECURE=production,
         REMEMBER_COOKIE_HTTPONLY=True,
         REMEMBER_COOKIE_SECURE=production,
+        REMEMBER_COOKIE_SAMESITE='Lax',
         # SameSite=None is required when the front end is on its own domain,
         # and browsers only accept it together with Secure - so these two are
         # set as a pair or not at all.
@@ -227,6 +229,14 @@ _FAILURES = defaultdict(lambda: deque(maxlen=64))
 
 LOGIN_PATHS = ('/api/v1/auth/staff/login', '/api/v1/auth/customer/login',
                '/login', '/customer/login')
+
+OTP_PATHS = ('/api/v1/auth/customer/forgot-password',
+             '/api/v1/auth/staff/forgot-password')
+
+#: ip -> timestamps of recent OTP requests (separate counter).
+_OTP_REQUESTS = defaultdict(lambda: deque(maxlen=16))
+OTP_MAX_REQUESTS = 5
+OTP_WINDOW_SECONDS = 300
 
 MAX_ATTEMPTS = int(os.environ.get('LOGIN_MAX_ATTEMPTS', 8))
 WINDOW_SECONDS = int(os.environ.get('LOGIN_WINDOW_SECONDS', 300))
@@ -256,7 +266,34 @@ def _key():
 def _install_rate_limit(app):
     @app.before_request
     def _guard():
-        if request.method != 'POST' or request.path not in LOGIN_PATHS:
+        if request.method != 'POST':
+            return None
+
+        # OTP / forgot-password rate limiting (by IP only).
+        if request.path in OTP_PATHS:
+            ip = _client_ip()
+            recent = _OTP_REQUESTS[ip]
+            now = time.time()
+            while recent and now - recent[0] > OTP_WINDOW_SECONDS:
+                recent.popleft()
+            if len(recent) >= OTP_MAX_REQUESTS:
+                wait = int(OTP_WINDOW_SECONDS - (now - recent[-1]))
+                current_app.logger.warning(
+                    'OTP rate-limited for %s after %d requests', ip, len(recent))
+                response = jsonify({
+                    'ok': False,
+                    'error': 'too_many_requests',
+                    'detail': 'Too many password-reset requests. '
+                              'Try again in a few minutes.',
+                })
+                response.status_code = 429
+                response.headers['Retry-After'] = str(max(1, wait))
+                return response
+            recent.append(now)
+            return None
+
+        # Login rate limiting.
+        if request.path not in LOGIN_PATHS:
             return None
 
         recent = _FAILURES[_key()]
@@ -294,6 +331,28 @@ def _install_rate_limit(app):
 
 
 # --------------------------------------------------------------------------- #
+
+def _encrypt_plaintext_secrets(app):
+    """One-time migration: encrypt any settings-table secrets still stored as
+    plaintext.  Runs on every boot but is a no-op once everything is encrypted
+    (Fernet tokens always start with ``gAAAAA``).
+    """
+    with app.app_context():
+        from models_ext import ENCRYPTED_SETTINGS, FERNET_PREFIX, encrypt_setting_value
+        from models import Setting
+        updated = []
+        for key in ENCRYPTED_SETTINGS:
+            row = Setting.query.filter_by(key=key).first()
+            if row and row.value and not row.value.startswith(FERNET_PREFIX):
+                row.value = encrypt_setting_value(row.value)
+                updated.append(key)
+        if updated:
+            from models import db
+            db.session.commit()
+            app.logger.info('Encrypted %d settings that were still plaintext: %s',
+                            len(updated), ', '.join(updated))
+
+
 def harden(app):
     """Apply everything. Safe to call once per app."""
     if getattr(app, '_hardened', False):
@@ -326,4 +385,10 @@ def harden(app):
                 'own domain, its API calls will be blocked by the browser.')
 
     app._hardened = True
+
+    # One-time migration: encrypt any settings-table secrets that are still
+    # stored as plaintext. Runs on every boot but is a no-op once everything
+    # is encrypted (Fernet tokens start with 'gAAAAA').
+    _encrypt_plaintext_secrets(app)
+
     return app

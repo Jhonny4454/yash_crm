@@ -24,6 +24,21 @@ from models import db
 # --------------------------------------------------------------------------- #
 #  Secret storage
 # --------------------------------------------------------------------------- #
+
+#: Settings-table keys whose values must be encrypted at rest. A database
+#: compromise exposes these; encrypting them means the attacker also needs
+#: CREDENTIAL_KEY to read them.
+ENCRYPTED_SETTINGS = frozenset({
+    'brevo_api_key',
+    'cashfree_secret_key',
+    'cloudinary_api_key',
+    'cloudinary_api_secret',
+    'wa_api_token',
+})
+
+FERNET_PREFIX = 'gAAAAA'  # all Fernet tokens start with this
+
+
 def _fernet():
     """
     Key used to encrypt ISP API secrets at rest.
@@ -36,6 +51,36 @@ def _fernet():
     if not key:
         return None
     return Fernet(key.encode() if isinstance(key, str) else key)
+
+
+def encrypt_setting_value(plaintext):
+    """Encrypt a setting value for storage. Returns plaintext if no key."""
+    if not plaintext:
+        return plaintext
+    f = _fernet()
+    if f is None:
+        return plaintext
+    return f.encrypt(plaintext.encode()).decode()
+
+
+def decrypt_setting_value(ciphertext):
+    """Decrypt a setting value from storage. Returns as-is if not encrypted."""
+    if not ciphertext:
+        return ciphertext
+    f = _fernet()
+    if f is None:
+        return ciphertext
+    if not ciphertext.startswith(FERNET_PREFIX):
+        return ciphertext
+    try:
+        return f.decrypt(ciphertext.encode()).decode()
+    except InvalidToken:
+        return ciphertext
+
+
+def is_encrypted(setting_key):
+    """True when a setting value is stored encrypted."""
+    return setting_key in ENCRYPTED_SETTINGS
 
 
 class EncryptedSecretMixin:

@@ -119,6 +119,7 @@ def settings_update():
     reloaded.
     """
     from .settings_schema import FIELDS, coerce, is_secret
+    from models_ext import ENCRYPTED_SETTINGS, encrypt_setting_value
 
     data = body()
     items = data.get('settings')
@@ -173,7 +174,7 @@ def settings_update():
         if not row:
             row = Setting(key=key, value_type=value_type)
             db.session.add(row)
-        row.value = value
+        row.value = encrypt_setting_value(value) if key in ENCRYPTED_SETTINGS else value
         row.updated_by_id = current_staff_id()
         saved += 1
 
@@ -632,8 +633,10 @@ def whatsapp_configure():
 
 
 def _setting_value(key):
+    from models_ext import decrypt_setting_value
     row = Setting.query.filter_by(key=key).first()
-    return (row.value or '').strip() if row else ''
+    val = (row.value or '').strip() if row else ''
+    return decrypt_setting_value(val)
 
 
 @bp.post('/settings/whatsapp/test')

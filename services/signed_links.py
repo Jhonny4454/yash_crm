@@ -39,18 +39,29 @@ DEFAULT_TTL_SECONDS = 30 * 24 * 3600
 
 
 def _secret():
-    return (current_app.config.get('SECRET_KEY') or 'dev').encode()
+    key = current_app.config.get('SECRET_KEY')
+    if not key or key in ('dev', 'dev-secret-key-change-me', 'changeme'):
+        return None
+    return key.encode()
 
 
 def _signature(kind, ident, expires):
+    secret = _secret()
+    if secret is None:
+        return None
     message = f'{kind}:{ident}:{expires}'.encode()
-    return hmac.new(_secret(), message, hashlib.sha256).hexdigest()[:32]
+    return hmac.new(secret, message, hashlib.sha256).hexdigest()[:32]
 
 
 def sign(kind, ident, ttl=DEFAULT_TTL_SECONDS):
-    """``(expires, signature)`` for one resource."""
+    """``(expires, signature)`` for one resource, or ``(0, None)`` if
+    SECRET_KEY is missing/weak (links must not be forgeable).
+    """
     expires = int(time.time()) + int(ttl)
-    return expires, _signature(kind, ident, expires)
+    signature = _signature(kind, ident, expires)
+    if signature is None:
+        return 0, None
+    return expires, signature
 
 
 def verify(kind, ident, expires, signature):
@@ -63,11 +74,14 @@ def verify(kind, ident, expires, signature):
     if expires < time.time():
         return False
 
+    expected = _signature(kind, ident, expires)
+    if expected is None:
+        return False
+
     # compare_digest, not ==. A plain comparison returns as soon as two bytes
     # differ, and that timing difference is enough to recover a signature one
     # character at a time.
-    return hmac.compare_digest(_signature(kind, ident, expires),
-                               str(signature or ''))
+    return hmac.compare_digest(expected, str(signature or ''))
 
 
 def public_base_url():
@@ -89,11 +103,15 @@ def public_base_url():
 
 
 def invoice_pdf_link(invoice_id, ttl=DEFAULT_TTL_SECONDS):
-    """A ready-to-send URL for one invoice's PDF, or '' if we have no base."""
+    """A ready-to-send URL for one invoice's PDF, or '' if we have no base
+    or no signing key.
+    """
     base = public_base_url()
     if not base:
         return ''
     expires, signature = sign('invoice', invoice_id, ttl)
+    if not signature:
+        return ''
     query = urlencode({'exp': expires, 'sig': signature})
     return f'{base}/api/v1/public/invoices/{invoice_id}/pdf?{query}'
 
@@ -111,5 +129,7 @@ def receipt_pdf_link(payment_id, ttl=DEFAULT_TTL_SECONDS):
     if not base:
         return ''
     expires, signature = sign('receipt', payment_id, ttl)
+    if not signature:
+        return ''
     query = urlencode({'exp': expires, 'sig': signature})
     return f'{base}/api/v1/public/payments/{payment_id}/receipt.pdf?{query}'

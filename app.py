@@ -115,7 +115,7 @@ csrf = CSRFProtect(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
-# login_manager.session_protection = 'strong'   # Disabled for now
+login_manager.session_protection = 'strong'
 
 # ---------- Register the REST API (/api/v1) ----------
 # register_api() attaches every sub-blueprint, mounts it on the app and marks
@@ -534,7 +534,7 @@ def server_error(e):
         }
         # The traceback is a development aid. Never in production - it names
         # file paths and can echo query values back to the browser.
-        if not _is_production_env():
+        if os.environ.get('DEBUG_TRACEBACK'):
             payload['traceback'] = traceback.format_exc()[-3000:]
         return jsonify(payload), 500
 
@@ -576,7 +576,7 @@ def api_exception(exc):
         'error': 'server_error',
         'detail': f'{type(exc).__name__}: {exc}'[:400],
     }
-    if not _is_production_env():
+    if os.environ.get('DEBUG_TRACEBACK'):
         payload['traceback'] = traceback.format_exc()[-3000:]
     return jsonify(payload), 500
 
@@ -1963,11 +1963,10 @@ def customer_add():
                 return render_template('customers/add.html', form=form, plans=plans, date=date, ref_id=ref_id)
 
         password = form.password.data
-        password_hash = None
-        if password:
-            password_hash = generate_password_hash(password)
-        else:
-            password_hash = generate_password_hash('123456')
+        if not password:
+            flash('Password is required. Please set a password for the customer.', 'danger')
+            return render_template('customers/add.html', form=form, plans=plans, date=date, ref_id=ref_id)
+        password_hash = generate_password_hash(password)
 
         reg_form_filename = None
         if form.reg_form.data:
