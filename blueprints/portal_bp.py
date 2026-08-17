@@ -527,6 +527,14 @@ def _save_proof(storage):
     ext = os.path.splitext(name)[1].lower()
     if ext not in PROOF_EXTENSIONS:
         return None
+
+    from services.cloudinary import is_enabled, upload
+    if is_enabled():
+        url = upload(storage, public_id=f'payment-proof-{secrets.token_hex(4)}')
+        if url:
+            return url
+        return None
+
     unique = f"{datetime.utcnow():%Y%m%d%H%M%S}-{secrets.token_hex(4)}{ext}"
     folder = os.path.join(current_app.root_path, 'static', PROOF_DIR)
     try:

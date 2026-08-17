@@ -1985,24 +1985,44 @@ def customer_add():
 
         reg_form_filename = None
         if form.reg_form.data:
-            file = form.reg_form.data
-            reg_form_filename = secure_filename(file.filename)
-            file.save(os.path.join(app.root_path, 'static', 'uploads', reg_form_filename))
+            from services.cloudinary import is_enabled, upload
+            if is_enabled():
+                url = upload(form.reg_form.data, public_id=f'cust-regform-{secrets.token_hex(4)}')
+                reg_form_filename = url or None
+            else:
+                file = form.reg_form.data
+                reg_form_filename = secure_filename(file.filename)
+                file.save(os.path.join(app.root_path, 'static', 'uploads', reg_form_filename))
         photo_filename = None
         if form.photo.data:
-            file = form.photo.data
-            photo_filename = secure_filename(file.filename)
-            file.save(os.path.join(app.root_path, 'static', 'uploads', photo_filename))
+            from services.cloudinary import is_enabled, upload
+            if is_enabled():
+                url = upload(form.photo.data, public_id=f'cust-photo-{secrets.token_hex(4)}')
+                photo_filename = url or None
+            else:
+                file = form.photo.data
+                photo_filename = secure_filename(file.filename)
+                file.save(os.path.join(app.root_path, 'static', 'uploads', photo_filename))
         address_proof_filename = None
         if form.address_proof.data:
-            file = form.address_proof.data
-            address_proof_filename = secure_filename(file.filename)
-            file.save(os.path.join(app.root_path, 'static', 'uploads', address_proof_filename))
+            from services.cloudinary import is_enabled, upload
+            if is_enabled():
+                url = upload(form.address_proof.data, public_id=f'cust-address-{secrets.token_hex(4)}')
+                address_proof_filename = url or None
+            else:
+                file = form.address_proof.data
+                address_proof_filename = secure_filename(file.filename)
+                file.save(os.path.join(app.root_path, 'static', 'uploads', address_proof_filename))
         id_proof_filename = None
         if form.id_proof.data:
-            file = form.id_proof.data
-            id_proof_filename = secure_filename(file.filename)
-            file.save(os.path.join(app.root_path, 'static', 'uploads', id_proof_filename))
+            from services.cloudinary import is_enabled, upload
+            if is_enabled():
+                url = upload(form.id_proof.data, public_id=f'cust-idproof-{secrets.token_hex(4)}')
+                id_proof_filename = url or None
+            else:
+                file = form.id_proof.data
+                id_proof_filename = secure_filename(file.filename)
+                file.save(os.path.join(app.root_path, 'static', 'uploads', id_proof_filename))
 
         try:
             customer = Customer(
@@ -2098,25 +2118,49 @@ def customer_edit(id):
         if form.password.data:
             customer.set_password(form.password.data)
         if form.reg_form.data:
-            file = form.reg_form.data
-            filename = secure_filename(file.filename)
-            customer.reg_form_file = filename
-            file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
+            from services.cloudinary import is_enabled, upload
+            if is_enabled():
+                url = upload(form.reg_form.data, public_id=f'cust{id}-regform-{secrets.token_hex(4)}')
+                if url:
+                    customer.reg_form_file = url
+            else:
+                file = form.reg_form.data
+                filename = secure_filename(file.filename)
+                customer.reg_form_file = filename
+                file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
         if form.photo.data:
-            file = form.photo.data
-            filename = secure_filename(file.filename)
-            customer.photo_file = filename
-            file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
+            from services.cloudinary import is_enabled, upload
+            if is_enabled():
+                url = upload(form.photo.data, public_id=f'cust{id}-photo-{secrets.token_hex(4)}')
+                if url:
+                    customer.photo_file = url
+            else:
+                file = form.photo.data
+                filename = secure_filename(file.filename)
+                customer.photo_file = filename
+                file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
         if form.address_proof.data:
-            file = form.address_proof.data
-            filename = secure_filename(file.filename)
-            customer.address_proof_file = filename
-            file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
+            from services.cloudinary import is_enabled, upload
+            if is_enabled():
+                url = upload(form.address_proof.data, public_id=f'cust{id}-address-{secrets.token_hex(4)}')
+                if url:
+                    customer.address_proof_file = url
+            else:
+                file = form.address_proof.data
+                filename = secure_filename(file.filename)
+                customer.address_proof_file = filename
+                file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
         if form.id_proof.data:
-            file = form.id_proof.data
-            filename = secure_filename(file.filename)
-            customer.id_proof_file = filename
-            file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
+            from services.cloudinary import is_enabled, upload
+            if is_enabled():
+                url = upload(form.id_proof.data, public_id=f'cust{id}-idproof-{secrets.token_hex(4)}')
+                if url:
+                    customer.id_proof_file = url
+            else:
+                file = form.id_proof.data
+                filename = secure_filename(file.filename)
+                customer.id_proof_file = filename
+                file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
         form.populate_obj(customer)
         if form.same_as_billing.data:
             customer.primary_address = customer.billing_address

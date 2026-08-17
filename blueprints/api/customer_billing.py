@@ -1020,13 +1020,23 @@ def customer_documents_upload(cid):
 
         # Prefix with the customer and a random token: two customers uploading
         # "aadhaar.jpg" must not overwrite one another.
-        stored = f'c{cid}-{field}-{secrets.token_hex(4)}{extension}'
-        try:
-            upload.save(os.path.join(folder, stored))
-        except OSError as exc:
-            rejected.append({'field': field, 'filename': original,
-                             'reason': f'Could not be saved: {str(exc)[:120]}'})
-            continue
+        from services.cloudinary import is_enabled, upload as _cloudinary_upload
+        if is_enabled():
+            url = _cloudinary_upload(upload, public_id=f'kyc-c{cid}-{field}-{secrets.token_hex(4)}')
+            if url:
+                stored = url
+            else:
+                rejected.append({'field': field, 'filename': original,
+                                 'reason': 'Cloudinary upload failed.'})
+                continue
+        else:
+            stored = f'c{cid}-{field}-{secrets.token_hex(4)}{extension}'
+            try:
+                upload.save(os.path.join(folder, stored))
+            except OSError as exc:
+                rejected.append({'field': field, 'filename': original,
+                                 'reason': f'Could not be saved: {str(exc)[:120]}'})
+                continue
 
         previous = getattr(customer, column, None)
         setattr(customer, column, stored)
