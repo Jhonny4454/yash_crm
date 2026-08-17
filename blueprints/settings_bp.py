@@ -247,6 +247,14 @@ def _save_banner(fs):
     fs.stream.seek(0)
     if size > 2 * 1024 * 1024:
         return False, "Banner image must be under 2 MB."
+
+    from services.cloudinary import is_enabled, upload
+    if is_enabled():
+        url = upload(fs, public_id='portal-banner')
+        if url:
+            return True, url
+        return False, 'Cloudinary upload failed. Check Settings > Cloudinary.'
+
     name = f"banner_{datetime.utcnow():%Y%m%d%H%M%S}{ext}"
     folder = os.path.join(current_app.root_path, 'static', 'uploads')
     os.makedirs(folder, exist_ok=True)

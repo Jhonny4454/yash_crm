@@ -257,7 +257,7 @@ FIELDS = {
         help='Where the portal banner takes the customer.'),
     'banner_image': dict(
         group='branding', order=11, input='text', label='Portal banner image',
-        help='Filename of an image already uploaded to static/uploads.'),
+        help='URL or filename of the portal banner image.'),
 
     # ---------------------------------------------------------- cloudinary --
     'cloudinary_enabled': dict(

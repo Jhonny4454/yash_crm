@@ -162,8 +162,12 @@ def _logo_path(explicit=None):
         # than a blank box - this returned None and printed nothing.
         return _bundled_logo(_root())
     if stored.startswith(('http://', 'https://')):
-        # A remote URL cannot be handed to ReportLab as a local file.
-        return _bundled_logo(_root())
+        # A remote URL (e.g. Cloudinary) — download to a temp file for ReportLab.
+        from services.cloudinary import download_to_temp
+        path = download_to_temp(stored)
+        if path and os.path.exists(path):
+            return path
+        return _bundled_logo(_root(), missing=stored)
 
     bare = stored.lstrip('/').split('/')[-1]
     root = _root()

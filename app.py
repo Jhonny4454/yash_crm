@@ -1310,10 +1310,15 @@ def zone_add():
     if form.validate_on_submit():
         logo_filename = None
         if form.logo.data:
-            file = form.logo.data
-            filename = secure_filename(file.filename)
-            logo_filename = filename
-            file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
+            from services.cloudinary import is_enabled, upload
+            if is_enabled():
+                url = upload(form.logo.data, public_id='zone-logo')
+                logo_filename = url or None
+            else:
+                file = form.logo.data
+                filename = secure_filename(file.filename)
+                logo_filename = filename
+                file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
         zone = Zone(
             name=form.name.data,
             code=form.code.data,
@@ -1348,10 +1353,15 @@ def zone_edit(id):
     form = ZoneForm(obj=zone)
     if form.validate_on_submit():
         if form.logo.data:
-            file = form.logo.data
-            filename = secure_filename(file.filename)
-            zone.logo = filename
-            file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
+            from services.cloudinary import is_enabled, upload
+            if is_enabled():
+                url = upload(form.logo.data, public_id=f'zone-{id}-logo')
+                zone.logo = url or zone.logo
+            else:
+                file = form.logo.data
+                filename = secure_filename(file.filename)
+                zone.logo = filename
+                file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
         form.populate_obj(zone)
         db.session.commit()
         log_audit('Edit Zone', f"Edited zone {zone.name}")
@@ -1507,10 +1517,15 @@ def company_edit():
         company.company_type = form.company_type.data
         company.invoice_notes = form.invoice_notes.data
         if form.company_logo.data:
-            file = form.company_logo.data
-            filename = secure_filename(file.filename)
-            company.company_logo = filename
-            file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
+            from services.cloudinary import is_enabled, upload
+            if is_enabled():
+                url = upload(form.company_logo.data, public_id='company-logo')
+                company.company_logo = url or company.company_logo
+            else:
+                file = form.company_logo.data
+                filename = secure_filename(file.filename)
+                company.company_logo = filename
+                file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
         selected_zone_ids = request.form.getlist('zones') if request.form.getlist('zones') else []
         company.zones = Zone.query.filter(Zone.id.in_(selected_zone_ids)).all()
         db.session.add(company)

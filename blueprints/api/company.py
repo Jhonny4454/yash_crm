@@ -124,6 +124,17 @@ def company_logo_upload(cid):
     if ext not in ALLOWED_LOGO_EXT:
         return fail('unsupported_file_type', 400)
 
+    from services.cloudinary import is_enabled, upload
+    if is_enabled():
+        url = upload(file, public_id=f'company-{cid}-logo')
+        if not url:
+            return fail('upload_failed', 500,
+                        detail='Cloudinary upload failed. Check credentials '
+                               'in Settings > Cloudinary.')
+        company.company_logo = url
+        db.session.commit()
+        return ok({'company_logo': url, 'logo_url': url})
+
     stamp = datetime.utcnow().strftime('%Y%m%d%H%M%S')
     filename = secure_filename(f'company-{cid}-{stamp}.{ext}')
     folder = os.path.join(current_app.root_path, 'static', UPLOAD_SUBDIR)

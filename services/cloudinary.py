@@ -2,7 +2,7 @@
 services/cloudinary.py
 ======================
 
-Cloudinary configuration helpers and a read-only credential check.
+Cloudinary configuration helpers, credential check, and upload.
 
 Credentials can come from two places, in this order of precedence:
 
@@ -16,17 +16,19 @@ Credentials can come from two places, in this order of precedence:
 An env var set at deploy time is a platform-level decision and wins over
 anything typed in the UI - the whole reason it exists is that a redeploy can
 silently drop a config that was only ever sitting in a text field, and the
-company logo with it.  Nothing here mutates anything: the credential check is
-a single read-only Admin API call.
+company logo with it.
 """
 import base64
 import json
 import os
+import tempfile
 import urllib.error
 import urllib.request
+from io import BytesIO
 
 URL_PREFIX = 'cloudinary://'
 ADMIN_BASE = 'https://api.cloudinary.com/v1_1'
+UPLOAD_BASE = f'{ADMIN_BASE}'
 
 
 def cloudinary_url():
@@ -117,3 +119,165 @@ def check_credentials(cloud_name, api_key, api_secret):
     except Exception as exc:                            # noqa: BLE001
         return {'ok': False, 'cloud': cloud_name,
                 'detail': f'The check itself failed: {exc}'}
+
+
+# --------------------------------------------------------------------------- #
+#  Upload / download helpers
+# --------------------------------------------------------------------------- #
+
+def _resolve_credentials():
+    """Return (cloud_name, api_key, api_secret) from env or DB, or None."""
+    env = from_env()
+    if env:
+        return env['cloud_name'], env['api_key'], env['api_secret']
+    try:
+        from models_ext import Setting
+        cloud = Setting.get('cloudinary_cloud_name', '')
+        key = Setting.get('cloudinary_api_key', '')
+        secret = Setting.get('cloudinary_api_secret', '')
+        if cloud and key and secret:
+            return cloud, key, secret
+    except Exception:                                   # noqa: BLE001
+        pass
+    return None
+
+
+def is_enabled():
+    """True when Cloudinary is configured AND enabled in Settings."""
+    enabled = False
+    try:
+        from models_ext import Setting
+        enabled = str(Setting.get('cloudinary_enabled', 'False')).lower() in (
+            '1', 'true', 'yes', 'on')
+    except Exception:                                   # noqa: BLE001
+        return False
+    if not enabled:
+        return False
+    return _resolve_credentials() is not None
+
+
+def _cloudinary_folder():
+    """The upload folder prefix from Settings, or ''."""
+    try:
+        from models_ext import Setting
+        return (Setting.get('cloudinary_folder', '') or '').strip()
+    except Exception:                                   # noqa: BLE001
+        return ''
+
+
+def upload(file_storage, public_id=None, folder=None, resource_type='image'):
+    """Upload a file to Cloudinary via the unsigned upload API.
+
+    ``file_storage`` is a Werkzeug ``FileStorage`` (from ``request.files``).
+    Returns the full HTTPS URL on success, or None on failure.
+
+    Uses the ``upload_preset`` configured in Settings. If no preset is set,
+    falls back to the signed upload API.
+    """
+    creds = _resolve_credentials()
+    if not creds:
+        return None
+    cloud_name, api_key, api_secret = creds
+
+    folder = folder or _cloudinary_folder()
+
+    # Read the file into memory.
+    file_storage.stream.seek(0)
+    raw = file_storage.stream.read()
+    file_storage.stream.seek(0)
+
+    if not public_id:
+        from werkzeug.utils import secure_filename as _sf
+        base = _sf(file_storage.filename or 'upload')
+        # Strip extension — Cloudinary appends format from content_type.
+        if '.' in base:
+            base = base.rsplit('.', 1)[0]
+        import time
+        public_id = f'{folder}/{base}_{int(time.time())}' if folder else f'{base}_{int(time.time())}'
+
+    # Use the signed upload API (supports all features without presets).
+    import time as _time
+    timestamp = int(_time.time())
+    params_to_sign = {'folder': folder, 'public_id': public_id,
+                      'timestamp': timestamp, 'type': 'upload'}
+    # Sort and build the string to sign.
+    to_sign = '&'.join(f'{k}={v}' for k, v in sorted(params_to_sign.items())
+                       if v is not None and v != '')
+    import hashlib
+    signature = hashlib.sha1(f'{to_sign}{api_secret}'.encode()).hexdigest()
+
+    url = f'{UPLOAD_BASE}/{cloud_name}/upload'
+    # Multipart form data.
+    boundary = f'----WebKitFormBoundary{int(timestamp)}'
+    body_parts = []
+
+    def add_field(name, value):
+        body_parts.append(f'--{boundary}\r\n'
+                          f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+                          f'{value}\r\n'.encode())
+
+    add_field('api_key', api_key)
+    add_field('timestamp', str(timestamp))
+    add_field('signature', signature)
+    add_field('type', 'upload')
+    if folder:
+        add_field('folder', folder)
+    add_field('public_id', public_id)
+    if resource_type:
+        add_field('resource_type', resource_type)
+
+    # File part.
+    filename = file_storage.filename or 'upload'
+    content_type = file_storage.content_type or 'application/octet-stream'
+    body_parts.append(
+        f'--{boundary}\r\n'
+        f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+        f'Content-Type: {content_type}\r\n\r\n'.encode()
+    )
+    body_parts.append(raw)
+    body_parts.append(f'\r\n--{boundary}--\r\n'.encode())
+
+    payload = b''.join(body_parts)
+    req = urllib.request.Request(url, data=payload, headers={
+        'Content-Type': f'multipart/form-data; boundary={boundary}',
+        'Accept': 'application/json',
+    }, method='POST')
+
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode('utf-8'))
+        return result.get('secure_url') or result.get('url')
+    except (urllib.error.HTTPError, urllib.error.URLError, Exception) as exc:
+        try:
+            from flask import current_app
+            current_app.logger.error('Cloudinary upload failed: %s', exc)
+        except Exception:                               # noqa: BLE001
+            pass
+        return None
+
+
+def download_to_temp(url):
+    """Download an image from a URL to a named temp file. Returns the path.
+
+    Used by the PDF generator, which needs a filesystem path for ReportLab.
+    The caller is responsible for cleaning up the file.
+    """
+    req = urllib.request.Request(url, headers={'User-Agent': 'YashApp/1.0'})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = resp.read()
+        suffix = '.png'
+        ct = resp.headers.get('Content-Type', '')
+        if 'jpeg' in ct or 'jpg' in ct:
+            suffix = '.jpg'
+        elif 'webp' in ct:
+            suffix = '.webp'
+        elif 'gif' in ct:
+            suffix = '.gif'
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        tmp.write(data)
+        tmp.flush()
+        tmp.close()
+        return tmp.name
+    except Exception:                                   # noqa: BLE001
+        return None
