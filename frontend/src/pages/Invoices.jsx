@@ -78,7 +78,7 @@ export default function Invoices() {
                       <td className="right num">{inr(i.total_amount)}</td>
                       <td className="right num">{inr(i.paid_amount)}</td>
                       <td className="right num">
-                        <strong style={{ color: i.balance > 0 ? "var(--danger)" : "inherit" }}>
+                        <strong style={{ color: i.balance > 0 && i.status !== 'cancelled' ? "var(--danger)" : "inherit" }}>
                           {inr(i.balance)}
                         </strong>
                       </td>

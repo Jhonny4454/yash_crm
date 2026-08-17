@@ -173,9 +173,14 @@ def _install_headers(app):
         # wildcard covers payments.cashfree.com, payments-test.cashfree.com and
         # whatever else the hosted flow reaches for, in both environments.
         cashfree = 'https://*.cashfree.com'
+        # In production, strip localhost/dev origins from connect-src so the
+        # CSP doesn't widen the attack surface with development URLs.
+        origins = _origins(app)
+        if _is_production(app):
+            origins = [o for o in origins if o.startswith('https://')]
         response.headers.setdefault('Content-Security-Policy', '; '.join([
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' "
+            "script-src 'self' 'unsafe-inline' "
             "https://cdnjs.cloudflare.com https://cdn.jsdelivr.net "
             f"{cashfree} https://code.jquery.com "
             "https://stackpath.bootstrapcdn.com",
@@ -185,7 +190,7 @@ def _install_headers(app):
             "font-src 'self' data: https://cdnjs.cloudflare.com "
             f"https://fonts.gstatic.com {cashfree}",
             "img-src 'self' data: blob: https:",
-            "connect-src 'self' " + ' '.join(_origins(app) + [cashfree]),
+            "connect-src 'self' " + ' '.join(origins + [cashfree]),
             f"frame-src 'self' {cashfree}",
             # Where the checkout is allowed to POST. Netbanking and some UPI
             # flows submit a form out to the bank; form-action does NOT fall

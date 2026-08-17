@@ -54,6 +54,9 @@ CUSTOMER_NULLABLE_UNIQUE = ('username', 'reference_id')
 
 def _assign_customer_fields(customer, data):
     """Copy the writable fields off the payload, normalising empties."""
+    email = data.get('email')
+    if email and '@' not in str(email).strip():
+        return None, 'Invalid email address format.'
     for field in CUSTOMER_WRITABLE:
         if field not in data:
             continue
@@ -279,7 +282,9 @@ def customer_create():
             return fail('username_unavailable', 409, detail=reason)
 
     customer = Customer()
-    _assign_customer_fields(customer, data)
+    result = _assign_customer_fields(customer, data)
+    if isinstance(result, tuple) and result[0] is None:
+        return fail('invalid_email', 400, detail=result[1])
 
     password = data.get('password')
     if password:
@@ -372,7 +377,9 @@ def customer_update(cid):
                            'has been created.')
     data.pop('username', None)
 
-    _assign_customer_fields(customer, data)
+    result = _assign_customer_fields(customer, data)
+    if isinstance(result, tuple) and result[0] is None:
+        return fail('invalid_email', 400, detail=result[1])
 
     password = data.get('password')
     if password:

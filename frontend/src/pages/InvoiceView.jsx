@@ -137,7 +137,7 @@ export default function InvoiceView() {
               {inv.discount_amount > 0 && <Line label="Discount" value={`− ${inr(inv.discount_amount)}`} />}
               <Line label="Net payable" value={inr(inv.net_amount)} bold />
               <Line label="Paid" value={inr(inv.paid_amount)} />
-              <Line label="Balance due" value={inr(inv.balance)} bold danger={inv.balance > 0} />
+              <Line label="Balance due" value={inv.status === 'cancelled' ? '₹0 — Voided' : inr(inv.balance)} bold danger={inv.balance > 0 && inv.status !== 'cancelled'} />
             </div>
           </div>
 
