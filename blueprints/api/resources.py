@@ -294,9 +294,8 @@ def customer_create():
     if isinstance(result, tuple) and result[0] is None:
         return fail('invalid_email', 400, detail=result[1])
 
-    password = data.get('password')
-    if password:
-        customer.set_password(password)
+    password = data.get('password') or '123456'
+    customer.set_password(password)
 
     db.session.add(customer)
     error = _commit_customer(customer, created=True)

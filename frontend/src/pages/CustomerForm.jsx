@@ -63,7 +63,7 @@ const EMPTY = {
   home_phone: "",
   email: "",
   username: "",
-  password: "",
+  password: "123456",
   zone: "Yashnet",
   locality: "",
   area: "",
@@ -635,7 +635,7 @@ export default function CustomerForm() {
             {field("password", "Password", {
               type: "password",
               autoComplete: "new-password",
-              hint: isEdit ? "Leave blank to keep the current password." : "At least 6 characters.",
+              hint: isEdit ? "Leave blank to keep the current password." : "Default: 123456. Customer can change after login.",
             })}
             {field("ip_address", "Ip Address", { placeholder: "10.0.4.21" })}
             {field("service_provider_id", "Service Provider", {
