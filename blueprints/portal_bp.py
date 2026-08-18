@@ -220,7 +220,7 @@ def reset_password():
         flash('The two passwords do not match.', 'danger')
         return redirect(url_for('portal.forgot_password'))
     if len(password) < 8:
-        flash('Please use a password of at least 6 characters.', 'danger')
+        flash('Please use a password of at least 8 characters.', 'danger')
         return redirect(url_for('portal.forgot_password'))
 
     customer.set_password(password)

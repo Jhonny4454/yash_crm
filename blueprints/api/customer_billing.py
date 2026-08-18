@@ -27,8 +27,8 @@ from models import (AuditLog, Customer, CustomerPlan, DiscountReason, Invoice,
                     InventoryAssignment, MessageLog, Payment, Plan, db)
 
 from .serializers import customer_plan_dict, invoice_dict, payment_dict
-from .utils import (admin_required, body, current_staff_id, fail, iso, money,
-                    ok, paginate, staff_required)
+from .utils import (admin_required, body, current_staff_id, escape_like,
+                    fail, iso, money, ok, paginate, staff_required)
 
 bp = Blueprint('api_customer_billing', __name__)
 
@@ -744,10 +744,10 @@ def customer_log(cid):
     name = customer.full_name or ''
     conditions = [AuditLog.customer_id == cid]
     if name.strip():
-        conditions.append(AuditLog.details.ilike(f'%{name}%'))
+        conditions.append(AuditLog.details.ilike(f'%{escape_like(name)}%'))
     for handle in (customer.username, customer.reference_id):
         if handle:
-            conditions.append(AuditLog.details.ilike(f'%{handle}%'))
+            conditions.append(AuditLog.details.ilike(f'%{escape_like(handle)}%'))
 
     query = AuditLog.query.filter(or_(*conditions)).order_by(
         AuditLog.created_at.desc(), AuditLog.id.desc())

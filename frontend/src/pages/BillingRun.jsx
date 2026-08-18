@@ -231,7 +231,7 @@ export default function BillingRun() {
           </Field>
           <Field label="Payable within (days)">
             <MoneyInput max={180} value={dueDays}
-                        onChange={(e) => setDueDays(e.target.value)} />
+                        onChange={(e) => setDueDays(Number(e.target.value) || 15)} />
           </Field>
           <p className="run-note">
             Raising a bill does not extend the connection. The plan's expiry
