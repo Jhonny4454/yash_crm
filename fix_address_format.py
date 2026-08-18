@@ -1,0 +1,11 @@
+import pymysql
+conn = pymysql.connect(host='sakura.proxy.rlwy.net', port=42443, user='root', password='NHdgWnKBJMCenGfIgaZMQDtQZdbDoPaI', database='railway')
+cur = conn.cursor()
+cur.execute("UPDATE customers SET billing_address = REPLACE(billing_address, ' -> ', ', ') WHERE billing_address LIKE '%% -> %%'")
+print(f'billing_address fixed: {cur.rowcount}')
+cur.execute("UPDATE customers SET primary_address = REPLACE(primary_address, ' -> ', ', ') WHERE primary_address LIKE '%% -> %%'")
+print(f'primary_address fixed: {cur.rowcount}')
+conn.commit()
+cur.close()
+conn.close()
+print('Done')

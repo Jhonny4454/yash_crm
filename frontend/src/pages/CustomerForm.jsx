@@ -289,9 +289,9 @@ export default function CustomerForm() {
   /* ---- auto-generate billing address from fields ----------------------- */
   const autoBillingAddress = useMemo(() => {
     const parts = [form.flat_no, form.building, form.area, form.locality]
-      .filter(Boolean);
+      .filter((v) => v && v !== '-');
     if (parts.length === 0) return "";
-    return parts.join(" -> ") + ", Navi Mumbai, Maharashtra";
+    return parts.join(', ') + ', Navi Mumbai, Maharashtra';
   }, [form.flat_no, form.building, form.area, form.locality]);
 
   /** Mirror the billing address into the primary one while the box is ticked. */
