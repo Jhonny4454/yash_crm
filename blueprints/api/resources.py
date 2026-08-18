@@ -705,6 +705,10 @@ def payment_create():
     if not invoice:
         return fail('invoice_not_found', 404)
 
+    from models import User as _User
+    _current_user = _User.query.get(current_staff_id())
+    _is_admin = _current_user.is_admin() if _current_user else False
+
     payment = Payment(
         invoice_id=invoice.id,
         customer_id=invoice.customer_id,
@@ -715,8 +719,10 @@ def payment_create():
         mode_detail=data.get('mode_detail'),
         book_receipt_no=data.get('book_receipt_no'),
         remarks=data.get('remarks'),
-        status='approved',
+        status='approved' if _is_admin else 'pending',
         source='admin',
+        authorized_at=datetime.utcnow() if _is_admin else None,
+        authorized_by_user_id=current_staff_id() if _is_admin else None,
         received_by_user_id=current_staff_id(),
     )
     db.session.add(payment)

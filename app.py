@@ -2,6 +2,7 @@ import os
 import re
 import traceback
 
+from sqlalchemy.exc import IntegrityError
 from werkzeug.exceptions import HTTPException
 import csv
 import time
@@ -74,22 +75,7 @@ if not app.config.get('SECRET_KEY') or app.config.get('SECRET_KEY') in ('dev', '
           "environment for production.")
 
 _prod = os.environ.get('FLASK_ENV') == 'production'
-# ==================== DISABLED SECURITY FEATURES ====================
-# The following settings are commented out to disable security features.
-# Uncomment them when you are ready to re-enable protection.
-# app.config.update(
-#     SESSION_COOKIE_HTTPONLY=True,
-#     SESSION_COOKIE_SAMESITE='Lax',
-#     SESSION_COOKIE_SECURE=_prod,
-#     SESSION_COOKIE_NAME='yash_session',
-#     REMEMBER_COOKIE_HTTPONLY=True,
-#     REMEMBER_COOKIE_SECURE=_prod,
-#     REMEMBER_COOKIE_SAMESITE='Lax',
-#     PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
-#     WTF_CSRF_TIME_LIMIT=7200,
-#     WTF_CSRF_SSL_STRICT=_prod,
-#     MAX_CONTENT_LENGTH=16 * 1024 * 1024,
-# )
+
 app.config.update(
     MAX_CONTENT_LENGTH=16 * 1024 * 1024,
 )
@@ -173,8 +159,12 @@ def generate_invoice_no():
         ).scalar()
         seq = (last + 1 + attempt) if last else (1 + attempt)
         candidate = f"INV-{today}-{seq:04d}"
-        if not Invoice.query.filter_by(invoice_no=candidate).first():
-            return candidate
+        try:
+            if not Invoice.query.filter_by(invoice_no=candidate).first():
+                return candidate
+        except IntegrityError:
+            db.session.rollback()
+            continue
     return f"INV-{today}-{secrets.token_hex(4).upper()}"
 
 def _vendor_choices(include_blank=True):
@@ -190,7 +180,6 @@ def generate_reference_id():
 @app.context_processor
 def inject_template_helpers():
     return dict(
-        generate_invoice_no=generate_invoice_no,
         payment_mode_choices=PAYMENT_MODE_CHOICES,
         today=date.today(),
     )
@@ -296,49 +285,6 @@ def send_template_message(customer, template_type, context=None, *,
                   f"({result.status})")
     return result
 
-# ===================== DISABLED RATE LIMITING =====================
-# The following rate-limiting functions are commented out.
-# _login_attempts = {}
-# _login_lock = Lock()
-# MAX_ATTEMPTS = 5
-# LOCKOUT_WINDOW_SECONDS = 300
-
-# def _rate_limit_key(ip, username):
-#     return f"{ip}:{(username or '').strip().lower()}"
-
-# def is_rate_limited(ip, username):
-#     now = datetime.utcnow()
-#     key = _rate_limit_key(ip, username)
-#     with _login_lock:
-#         stale = [k for k, (t, _c) in _login_attempts.items()
-#                  if (now - t).total_seconds() > LOCKOUT_WINDOW_SECONDS]
-#         for k in stale:
-#             _login_attempts.pop(k, None)
-#         if key not in _login_attempts:
-#             return False
-#         last_time, count = _login_attempts[key]
-#         if (now - last_time).total_seconds() > LOCKOUT_WINDOW_SECONDS:
-#             _login_attempts.pop(key, None)
-#             return False
-#         return count >= MAX_ATTEMPTS
-
-# def register_failed_attempt(ip, username):
-#     now = datetime.utcnow()
-#     key = _rate_limit_key(ip, username)
-#     with _login_lock:
-#         if key not in _login_attempts:
-#             _login_attempts[key] = [now, 1]
-#         else:
-#             last_time, count = _login_attempts[key]
-#             if (now - last_time).total_seconds() > LOCKOUT_WINDOW_SECONDS:
-#                 _login_attempts[key] = [now, 1]
-#             else:
-#                 _login_attempts[key][1] = count + 1
-
-# def clear_attempts(ip, username):
-#     with _login_lock:
-#         _login_attempts.pop(_rate_limit_key(ip, username), None)
-# ===================================================================
 
 # ---------- Access control ----------
 def admin_required(f):
@@ -798,13 +744,6 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     form = LoginForm()
-    # client_ip = request.remote_addr
-    # submitted_username = form.username.data if request.method == 'POST' else None
-
-    # Rate limiting disabled
-    # if request.method == 'POST' and is_rate_limited(client_ip, submitted_username):
-    #     flash('Too many login attempts. Please wait 5 minutes and try again.', 'danger')
-    #     return render_template('login.html', form=form), 429
 
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
@@ -812,12 +751,10 @@ def login():
             session.permanent = True
             login_user(user, remember=form.remember.data)
             log_audit('Login', f"User {user.username} logged in")
-            # clear_attempts(client_ip, submitted_username)
             next_page = request.args.get('next')
             if next_page and urlsplit(next_page).netloc == '' and next_page.startswith('/'):
                 return redirect(next_page)
             return redirect(url_for('dashboard'))
-        # register_failed_attempt(client_ip, submitted_username)
         from security import record_web_login_failure
         record_web_login_failure(form.username.data or '')
         log_audit('Failed Login', f"Failed login attempt for username '{form.username.data}'")
@@ -1980,11 +1917,14 @@ def customer_add():
 
         username = form.username.data.strip() if form.username.data else None
         if not username:
-            while True:
+            for _ in range(100):
                 candidate = f"cust_{secrets.token_hex(4)}"
                 if not User.query.filter_by(username=candidate).first() and not Customer.query.filter_by(username=candidate).first():
                     username = candidate
                     break
+            else:
+                flash('Could not generate a unique username. Please try again.', 'danger')
+                return render_template('customers/add.html', form=form, plans=plans, date=date, ref_id=ref_id)
         else:
             if User.query.filter_by(username=username).first() or Customer.query.filter_by(username=username).first():
                 flash(f'Username "{username}" is already taken. Please choose another.', 'danger')
@@ -2083,7 +2023,11 @@ def customer_add():
             if plan_id and plan_start_date_str:
                 plan = Plan.query.get(plan_id)
                 if plan:
-                    start_date = datetime.strptime(plan_start_date_str, '%Y-%m-%d').date()
+                    try:
+                        start_date = datetime.strptime(plan_start_date_str, '%Y-%m-%d').date()
+                    except (ValueError, TypeError):
+                        flash('Invalid plan start date. Use YYYY-MM-DD.', 'danger')
+                        return render_template('customers/add.html', form=form, plans=plans, date=date, ref_id=ref_id)
                     end_date = start_date + timedelta(days=plan.validity_days or 30)
                     customer_plan = CustomerPlan(
                         customer_id=customer.id,
@@ -2105,7 +2049,7 @@ def customer_add():
         except Exception as e:
             db.session.rollback()
             app.logger.exception("Database error while saving customer")
-            flash(f'Error saving customer: {str(e)}', 'danger')
+            flash('An unexpected error occurred while saving the customer. Please try again.', 'danger')
             return render_template('customers/add.html', form=form, plans=plans, date=date, ref_id=ref_id)
     else:
         if form.errors:
@@ -2177,10 +2121,15 @@ def customer_edit(id):
         form.populate_obj(customer)
         if form.same_as_billing.data:
             customer.primary_address = customer.billing_address
-        db.session.commit()
-        log_audit('Edit Customer', f"Edited customer {customer.full_name}")
-        flash('Customer updated.', 'success')
-        return redirect(url_for('customer_view', id=id))
+        try:
+            db.session.commit()
+            log_audit('Edit Customer', f"Edited customer {customer.full_name}")
+            flash('Customer updated.', 'success')
+            return redirect(url_for('customer_view', id=id))
+        except Exception as e:
+            db.session.rollback()
+            app.logger.exception("Database error while editing customer")
+            flash('An unexpected error occurred while saving the customer. Please try again.', 'danger')
     return render_template('customers/edit.html', form=form, customer=customer)
 
 # ===== CUSTOMER LEDGER =====
@@ -2845,7 +2794,11 @@ def assign_plan(customer_id):
         flash('Please select a plan and start date.', 'danger')
         return redirect(url_for('customer_view', id=customer_id))
     plan = Plan.query.get_or_404(plan_id)
-    start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+    try:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+    except (ValueError, TypeError):
+        flash('Invalid date format. Use YYYY-MM-DD.', 'danger')
+        return redirect(url_for('customer_view', id=customer_id))
     end_date = start_date + timedelta(days=plan.validity_days)
     # Same rule as the REST endpoint: every open row closes, so this screen
     # cannot leave a customer on two plans either.
@@ -2890,7 +2843,6 @@ def renew_plan(customer_id):
     active_plan.end_date = new_end_date
     active_plan.status = 'active'
     active_plan.last_invoice_date = date.today()
-    db.session.commit()
     invoice = Invoice(
         customer_id=customer_id,
         invoice_no=generate_invoice_no(),
@@ -2937,7 +2889,11 @@ def record_payment(invoice_id):
         flash('Invalid amount.', 'danger')
         return redirect(url_for('customer_view', id=customer.id))
 
-    payment_date = datetime.strptime(payment_date_str, '%Y-%m-%d').date() if payment_date_str else date.today()
+    try:
+        payment_date = datetime.strptime(payment_date_str, '%Y-%m-%d').date() if payment_date_str else date.today()
+    except (ValueError, TypeError):
+        flash('Invalid payment date format. Use YYYY-MM-DD.', 'danger')
+        return redirect(url_for('customer_view', id=customer.id))
 
     final_mode_detail = mode_detail
     if bank_name:
@@ -2960,12 +2916,12 @@ def record_payment(invoice_id):
         remarks=remarks or None,
         received_by_user_id=current_user.id,
         source='admin',
-        status='approved',
+        status='pending' if needs_auth else 'approved',
         authorized_at=None if needs_auth else datetime.utcnow(),
         authorized_by_user_id=None if needs_auth else current_user.id,
     )
     db.session.add(payment)
-    db.session.commit()
+    db.session.flush()
     if not invoice.caption:
         invoice.caption = payment.payment_mode
     if invoice.balance <= 0:
@@ -3132,7 +3088,8 @@ def add_payment(invoice_id):
             received_by_user_id=current_user.id
         )
         db.session.add(payment)
-        invoice.status = 'paid' if invoice.total_amount <= invoice.paid_amount + payment.amount else 'sent'
+        db.session.flush()
+        invoice.status = 'paid' if invoice.total_amount <= invoice.paid_amount else 'sent'
         db.session.commit()
         log_audit('Add Payment', f"Added payment {payment.amount} to invoice {invoice.invoice_no}")
         flash('Payment recorded.', 'success')
@@ -4449,11 +4406,6 @@ def customer_login():
     if form.validate_on_submit():
         ip = request.remote_addr
         uname = (form.username.data or '').strip()
-        # Rate limiting disabled
-        # if is_rate_limited(ip, uname):
-        #     flash('Too many failed attempts. Please try again in a few minutes.',
-        #           'danger')
-        #     return render_template('customer/login.html', form=form)
 
         customer = Customer.query.filter_by(username=uname).first()
         if customer and customer.password_hash and customer.check_password(form.password.data):
@@ -4461,7 +4413,6 @@ def customer_login():
                 flash('Your connection is currently disabled. Please contact support.',
                       'warning')
                 return render_template('customer/login.html', form=form)
-            # clear_attempts(ip, uname)
             session['customer_id'] = customer.id
             session.permanent = True
             log_audit('Customer Login', f"Customer {customer.full_name} logged in")
@@ -4469,7 +4420,6 @@ def customer_login():
             if nxt and urlsplit(nxt).netloc == '' and nxt.startswith('/'):
                 return redirect(nxt)
             return redirect(url_for('customer_dashboard'))
-        # register_failed_attempt(ip, uname)
         from security import record_web_login_failure
         record_web_login_failure(uname)
         flash('Invalid username or password.', 'danger')
@@ -4640,6 +4590,7 @@ def customer_renew_plan():
 
 def _settle_online_order(order):
     """Confirm a Cashfree order and credit the money. Idempotent – safe to call from both the return URL and the webhook."""
+    order = db.session.query(OnlinePaymentOrder).with_for_update().get(order.id)
     if order.status == 'paid':
         return order
 
@@ -4761,6 +4712,14 @@ def cashfree_webhook():
     if not cashfree.verify_webhook(raw, signature, timestamp):
         app.logger.warning('Rejected Cashfree webhook with a bad signature.')
         return jsonify(status='invalid signature'), 401
+
+    try:
+        ts = int(timestamp)
+        if abs(datetime.utcnow().timestamp() - ts) > 300:
+            app.logger.warning('Rejected stale Cashfree webhook (timestamp %s)', timestamp)
+            return jsonify(status='stale webhook'), 410
+    except (ValueError, TypeError):
+        return jsonify(status='invalid timestamp'), 400
 
     payload = request.get_json(silent=True) or {}
     order_id = (payload.get('data', {}).get('order', {}) or {}).get('order_id')
