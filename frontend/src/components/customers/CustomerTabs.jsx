@@ -79,8 +79,9 @@ export function OverviewTab({ customer, outstanding, onRefresh }) {
 }
 
 function addressLine(customer) {
-  return [customer.flat_no, customer.building, customer.locality, customer.area]
-    .filter(Boolean).join(", ");
+  return [customer.flat_no, customer.building, customer.area, customer.locality]
+    .filter((v) => v && v !== '-')
+    .join(' -> ') + (customer.locality ? ', Navi Mumbai, Maharashtra' : '');
 }
 
 function Row({ label, value, mono }) {

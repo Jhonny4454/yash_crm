@@ -68,6 +68,13 @@ def _assign_customer_fields(customer, data):
         elif field in ('invoice_date',) and not value:
             value = None
         setattr(customer, field, value)
+
+    if not customer.billing_address:
+        parts = [customer.flat_no, customer.building, customer.area, customer.locality]
+        parts = [p for p in parts if p and p != '-']
+        if parts:
+            customer.billing_address = ' -> '.join(parts) + ', Navi Mumbai, Maharashtra'
+
     return customer
 
 

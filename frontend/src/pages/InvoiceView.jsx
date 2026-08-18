@@ -101,7 +101,7 @@ export default function InvoiceView() {
               <strong>{cust.full_name}</strong>
               <div className="num" style={{ fontSize: 13 }}>{cust.mobile}</div>
               <div style={{ fontSize: 13, color: "var(--ink-soft)", whiteSpace: "pre-line" }}>
-                {cust.billing_address || [cust.flat_no, cust.building, cust.locality, cust.area].filter(Boolean).join(", ")}
+                {cust.billing_address || [cust.flat_no, cust.building, cust.area, cust.locality].filter((v) => v && v !== '-').join(' -> ') + (cust.locality ? ', Navi Mumbai, Maharashtra' : '')}
               </div>
               {cust.gstin && <div className="num" style={{ fontSize: 12.5 }}>GSTIN: {cust.gstin}</div>}
             </div>

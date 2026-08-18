@@ -722,6 +722,11 @@ class Building(db.Model):
     __tablename__ = 'buildings'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+    locality_id = db.Column(db.Integer, db.ForeignKey('localities.id'), nullable=True)
+    area_id = db.Column(db.Integer, db.ForeignKey('areas.id'), nullable=True)
+
+    locality = db.relationship('Locality', backref='buildings', lazy=True)
+    area = db.relationship('Area', backref='buildings', lazy=True)
 
 
 class TaxMaster(db.Model):

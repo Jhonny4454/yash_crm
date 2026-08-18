@@ -64,7 +64,7 @@ const EMPTY = {
   email: "",
   username: "",
   password: "",
-  zone: "",
+  zone: "Yashnet",
   locality: "",
   area: "",
   building: "",
@@ -76,7 +76,7 @@ const EMPTY = {
   gstin: "",
   pan: "",
   aadhar: "",
-  tax_type: "Taxable",
+  tax_type: "Non-Taxable",
   is_active: true,
   registration_date: today(),
   billing_type: "Prepaid",
@@ -148,9 +148,10 @@ export default function CustomerForm() {
 
   const [zones, setZones] = useState([]);
   const [localities, setLocalities] = useState([]);
-  const [areas, setAreas] = useState([]);
-  const [buildings, setBuildings] = useState([]);
+  const [allAreas, setAllAreas] = useState([]);
+  const [allBuildings, setAllBuildings] = useState([]);
   const [providers, setProviders] = useState([]);
+  const [l2sProviderId, setL2sProviderId] = useState("");
 
   // Plan choice, KYC files and the address mirror are not Customer columns, so
   // they live beside the form rather than inside it.
@@ -178,19 +179,31 @@ export default function CustomerForm() {
       get("/masters/zones", { per_page: 200 }),
       get("/masters/localities", { per_page: 200 }),
       get("/masters/areas", { per_page: 200 }),
-      get("/masters/buildings", { per_page: 200 }),
+      get("/masters/buildings", { per_page: 500 }),
       get("/service-providers"),
     ]).then(([z, l, a, b, sp]) => {
       if (cancelled) return;
       if (z.status === "fulfilled") setZones(pick(z.value));
       if (l.status === "fulfilled") setLocalities(pick(l.value));
-      if (a.status === "fulfilled") setAreas(pick(a.value));
-      if (b.status === "fulfilled") setBuildings(pick(b.value));
-      if (sp.status === "fulfilled") setProviders(pick(sp.value));
+      if (a.status === "fulfilled") setAllAreas(pick(a.value));
+      if (b.status === "fulfilled") setAllBuildings(pick(b.value));
+      if (sp.status === "fulfilled") {
+        const list = pick(sp.value);
+        setProviders(list);
+        const l2s = list.find((p) => p.name === "L2S");
+        if (l2s) setL2sProviderId(String(l2s.id));
+      }
     });
 
     return () => { cancelled = true; };
   }, []);
+
+  /* ---- set L2S default for new customers once providers load ----------- */
+  useEffect(() => {
+    if (!isEdit && l2sProviderId && !form.service_provider_id) {
+      setForm((prev) => ({ ...prev, service_provider_id: l2sProviderId }));
+    }
+  }, [l2sProviderId, isEdit]);
 
   /* ---- existing record when editing ------------------------------------ */
   useEffect(() => {
@@ -226,7 +239,19 @@ export default function CustomerForm() {
 
   function change(event) {
     const { name, type, value, checked } = event.target;
-    setForm((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
+    setForm((prev) => {
+      const next = { ...prev, [name]: type === "checkbox" ? checked : value };
+      // Cascade: reset area and building when locality changes
+      if (name === "locality") {
+        next.area = "";
+        next.building = "";
+      }
+      // Cascade: reset building when area changes
+      if (name === "area") {
+        next.building = "";
+      }
+      return next;
+    });
     // A server-side error on this field is stale as soon as it is edited.
     setServerErrors((prev) => {
       if (!(name in prev)) return prev;
@@ -236,8 +261,41 @@ export default function CustomerForm() {
     });
   }
 
+  /* ---- cascading address dropdowns -------------------------------------- */
+  // Derive which areas exist for the selected locality (from buildings table)
+  const filteredAreas = useMemo(() => {
+    if (!form.locality) return allAreas;
+    const locObj = localities.find((l) => l.name === form.locality);
+    if (!locObj) return allAreas;
+    const areaIds = new Set(
+      allBuildings.filter((b) => b.locality_id === locObj.id).map((b) => b.area_id)
+    );
+    if (areaIds.size === 0) return allAreas;
+    return allAreas.filter((a) => areaIds.has(a.id));
+  }, [form.locality, allAreas, allBuildings, localities]);
+
+  // Derive which buildings exist for the selected locality + area
+  const filteredBuildings = useMemo(() => {
+    if (!form.locality && !form.area) return allBuildings;
+    const locObj = localities.find((l) => l.name === form.locality);
+    const areaObj = allAreas.find((a) => a.name === form.area);
+    return allBuildings.filter((b) => {
+      if (locObj && b.locality_id !== locObj.id) return false;
+      if (areaObj && b.area_id !== areaObj.id) return false;
+      return true;
+    });
+  }, [form.locality, form.area, allBuildings, localities, allAreas]);
+
+  /* ---- auto-generate billing address from fields ----------------------- */
+  const autoBillingAddress = useMemo(() => {
+    const parts = [form.flat_no, form.building, form.area, form.locality]
+      .filter(Boolean);
+    if (parts.length === 0) return "";
+    return parts.join(" -> ") + ", Navi Mumbai, Maharashtra";
+  }, [form.flat_no, form.building, form.area, form.locality]);
+
   /** Mirror the billing address into the primary one while the box is ticked. */
-  const primaryAddress = sameAsBilling ? form.billing_address : form.primary_address;
+  const primaryAddress = sameAsBilling ? (autoBillingAddress || form.billing_address) : form.primary_address;
 
   function chooseFile(field, fileList) {
     const file = fileList?.[0];
@@ -326,10 +384,15 @@ export default function CustomerForm() {
     const payload = {};
     for (const [key, value] of Object.entries(form)) {
       if (key === "password" && !value) continue;
+      if (key === "billing_address") continue;
       payload[key] = typeof value === "string" && value.trim() === "" ? null : value;
     }
+    payload.billing_address = autoBillingAddress || null;
     payload.primary_address = primaryAddress?.trim() ? primaryAddress : null;
     payload.billing_type = "Prepaid";
+    if (!payload.service_provider_id && l2sProviderId) {
+      payload.service_provider_id = l2sProviderId;
+    }
 
     // A plan is only assigned on create. Changing an existing customer's plan
     // goes through Assign/Change on the Plan tab, which terminates the old one
@@ -502,12 +565,16 @@ export default function CustomerForm() {
               as: "select", options: localities.map((l) => l.name), allowEmpty: "-Select-",
             })}
             {field("area", "Area", {
-              as: "select", options: areas.map((a) => a.name), allowEmpty: "-Select-",
+              as: "select", options: filteredAreas.map((a) => a.name), allowEmpty: "-Select-",
             })}
             {field("building", "Building", {
-              as: "select", options: buildings.map((b) => b.name), allowEmpty: "-Select-",
+              as: "select", options: ["-", ...filteredBuildings.map((b) => b.name)], allowEmpty: "-Select-",
             })}
-            {field("billing_address", "Billing address", { as: "textarea", span: 2 })}
+            <div className="field" style={{ gridColumn: "span 2" }}>
+              <label>Billing Address (auto-generated)</label>
+              <textarea readOnly rows={2} value={autoBillingAddress}
+                style={{ background: "#f5f5f5", cursor: "default", resize: "none" }} />
+            </div>
           </div>
         </fieldset>
 
@@ -526,9 +593,9 @@ export default function CustomerForm() {
           {sameAsBilling && (
             <p className="hint">
               The installation address will be saved as{" "}
-              {form.billing_address?.trim()
-                ? <strong>{form.billing_address}</strong>
-                : "the billing address once you fill that in above"}.
+              {autoBillingAddress
+                ? <strong>{autoBillingAddress}</strong>
+                : "the billing address once you fill in the address fields above"}.
             </p>
           )}
         </fieldset>
