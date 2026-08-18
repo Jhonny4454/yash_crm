@@ -364,7 +364,7 @@ def _encrypt_plaintext_secrets(app):
     """
     with app.app_context():
         from models_ext import ENCRYPTED_SETTINGS, FERNET_PREFIX, encrypt_setting_value
-        from models import Setting
+        from models_ext import Setting
         updated = []
         for key in ENCRYPTED_SETTINGS:
             row = Setting.query.filter_by(key=key).first()
