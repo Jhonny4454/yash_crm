@@ -71,13 +71,13 @@ export default function IspIntegrations() {
           <p>Credentials for the upstream provider APIs used to activate, suspend and renew connections.</p>
         </div>
         {isAdmin && (
-          <button className="btn primary" onClick={() => setEditing({})}>
+          <button className="btn primary" onClick={() => setEditing({})} style={{ borderRadius: 8, padding: "9px 18px" }}>
             <i className="fas fa-plus" aria-hidden="true" /> Add integration
           </button>
         )}
       </div>
 
-      <div className="filter-chips" role="tablist" style={{ marginBottom: "1rem" }}>
+      <div className="filter-chips" role="tablist" style={{ marginBottom: "1.25rem" }}>
         <button type="button" role="tab" aria-selected={tab === "credentials"}
                 className={tab === "credentials" ? "chip is-active" : "chip"}
                 onClick={() => setTab("credentials")}>
@@ -95,7 +95,7 @@ export default function IspIntegrations() {
       ) : (
         <>
           <ErrorNote error={error} onRetry={refetch} />
-          <div className="card">
+          <div className="card" style={{ borderRadius: 12, overflow: "hidden" }}>
             <div className="table-wrap">
               {loading ? (
                 <Loading label="Loading integrations" />
@@ -104,7 +104,7 @@ export default function IspIntegrations() {
                   title="No integrations configured"
                   hint="Add your provider's API details so plans can be activated automatically."
                   action={isAdmin && (
-                    <button className="btn primary" onClick={() => setEditing({})}>Add integration</button>
+                    <button className="btn primary" onClick={() => setEditing({})} style={{ borderRadius: 8 }}>Add integration</button>
                   )}
                 />
               ) : (
@@ -125,7 +125,7 @@ export default function IspIntegrations() {
                           {!cred.is_active && <span className="pill idle" style={{ marginLeft: 6 }}>disabled</span>}
                         </td>
                         <td>{cred.label || "—"}</td>
-                        <td className="wrap-cell"><code>{cred.base_url || "—"}</code></td>
+                        <td className="wrap-cell"><code style={{ fontSize: "0.8rem", background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>{cred.base_url || "—"}</code></td>
                         <td>
                           <span className={`pill ${cred.has_secret ? "ok" : "idle"}`}>
                             {cred.has_secret ? "password set" : "no password"}
@@ -135,7 +135,7 @@ export default function IspIntegrations() {
                         <td>
                           <HealthPill health={cred.health} />
                           {cred.last_error && (
-                            <div className="field-error" title={cred.last_error}>
+                            <div className="field-error" title={cred.last_error} style={{ marginTop: 3, fontSize: "0.78rem" }}>
                               {cred.last_error.slice(0, 60)}
                               {cred.last_error.length > 60 ? "…" : ""}
                             </div>
@@ -146,14 +146,16 @@ export default function IspIntegrations() {
                           <div className="row-actions">
                             {isAdmin && (
                               <button className="btn sm" disabled={testingId === cred.id}
-                                      onClick={() => testConnection(cred)}>
+                                      onClick={() => testConnection(cred)}
+                                      style={{ borderRadius: 6 }}>
                                 {testingId === cred.id ? "Testing…" : "Test"}
                               </button>
                             )}
                             {isAdmin && (
-                              <button className="btn sm" onClick={() => setEditing({ ...cred })}>Edit</button>
+                              <button className="btn sm" onClick={() => setEditing({ ...cred })}
+                                      style={{ borderRadius: 6 }}>Edit</button>
                             )}
-                            {!isAdmin && <span className="muted">Admin only</span>}
+                            {!isAdmin && <span className="muted" style={{ fontSize: "0.78rem" }}>Admin only</span>}
                           </div>
                         </td>
                       </tr>
@@ -259,106 +261,117 @@ function CredentialDialog({ value, onClose, onSaved }) {
 
   return (
     <div className="modal-scrim" onClick={onClose}>
-      <form className="card modal-card" style={{ maxWidth: 660 }}
+      <form className="card modal-card" style={{ maxWidth: 680, borderRadius: 16 }}
             onClick={(e) => e.stopPropagation()} onSubmit={save} noValidate>
-        <div className="card-head">
-          <h2>{isNew ? "Add ISP integration" : `Edit ${driverLabel(form.driver)}`}</h2>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
+        <div className="card-head" style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>
+          <h2 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700 }}>{isNew ? "Add ISP integration" : `Edit ${driverLabel(form.driver)}`}</h2>
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close"
+                  style={{ fontSize: 18, opacity: 0.5 }}>✕</button>
         </div>
 
-        <div className="card-body">
+        <div className="card-body" style={{ padding: "20px 24px" }}>
           {error && (
-            <div className="alert error">
+            <div className="alert error" style={{ borderRadius: 8, marginBottom: 16 }}>
               {error.message === "service_provider_id_required"
                 ? "Create a service provider first, then link this integration to it."
                 : error.message === "unknown_driver"
                   ? "That provider is not supported."
                   : readableError(error)}
-              {error.detail && <div className="hint">{error.detail}</div>}
+              {error.detail && <div className="hint" style={{ marginTop: 4 }}>{error.detail}</div>}
             </div>
           )}
 
-          <div className="grid grid-2">
+          <div className="grid grid-2" style={{ gap: "16px 24px" }}>
             <div className="field">
-              <label>Provider *</label>
-              <select className="input" value={form.driver} onChange={set("driver")}>
+              <label style={{ fontSize: "0.82rem", fontWeight: 600, marginBottom: 5, display: "block" }}>Provider *</label>
+              <select className="input" value={form.driver} onChange={set("driver")}
+                      style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #d0d5dd" }}>
                 {DRIVERS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
               </select>
             </div>
 
             <div className={`field${errorFor("service_provider_id") ? " has-error" : ""}`}>
-              <label>Service provider {isNew && "*"}</label>
+              <label style={{ fontSize: "0.82rem", fontWeight: 600, marginBottom: 5, display: "block" }}>Service provider {isNew && "*"}</label>
               <select className="input" value={form.service_provider_id}
                       onChange={set("service_provider_id")} onBlur={blur("service_provider_id")}
-                      disabled={providersLoading || !isNew}>
+                      disabled={providersLoading || !isNew}
+                      style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #d0d5dd" }}>
                 <option value="">{providersLoading ? "Loading…" : "Select…"}</option>
                 {providers.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
               {errorFor("service_provider_id")
                 ? <div className="field-error">{errorFor("service_provider_id")}</div>
-                : !isNew && <div className="hint">Cannot be changed after creation.</div>}
+                : !isNew && <div className="hint" style={{ marginTop: 4 }}>Cannot be changed after creation.</div>}
             </div>
 
             <div className="field">
-              <label>Label</label>
+              <label style={{ fontSize: "0.82rem", fontWeight: 600, marginBottom: 5, display: "block" }}>Label</label>
               <input className="input" value={form.label} onChange={set("label")}
-                     placeholder="e.g. Primary NAS" />
+                     placeholder="e.g. Primary NAS"
+                     style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #d0d5dd" }} />
             </div>
 
             <div className={`field${errorFor("base_url") ? " has-error" : ""}`}>
-              <label>Base URL *</label>
+              <label style={{ fontSize: "0.82rem", fontWeight: 600, marginBottom: 5, display: "block" }}>Base URL *</label>
               <input className="input" value={form.base_url} onChange={set("base_url")}
-                     onBlur={blur("base_url")} placeholder="https://provider.example.com" />
+                     onBlur={blur("base_url")} placeholder="https://provider.example.com"
+                     style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #d0d5dd" }} />
               {errorFor("base_url") && <div className="field-error">{errorFor("base_url")}</div>}
             </div>
 
             <div className="field">
-              <label>Username</label>
+              <label style={{ fontSize: "0.82rem", fontWeight: 600, marginBottom: 5, display: "block" }}>Username</label>
               <input className="input" value={form.username} onChange={set("username")}
-                     autoComplete="off" />
+                     autoComplete="off"
+                     style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #d0d5dd" }} />
             </div>
 
             <div className={`field${errorFor("password") ? " has-error" : ""}`}>
-              <label>Password {isNew && "*"}</label>
+              <label style={{ fontSize: "0.82rem", fontWeight: 600, marginBottom: 5, display: "block" }}>Password {isNew && "*"}</label>
               <input className="input" type="password" value={form.password}
                      onChange={set("password")} onBlur={blur("password")}
                      autoComplete="new-password"
-                     placeholder={value.has_secret ? "•••••• (stored)" : ""} />
+                     placeholder={value.has_secret ? "•••••• (stored)" : ""}
+                     style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #d0d5dd" }} />
               {errorFor("password")
                 ? <div className="field-error">{errorFor("password")}</div>
-                : <div className="hint">
+                : <div className="hint" style={{ marginTop: 4 }}>
                     {value.has_secret ? "Leave blank to keep the stored password." : "Stored encrypted; never shown again."}
                   </div>}
             </div>
 
             <div className="field">
-              <label>API key</label>
+              <label style={{ fontSize: "0.82rem", fontWeight: 600, marginBottom: 5, display: "block" }}>API key</label>
               <input className="input" type="password" value={form.api_key}
                      onChange={set("api_key")} autoComplete="off"
-                     placeholder={value.has_api_key ? "•••••• (stored)" : ""} />
-              <div className="hint">Optional, depending on the provider.</div>
+                     placeholder={value.has_api_key ? "•••••• (stored)" : ""}
+                     style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #d0d5dd" }} />
+              <div className="hint" style={{ marginTop: 4 }}>Optional, depending on the provider.</div>
             </div>
 
             <div className="field">
-              <label>NAS</label>
-              <input className="input" value={form.nas} onChange={set("nas")} />
+              <label style={{ fontSize: "0.82rem", fontWeight: 600, marginBottom: 5, display: "block" }}>NAS</label>
+              <input className="input" value={form.nas} onChange={set("nas")}
+                     style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #d0d5dd" }} />
             </div>
 
             <div className="field">
-              <label>Site</label>
-              <input className="input" value={form.site} onChange={set("site")} />
+              <label style={{ fontSize: "0.82rem", fontWeight: 600, marginBottom: 5, display: "block" }}>Site</label>
+              <input className="input" value={form.site} onChange={set("site")}
+                     style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #d0d5dd" }} />
             </div>
 
             <div className={`field${errorFor("timeout_seconds") ? " has-error" : ""}`}>
-              <label>Timeout (seconds)</label>
+              <label style={{ fontSize: "0.82rem", fontWeight: 600, marginBottom: 5, display: "block" }}>Timeout (seconds)</label>
               <MoneyInput className="input" min={1} max={300}
- value={form.timeout_seconds} onChange={set("timeout_seconds")}
- onBlur={blur("timeout_seconds")} />
+                value={form.timeout_seconds} onChange={set("timeout_seconds")}
+                onBlur={blur("timeout_seconds")}
+                style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #d0d5dd" }} />
               {errorFor("timeout_seconds") && <div className="field-error">{errorFor("timeout_seconds")}</div>}
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap", marginTop: "0.75rem" }}>
+          <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap", marginTop: 16, padding: "12px 0", borderTop: "1px solid #f1f5f9" }}>
             <label className="check-row">
               <input type="checkbox" checked={form.is_active} onChange={set("is_active", "checkbox")} />
               Active
@@ -374,11 +387,11 @@ function CredentialDialog({ value, onClose, onSaved }) {
           </div>
         </div>
 
-        <div className="modal-foot">
+        <div className="modal-foot" style={{ padding: "14px 24px", borderTop: "1px solid #f1f5f9" }}>
           <span />
           <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button type="button" className="btn" onClick={onClose}>Cancel</button>
-            <button className="btn primary" disabled={busy}>
+            <button type="button" className="btn" onClick={onClose} style={{ borderRadius: 8 }}>Cancel</button>
+            <button className="btn primary" disabled={busy} style={{ borderRadius: 8 }}>
               {busy ? <span className="spinner" /> : isNew ? "Add integration" : "Save changes"}
             </button>
           </div>

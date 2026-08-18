@@ -23,28 +23,40 @@ export default function Invoices() {
   return (
     <>
       {(from || to || label) && (
-        <div className="bulk-bar" role="status">
+        <div className="bulk-bar" role="status" style={{ borderRadius: 10 }}>
           <span>
             Showing <strong>{label || "invoices"}</strong>
             {from && to ? ` for ${from} to ${to}` : ""}
           </span>
           <div className="bulk-actions">
-            <button className="btn sm" onClick={() => { setStatus(""); setParams({}, { replace: true }); }}>
+            <button className="btn sm" onClick={() => { setStatus(""); setParams({}, { replace: true }); }}
+                    style={{ borderRadius: 6 }}>
               Clear filter
             </button>
           </div>
         </div>
       )}
 
-      <div className="toolbar">
+      <div className="page-heading">
+        <div>
+          <h1>Invoices</h1>
+          <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 2 }}>
+            Manage invoices and track payment status.
+          </p>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: "1.1rem", flexWrap: "wrap" }}>
         <input
           className="input grow"
           placeholder="Search invoice number, customer name or mobile"
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          style={{ flex: 1, minWidth: 200, padding: "8px 12px", borderRadius: 8, border: "1px solid #d0d5dd" }}
         />
-        <select className="select" style={{ width: 160 }} value={status}
-          onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
+        <select className="select" value={status}
+          onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+          style={{ width: 160, padding: "8px 12px", borderRadius: 8, border: "1px solid #d0d5dd", fontSize: "0.88rem" }}>
           <option value="">All statuses</option>
           {["draft", "sent", "paid", "overdue", "cancelled"].map((s) => (
             <option key={s} value={s}>{s}</option>
@@ -54,7 +66,7 @@ export default function Invoices() {
 
       <ErrorNote error={error} onRetry={refetch} />
 
-      <div className="card">
+      <div className="card" style={{ borderRadius: 12, overflow: "hidden" }}>
         <div className="table-wrap">
           {loading ? <Loading label="Loading invoices" />
             : !data?.length ? <Empty title="No invoices match" hint="Try clearing the filters." />
@@ -71,14 +83,14 @@ export default function Invoices() {
                       <td><Link to={`/invoices/${i.id}`} className="num">{i.invoice_no}</Link></td>
                       <td>
                         <Link to={`/customers/${i.customer_id}`}>{i.customer_name}</Link>
-                        <div className="num" style={{ fontSize: 12, color: "var(--muted)" }}>{i.customer_mobile}</div>
+                        <div className="num" style={{ fontSize: 12, color: "#94a3b8" }}>{i.customer_mobile}</div>
                       </td>
                       <td className="num">{fmtDate(i.issue_date)}</td>
                       <td className="num">{fmtDate(i.due_date)}</td>
                       <td className="right num">{inr(i.total_amount)}</td>
                       <td className="right num">{inr(i.paid_amount)}</td>
                       <td className="right num">
-                        <strong style={{ color: i.balance > 0 && i.status !== 'cancelled' ? "var(--danger)" : "inherit" }}>
+                        <strong style={{ color: i.balance > 0 && i.status !== 'cancelled' ? "#dc2626" : "inherit" }}>
                           {inr(i.balance)}
                         </strong>
                       </td>

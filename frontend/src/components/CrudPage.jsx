@@ -203,12 +203,15 @@ export default function CrudPage({
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           aria-label={`Search ${title.toLowerCase()}`}
+          style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #d0d5dd" }}
         />
         <button className="btn" onClick={exportCsv} disabled={!rows.length}
-                title="Download the rows shown below as CSV">
+                title="Download the rows shown below as CSV"
+                style={{ borderRadius: 8 }}>
           <i className="fas fa-download" aria-hidden="true" /> Export
         </button>
-        <button className="btn primary" onClick={() => setEditing({ ...blank })}>
+        <button className="btn primary" onClick={() => setEditing({ ...blank })}
+                style={{ borderRadius: 8, padding: "9px 18px" }}>
           <i className="fas fa-plus" aria-hidden="true" /> Add {singular}
         </button>
       </div>
@@ -233,7 +236,7 @@ export default function CrudPage({
       <ErrorNote error={error} onRetry={refetch} />
       {actionError && <div className="alert error">{readableError(actionError)}</div>}
 
-      <div className="card">
+      <div className="card" style={{ borderRadius: 12, overflow: "hidden" }}>
         {/* `refreshing` dims the existing rows; `loading` means there are no
             rows yet. Searching and paging now land in the first case, so the
             table stays on screen instead of being replaced by a spinner. */}
@@ -311,7 +314,8 @@ export default function CrudPage({
                     ))}
                     <td className="right row-actions" data-label="Actions">
                       <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                        <button className="btn sm" onClick={() => setEditing({ ...row })}>
+                        <button className="btn sm" onClick={() => setEditing({ ...row })}
+                                style={{ borderRadius: 6 }}>
                           Edit
                         </button>
                         {canDelete && isAdmin && (
@@ -319,6 +323,7 @@ export default function CrudPage({
                             className="btn sm danger"
                             disabled={busyId === row.id}
                             onClick={() => remove(row)}
+                            style={{ borderRadius: 6 }}
                           >
                             {busyId === row.id ? "Deleting…" : "Delete"}
                           </button>
@@ -460,18 +465,19 @@ function CrudDialog({ endpoint, singular, columns, value, onClose, onSaved }) {
     <div className="modal-scrim" onClick={onClose}>
       <form
         className="card modal-card"
-        style={{ maxWidth: wide ? 640 : 460 }}
+        style={{ maxWidth: wide ? 660 : 480, borderRadius: 16 }}
         onClick={(e) => e.stopPropagation()}
         onSubmit={save}
         noValidate
       >
-        <div className="card-head">
-          <h2>{isNew ? `Add ${singular}` : `Edit ${form.name || singular}`}</h2>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
+        <div className="card-head" style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>
+          <h2 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700 }}>{isNew ? `Add ${singular}` : `Edit ${form.name || singular}`}</h2>
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close"
+                  style={{ fontSize: 18, opacity: 0.5 }}>✕</button>
         </div>
 
-        <div className="card-body">
-          {error && <div className="alert error">{readableError(error)}</div>}
+        <div className="card-body" style={{ padding: "20px 24px" }}>
+          {error && <div className="alert error" style={{ borderRadius: 8, marginBottom: 16 }}>{readableError(error)}</div>}
 
           <div className={wide ? "grid grid-2" : ""}>
             {columns.map((c) => {
@@ -583,11 +589,11 @@ function CrudDialog({ endpoint, singular, columns, value, onClose, onSaved }) {
           </div>
         </div>
 
-        <div className="modal-foot">
+        <div className="modal-foot" style={{ padding: "14px 24px", borderTop: "1px solid #f1f5f9" }}>
           <span />
           <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button type="button" className="btn" onClick={onClose}>Cancel</button>
-            <button className="btn primary" disabled={busy}>
+            <button type="button" className="btn" onClick={onClose} style={{ borderRadius: 8 }}>Cancel</button>
+            <button className="btn primary" disabled={busy} style={{ borderRadius: 8 }}>
               {busy ? <span className="spinner" /> : isNew ? `Add ${singular}` : "Save changes"}
             </button>
           </div>

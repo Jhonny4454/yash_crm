@@ -62,47 +62,54 @@ export default function Customers() {
   return (
     <div className="list-container">
       {(from || to || label) && (
-        <div className="bulk-bar" role="status">
+        <div className="bulk-bar" role="status" style={{ borderRadius: 10 }}>
           <span>
             Showing <strong>{label || "customers"}</strong>
             {from && to ? ` registered ${from} to ${to}` : ""}
           </span>
           <div className="bulk-actions">
-            <button className="btn sm" onClick={() => setParams({}, { replace: true })}>Clear filter</button>
+            <button className="btn sm" onClick={() => setParams({}, { replace: true })} style={{ borderRadius: 6 }}>Clear filter</button>
           </div>
         </div>
       )}
-      <div className="list-head">
-        <h4><i className="fas fa-users" /> All Customers</h4>
-        <div className="list-actions">
-          <div className="search-wrapper">
-            <i className="fas fa-search" />
+      <div className="page-heading">
+        <div>
+          <h1>All Customers</h1>
+          <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 2 }}>
+            Manage your customer base.
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <div className="search-wrapper" style={{ position: "relative" }}>
+            <i className="fas fa-search" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: "0.82rem" }} />
             <input
               type="text"
               placeholder="Search customers..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              style={{ padding: "8px 12px 8px 34px", borderRadius: 8, border: "1px solid #d0d5dd", fontSize: "0.88rem", width: 220 }}
             />
           </div>
           <select
-            className="select" style={{ width: 150 }}
+            className="select"
             value={status}
             onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+            style={{ width: 140, padding: "8px 12px", borderRadius: 8, border: "1px solid #d0d5dd", fontSize: "0.88rem" }}
           >
             <option value="">All</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
-          <Link to="/customers/add" className="btn primary rounded-pill">
+          <Link to="/customers/add" className="btn primary" style={{ borderRadius: 8, padding: "9px 18px" }}>
             <i className="fas fa-plus" /> Add New
           </Link>
         </div>
       </div>
 
       <ErrorNote error={error} onRetry={refetch} />
-      {actionError && <div className="alert error">{readableError(actionError)}</div>}
+      {actionError && <div className="alert error" style={{ borderRadius: 8 }}>{readableError(actionError)}</div>}
 
-      <div className={`table-wrap${refreshing ? " is-refreshing" : ""}`}>
+      <div className={`table-wrap${refreshing ? " is-refreshing" : ""}`} style={{ borderRadius: 12, overflow: "hidden" }}>
         {loading ? (
           <TableSkeleton rows={8} cols={8} label="Loading customers" />
         ) : !data?.length ? (
@@ -111,11 +118,6 @@ export default function Customers() {
             hint={search ? "Try a different search." : "Add your first customer to get started."}
           />
         ) : (
-          /* `cards-sm`: eight columns is far wider than a phone, so this
-             scrolled sideways with the name column clipped and a scrollbar
-             drawn through the middle of the panel. Below 720px each customer
-             becomes a labelled card - every cell carries the data-label those
-             cards print as headings. */
           <table className="data cards-sm">
             <thead>
               <tr>
@@ -140,7 +142,7 @@ export default function Customers() {
                       <strong>{c.full_name}</strong>
                     </Link>
                     {c.company_name && (
-                      <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                      <div style={{ fontSize: 12, color: "#64748b" }}>
                         {c.company_name}
                       </div>
                     )}
@@ -150,7 +152,7 @@ export default function Customers() {
                   <td data-label="Zone">{c.zone || "-"}</td>
                   <td data-label="Plan">
                     {c.active_plan_name || (
-                      <span style={{ color: "var(--text-muted)" }}>None</span>
+                      <span style={{ color: "#94a3b8" }}>None</span>
                     )}
                   </td>
                   <td data-label="Status">
@@ -158,27 +160,31 @@ export default function Customers() {
                       {c.is_active ? "Active" : "Inactive"}
                     </span>
                   </td>
-                  <td className="actions-cell row-actions" data-label="">
-                    <Link to={`/customers/${c.id}`} className="btn-icon-sm" title="View">
-                      <i className="fas fa-eye" />
-                    </Link>
-                    <button
-                      className="btn-icon-sm"
-                      title="Edit"
-                      onClick={() => navigate(`/customers/${c.id}/edit`)}
-                    >
-                      <i className="fas fa-edit" />
-                    </button>
-                    {isAdmin && (
+                  <td className="actions-cell" data-label="">
+                    <div className="row-actions">
+                      <Link to={`/customers/${c.id}`} className="btn sm" title="View" style={{ borderRadius: 6 }}>
+                        <i className="fas fa-eye" />
+                      </Link>
                       <button
-                        className="btn-icon-sm danger"
-                        title="Delete"
-                        disabled={busyId === c.id}
-                        onClick={() => remove(c)}
+                        className="btn sm"
+                        title="Edit"
+                        onClick={() => navigate(`/customers/${c.id}/edit`)}
+                        style={{ borderRadius: 6 }}
                       >
-                        <i className="fas fa-trash" />
+                        <i className="fas fa-edit" />
                       </button>
-                    )}
+                      {isAdmin && (
+                        <button
+                          className="btn sm danger"
+                          title="Delete"
+                          disabled={busyId === c.id}
+                          onClick={() => remove(c)}
+                          style={{ borderRadius: 6 }}
+                        >
+                          <i className="fas fa-trash" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

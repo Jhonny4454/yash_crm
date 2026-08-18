@@ -116,14 +116,20 @@ export default function Plans() {
   return (
     <>
       {isAdmin && (
-        <div className="toolbar">
-          <button className="btn primary" onClick={() => setEditing({ ...BLANK })}>Add plan</button>
+        <div className="page-heading">
+          <div>
+            <h1>Plans</h1>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 2 }}>Manage service plans offered to customers.</p>
+          </div>
+          <button className="btn primary" onClick={() => setEditing({ ...BLANK })} style={{ borderRadius: 8, padding: "9px 18px" }}>
+            <i className="fas fa-plus" aria-hidden="true" /> Add plan
+          </button>
         </div>
       )}
 
       <ErrorNote error={error} onRetry={refetch} />
 
-      <div className="card">
+      <div className="card" style={{ borderRadius: 12, overflow: "hidden" }}>
         <div className="table-wrap">
           {loading ? <Loading label="Loading plans" />
             : !data?.length ? <Empty title="No plans yet" hint="Add your first plan to start billing." />
@@ -134,7 +140,7 @@ export default function Plans() {
                     <th className="right">Price</th><th className="right">ISP cost</th>
                     <th className="right">Validity</th><th>Provider</th>
                     <th className="right">Customers</th><th>Status</th>
-                    {isAdmin && <th />}</tr>
+                    {isAdmin && <th className="right" style={{ width: 180 }}>Actions</th>}</tr>
                 </thead>
                 <tbody>
                   {data.map((p) => (
@@ -150,31 +156,33 @@ export default function Plans() {
                       <td><span className={`pill ${p.is_active ? "ok" : "idle"}`}>
                         {p.is_active ? "active" : "inactive"}</span></td>
                       {isAdmin && (
-                        <td className="right row-actions">
-                          <button className="btn sm" onClick={() => setEditing({ ...p })}>Edit</button>
+                        <td className="right">
+                          <div className="row-actions">
+                            <button className="btn sm" onClick={() => setEditing({ ...p })}
+                                    style={{ borderRadius: 6 }}>Edit</button>
 
-                          <button className="btn sm" disabled={busy?.id === p.id}
-                                  onClick={() => retirePlan(p)}
-                                  title={p.is_active
-                                    ? "Stop offering this plan. Existing customers keep it."
-                                    : "Offer this plan again."}>
-                            {busy?.id === p.id && busy.what === "retire" ? "…"
-                              : p.is_active ? "Retire" : "Restore"}
-                          </button>
+                            <button className="btn sm" disabled={busy?.id === p.id}
+                                    onClick={() => retirePlan(p)}
+                                    title={p.is_active
+                                      ? "Stop offering this plan. Existing customers keep it."
+                                      : "Offer this plan again."}
+                                    style={{ borderRadius: 6 }}>
+                              {busy?.id === p.id && busy.what === "retire" ? "…"
+                                : p.is_active ? "Retire" : "Restore"}
+                            </button>
 
-                          {/* Disabled rather than hidden: an operator looking
-                              for Delete needs to find it and be told why it
-                              is unavailable, not wonder where it went. */}
-                          <button className="btn sm danger"
-                                  disabled={busy?.id === p.id
-                                            || Number(p.customer_count || 0) > 0}
-                                  onClick={() => deletePlan(p)}
-                                  title={Number(p.customer_count || 0) > 0
-                                    ? `${p.customer_count} customer plan(s) reference `
-                                      + "this plan, so it cannot be deleted. Retire it instead."
-                                    : "Remove this plan completely."}>
-                            {busy?.id === p.id && busy.what === "delete" ? "…" : "Delete"}
-                          </button>
+                            <button className="btn sm danger"
+                                    disabled={busy?.id === p.id
+                                              || Number(p.customer_count || 0) > 0}
+                                    onClick={() => deletePlan(p)}
+                                    title={Number(p.customer_count || 0) > 0
+                                      ? `${p.customer_count} customer plan(s) reference `
+                                        + "this plan, so it cannot be deleted. Retire it instead."
+                                      : "Remove this plan completely."}
+                                    style={{ borderRadius: 6 }}>
+                              {busy?.id === p.id && busy.what === "delete" ? "…" : "Delete"}
+                            </button>
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -219,59 +227,69 @@ function PlanDialog({ value, knownTypes = [], onClose, onSaved }) {
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(15,27,45,.5)", display: "grid", placeItems: "center", zIndex: 100, padding: 16 }} onClick={onClose}>
-      <form className="card" style={{ width: "100%", maxWidth: 520 }} onClick={(e) => e.stopPropagation()} onSubmit={save}>
-        <div className="card-head">
-          <h2>{isNew ? "Add plan" : `Edit ${form.name}`}</h2>
-          <button type="button" className="icon-btn" onClick={onClose}>✕</button>
+    <div className="modal-scrim" onClick={onClose}>
+      <form className="card modal-card" style={{ width: "100%", maxWidth: 540, borderRadius: 16 }}
+            onClick={(e) => e.stopPropagation()} onSubmit={save}>
+        <div className="card-head" style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>
+          <h2 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700 }}>{isNew ? "Add plan" : `Edit ${form.name}`}</h2>
+          <button type="button" className="icon-btn" onClick={onClose}
+                  style={{ fontSize: 18, opacity: 0.5 }}>✕</button>
         </div>
-        <div className="card-body">
-          {error && <div className="alert error">{readableError(error)}</div>}
+        <div className="card-body" style={{ padding: "20px 24px" }}>
+          {error && <div className="alert error" style={{ borderRadius: 8, marginBottom: 16 }}>{readableError(error)}</div>}
           <div className="field">
-            <label>Plan name</label>
-            <input className="input" value={form.name} onChange={set("name")} required />
+            <label style={{ fontSize: "0.82rem", fontWeight: 600, marginBottom: 5, display: "block" }}>Plan name</label>
+            <input className="input" value={form.name} onChange={set("name")} required
+                   style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #d0d5dd" }} />
           </div>
-          <div className="grid grid-2">
-            <div className="field"><label>Plan code</label>
-              <input className="input" value={form.plan_code || ""} onChange={set("plan_code")} /></div>
-            <div className="field"><label>Speed (Mbps)</label>
-              <MoneyInput className="input" value={form.speed_mbps} onChange={set("speed_mbps")} /></div>
-            <div className="field"><label>Price per cycle</label>
-              <MoneyInput className="input" value={form.price_monthly} onChange={set("price_monthly")} required /></div>
-            <div className="field"><label>ISP cost</label>
-              <MoneyInput className="input" value={form.isp_amount || ""} onChange={set("isp_amount")} /></div>
-            <div className="field"><label>Validity (days)</label>
-              <MoneyInput className="input" value={form.validity_days} onChange={set("validity_days")} /></div>
-            <div className="field"><label>Plan type</label>
-              <select className="input" value={form.plan_type || ""} onChange={set("plan_type")}>
+          <div className="grid grid-2" style={{ gap: "16px 24px" }}>
+            <div className="field"><label style={{ fontSize: "0.82rem", fontWeight: 600, marginBottom: 5, display: "block" }}>Plan code</label>
+              <input className="input" value={form.plan_code || ""} onChange={set("plan_code")}
+                     style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #d0d5dd" }} /></div>
+            <div className="field"><label style={{ fontSize: "0.82rem", fontWeight: 600, marginBottom: 5, display: "block" }}>Speed (Mbps)</label>
+              <MoneyInput className="input" value={form.speed_mbps} onChange={set("speed_mbps")}
+                     style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #d0d5dd" }} /></div>
+            <div className="field"><label style={{ fontSize: "0.82rem", fontWeight: 600, marginBottom: 5, display: "block" }}>Price per cycle</label>
+              <MoneyInput className="input" value={form.price_monthly} onChange={set("price_monthly")} required
+                     style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #d0d5dd" }} /></div>
+            <div className="field"><label style={{ fontSize: "0.82rem", fontWeight: 600, marginBottom: 5, display: "block" }}>ISP cost</label>
+              <MoneyInput className="input" value={form.isp_amount || ""} onChange={set("isp_amount")}
+                     style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #d0d5dd" }} /></div>
+            <div className="field"><label style={{ fontSize: "0.82rem", fontWeight: 600, marginBottom: 5, display: "block" }}>Validity (days)</label>
+              <MoneyInput className="input" value={form.validity_days} onChange={set("validity_days")}
+                     style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #d0d5dd" }} /></div>
+            <div className="field"><label style={{ fontSize: "0.82rem", fontWeight: 600, marginBottom: 5, display: "block" }}>Plan type</label>
+              <select className="input" value={form.plan_type || ""} onChange={set("plan_type")}
+                      style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #d0d5dd" }}>
                 <option value="">Not set</option>
                 {knownTypes.map((type) => (
                   <option key={type} value={type}>{type}</option>
                 ))}
               </select></div>
-            <div className="field"><label>Service provider</label>
+            <div className="field"><label style={{ fontSize: "0.82rem", fontWeight: 600, marginBottom: 5, display: "block" }}>Service provider</label>
               <select className="input" value={form.service_provider_id || ""}
                       disabled={providersLoading}
                       onChange={(e) => setForm((f) => ({
                         ...f,
                         service_provider_id: e.target.value ? Number(e.target.value) : null,
-                      }))}>
+                      }))}
+                      style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #d0d5dd" }}>
                 <option value="">{providersLoading ? "Loading…" : "Not set"}</option>
                 {providers.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select></div>
           </div>
-          <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13.5 }}>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: "0.88rem", marginTop: 16, padding: "10px 0", borderTop: "1px solid #f1f5f9" }}>
             <input type="checkbox" checked={!!form.is_active} onChange={set("is_active")} />
             Offer this plan to customers
           </label>
         </div>
-        <div className="card-head" style={{ borderTop: "1px solid var(--line)", borderBottom: "none" }}>
+        <div className="modal-foot" style={{ padding: "14px 24px", borderTop: "1px solid #f1f5f9" }}>
           <span />
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" className="btn" onClick={onClose}>Cancel</button>
-            <button className="btn primary" disabled={busy}>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <button type="button" className="btn" onClick={onClose} style={{ borderRadius: 8 }}>Cancel</button>
+            <button className="btn primary" disabled={busy} style={{ borderRadius: 8 }}>
               {busy ? <span className="spinner" /> : isNew ? "Add plan" : "Save changes"}
             </button>
           </div>
