@@ -1560,12 +1560,133 @@ DEFAULT_TEMPLATES = [
         template_type='welcome',
         description='Sent when a new connection is activated.',
         body=(
-            "Dear {{customer_name}},\n\n"
+            "Welcome\n"
+            "\n"
+            "Dear {{customer_name}},\n"
+            "\n"
             "Your username: {{username}}\n"
-            "Amount payable: Rs.{{amount}}\n\n"
-            "For support: \u260e\ufe0f {{company_phone}}\n\n"
+            "Amount payable: Rs.{{amount}}\n"
+            "\n"
+            "For support: \u260e\ufe0f {{company_phone}}\n"
+            "\n"
             "{{company_name}}\n"
-            "Thank You For choosing us"
+            "Thank You For choosing us\n"
+            "\n"
+            "Visit Account\n"
+            "{{app_link}}"
+        ),
+    ),
+    dict(
+        name='Daily Report',
+        template_type='daily_report',
+        description='Daily summary sent to admin.',
+        body=(
+            "\ud83d\udd30 Daily Report - {{today}}\n"
+            "\n"
+            "\ud83d\udcdd Complaint Report\n"
+            "\ud83d\udcdd New Complaint: {{new_complaints}}\n"
+            "\u26a0\ufe0f Open Complaint: {{open_complaints}}\n"
+            "\ud83e\udeab Old Complaint: {{old_complaints}}\n"
+            "\u2705 Closed Complaint: {{closed_complaints}}\n"
+            "\n"
+            "\ud83d\udca5 Collection Report\n"
+            "\u2728 New Leads: {{new_leads}}\n"
+            "\ud83c\udfaf New Connection: {{new_connections}}\n"
+            "\u2b07\ufe0f Plan Expiring: {{expiring_count}}\n"
+            "\u274c Plan Expired: {{expired_count}}\n"
+            "\u2705 Plan Renewed: {{renewed_count}}\n"
+            "\u26a0\ufe0f Today's Outstanding: \u20b9{{today_outstanding}}\n"
+            "\ud83d\udcc9 Total Outstanding: \u20b9{{total_outstanding}}\n"
+            "\n"
+            "\ud83d\udcb5 Collection Details\n"
+            "{{collection_details}}\n"
+            "Total Collected Amount: \u20b9{{total_collected}}\n"
+            "Thank You"
+        ),
+    ),
+    dict(
+        name='Internet Down',
+        template_type='internet_down',
+        description='Area outage notification to customer.',
+        body=(
+            "Dear Customer\n"
+            "\n"
+            "Our internet service is currently down in your area due to a "
+            "technical issue. The service is expected to be restored within "
+            "{{hours}} hours.\n"
+            "\n"
+            "Support No : {{company_phone}}\n"
+            "\n"
+            "{{company_name}}\n"
+            "Thank you for your patience and cooperation."
+        ),
+    ),
+    dict(
+        name='Internet Restored',
+        template_type='internet_restored',
+        description='Area restored notification to customer.',
+        body=(
+            "Dear Customer\n"
+            "\n"
+            "The internet service in your area has now been restored.\n"
+            "\n"
+            "Support No :{{company_phone}}\n"
+            "\n"
+            "{{company_name}}\n"
+            "Thank you for your patience and continued support."
+        ),
+    ),
+    dict(
+        name='Complaint Registered',
+        template_type='complaint_registered',
+        description='Customer complaint confirmation.',
+        body=(
+            "Hello {{customer_name}},\n"
+            "\n"
+            "Your complaint has been registered.\n"
+            "\n"
+            "Ticket No: {{ticket_no}}\n"
+            "We appreciate your patience.\n"
+            "\n"
+            "\ud83c\udd94 User id: {{username}}\n"
+            "\n"
+            "\u260e\ufe0f {{company_phone}}\n"
+            "{{company_name}}\n"
+            "Thank you"
+        ),
+    ),
+    dict(
+        name='Issue Resolved',
+        template_type='issue_resolved',
+        description='Complaint resolved notification to customer.',
+        body=(
+            "Hello {{customer_name}},\n"
+            "\n"
+            "Your complaint has been successfully resolved.\n"
+            "\n"
+            "Ticket no: {{ticket_no}}\n"
+            "\ud83c\udd94 User id: {{username}}\n"
+            "\n"
+            "\u260e\ufe0f {{company_phone}}\n"
+            "{{company_name}}\n"
+            "Thank you"
+        ),
+    ),
+    dict(
+        name='New Complaint (Admin)',
+        template_type='new_complaint',
+        description='Admin notification of new complaint.',
+        body=(
+            "A new complaint has been registered with the following details:\n"
+            "\n"
+            "Complaint: {{complaint_type}}\n"
+            "Name: {{customer_name}}\n"
+            "User ID: {{username}}\n"
+            "Ticket No: {{ticket_no}}\n"
+            "Address: {{address}}\n"
+            "\n"
+            "{{company_name}}\n"
+            "Thank you"
         ),
     ),
 

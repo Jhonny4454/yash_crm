@@ -241,6 +241,15 @@ class CustomerPlan(db.Model):
             return self.plan.price_monthly
         return Decimal('0.00')
 
+    @property
+    def _payment_mode(self):
+        """Payment mode from the most recent approved payment on any invoice."""
+        for inv in sorted(self.invoices or [], key=lambda i: i.id, reverse=True):
+            for p in sorted(inv.payments or [], key=lambda x: x.id, reverse=True):
+                if p.status == 'approved' and p.payment_mode:
+                    return p.payment_mode
+        return ''
+
 
 class Invoice(db.Model):
     __tablename__ = 'invoices'

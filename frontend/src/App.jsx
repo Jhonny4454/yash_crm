@@ -8,6 +8,7 @@ import PortalShell from "./components/PortalShell";
 import AdminLayout from "./layouts/AdminLayout";
 import { PageSkeleton, ProtectedRoute } from "./components/ui";
 import { AuthProvider } from "./context/AuthContext";
+import { LanguageProvider } from "./context/LanguageContext";
 import { ToastProvider } from "./context/ToastContext";
 
 const Login = lazy(() => import("./pages/Login"));
@@ -111,7 +112,7 @@ function StaffLayout() { return <ProtectedRoute audience="staff"><AdminLayout />
 /* PortalShell, not the old AppShell: a customer is on a phone, and the shared
    shell's answer to a narrow screen was a sideways-scrolling strip of links
    above the content. */
-function CustomerLayout() { return <ProtectedRoute audience="customer"><PortalShell /></ProtectedRoute>; }
+function CustomerLayout() { return <LanguageProvider><ProtectedRoute audience="customer"><PortalShell /></ProtectedRoute></LanguageProvider>; }
 
 const resource = (name) => <Page><ResourcePage resource={name} /></Page>;
 const report = (endpoint, title) => <Page><ReportsPage endpoint={endpoint} title={title} /></Page>;

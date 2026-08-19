@@ -825,7 +825,7 @@ export function PaymentHistoryTab({ payments, onRefresh }) {
                   className={railFor("payment", payment.status, payment.needs_authorization)}>
                 <td>{fmtDate(payment.payment_date)}</td>
                 <td className="mono">R{payment.id}</td>
-                <td className="mono">{payment.book_receipt_no || "—"}</td>
+                <td className="mono">{payment.book_receipt_no || payment.receipt_no || "—"}</td>
                 {/* A return is a negative row. Shown as a negative, in red,
                     labelled - not as a positive number that silently makes
                     the column stop adding up. */}
@@ -937,8 +937,8 @@ export function PlanHistoryTab({ customerId }) {
                 empty={!rows.length} emptyTitle="No plans on record">
       <table className="tbl">
         <thead>
-          <tr><th>Plan</th><th>Provider</th><th className="num">Price</th>
-            <th>Start</th><th>End</th><th>Auto renew</th><th>Status</th></tr>
+            <tr><th>Plan</th><th>Provider</th><th className="num">Price</th>
+              <th>Start</th><th>End</th><th>Payment</th><th>Status</th></tr>
         </thead>
         <tbody>
           {rows.map((row) => (
@@ -948,7 +948,7 @@ export function PlanHistoryTab({ customerId }) {
               <td className="num">{inr(row.price_monthly)}</td>
               <td>{fmtDate(row.start_date)}</td>
               <td>{fmtDate(row.end_date)}</td>
-              <td>{row.auto_renew ? "Yes" : "No"}</td>
+              <td>{row.payment_mode || "—"}</td>
               <td><StatusPill value={row.status} /></td>
             </tr>
           ))}

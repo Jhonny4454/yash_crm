@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useLang, useT } from "../context/LanguageContext";
 import logoImage from "../assets/logo.jpg";
 
 /**
@@ -21,24 +22,32 @@ import logoImage from "../assets/logo.jpg";
  */
 
 const TABS = [
-  { to: "/customer", label: "Home", icon: "fa-house", end: true },
-  { to: "/customer/invoices", label: "Bills", icon: "fa-file-invoice" },
-  { to: "/customer/payments", label: "Payments", icon: "fa-receipt" },
-  { to: "/customer/plans", label: "Plan", icon: "fa-wifi" },
-  { to: "/customer/profile", label: "Account", icon: "fa-user" },
+  { to: "/customer", labelKey: "nav.home", icon: "fa-house", end: true },
+  { to: "/customer/invoices", labelKey: "nav.bills", icon: "fa-file-invoice" },
+  { to: "/customer/payments", labelKey: "nav.payments", icon: "fa-receipt" },
+  { to: "/customer/plans", labelKey: "nav.plan", icon: "fa-wifi" },
+  { to: "/customer/profile", labelKey: "nav.account", icon: "fa-user" },
 ];
 
 const TITLES = {
-  "/customer": "My account",
-  "/customer/invoices": "Invoices",
-  "/customer/payments": "Payments",
-  "/customer/plans": "Renew or change plan",
-  "/customer/notifications": "Notifications",
-  "/customer/profile": "My profile",
+  "/customer": "nav.home",
+  "/customer/invoices": "nav.bills",
+  "/customer/payments": "nav.payments",
+  "/customer/plans": "nav.plan",
+  "/customer/notifications": "nav.notifications",
+  "/customer/profile": "nav.profile",
 };
+
+const LANG_OPTIONS = [
+  { code: "en", label: "English" },
+  { code: "hi", label: "\u0939\u093f\u0928\u094d\u0926\u0940" },
+  { code: "mr", label: "\u092e\u0930\u093e\u0920\u0940" },
+];
 
 export default function PortalShell() {
   const { user, company, signOut } = useAuth();
+  const { lang, setLang } = useLang();
+  const t = useT();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -64,10 +73,10 @@ export default function PortalShell() {
     navigate("/customer/login", { replace: true });
   }
 
-  const title = TITLES[pathname] || "My account";
+  const title = t(TITLES[pathname] || "nav.home");
   const name = user?.full_name || user?.username || user?.mobile || "Customer";
 
-  const tabLink = ({ to, label, icon, end }) => (
+  const tabLink = ({ to, labelKey, icon, end }) => (
     <NavLink
       key={to}
       to={to}
@@ -75,7 +84,7 @@ export default function PortalShell() {
       className={({ isActive }) => `pt-tab${isActive ? " active" : ""}`}
     >
       <i className={`fas ${icon}`} aria-hidden="true" />
-      <span>{label}</span>
+      <span>{t(labelKey)}</span>
     </NavLink>
   );
 
@@ -101,13 +110,13 @@ export default function PortalShell() {
           <NavLink to="/customer/notifications"
                    className={({ isActive }) => `pt-tab${isActive ? " active" : ""}`}>
             <i className="fas fa-bell" aria-hidden="true" />
-            <span>Notifications</span>
+            <span>{t("nav.notifications")}</span>
           </NavLink>
         </nav>
 
         <button type="button" className="pt-rail-signout" onClick={logout}>
           <i className="fas fa-right-from-bracket" aria-hidden="true" />
-          <span>Sign out</span>
+          <span>{t("nav.signout")}</span>
         </button>
       </aside>
 
@@ -154,13 +163,26 @@ export default function PortalShell() {
                     {user?.reference_id && <span>ID {user.reference_id}</span>}
                   </div>
                   <NavLink to="/customer/profile" className="pt-menu-item">
-                    <i className="fas fa-user" aria-hidden="true" /> My profile
+                    <i className="fas fa-user" aria-hidden="true" /> {t("nav.profile")}
                   </NavLink>
                   <NavLink to="/customer/notifications" className="pt-menu-item">
-                    <i className="fas fa-bell" aria-hidden="true" /> Notifications
+                    <i className="fas fa-bell" aria-hidden="true" /> {t("nav.notifications")}
                   </NavLink>
+                  <div className="pt-menu-divider" />
+                  <div className="pt-menu-item pt-lang-row">
+                    <i className="fas fa-globe" aria-hidden="true" /> {t("lang.label")}
+                    <div className="pt-lang-options">
+                      {LANG_OPTIONS.map((opt) => (
+                        <button key={opt.code} type="button"
+                                className={`pt-lang-btn${lang === opt.code ? " active" : ""}`}
+                                onClick={() => setLang(opt.code)}>
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <button type="button" className="pt-menu-item danger" onClick={logout}>
-                    <i className="fas fa-right-from-bracket" aria-hidden="true" /> Sign out
+                    <i className="fas fa-right-from-bracket" aria-hidden="true" /> {t("nav.signout")}
                   </button>
                 </div>
               </>

@@ -3,6 +3,7 @@ import { useFetch } from "../api/useFetch";
 import { BillActions, billRowProps, useBillActions } from "../components/BillLink";
 import { PayButton, PayDuesPanel, usePayConfig, usePayee } from "../components/PayNow";
 import { Empty, ErrorNote, fmtDate, inr, Loading, Pager } from "../components/ui";
+import { useT } from "../context/LanguageContext";
 import "../styles/PortalPay.css";
 
 /**
@@ -26,6 +27,7 @@ export default function PortalInvoices() {
   const gateway = usePayConfig();
   const payee = usePayee(gateway);
   const bill = useBillActions();
+  const t = useT();
 
   const rows = Array.isArray(data) ? data : [];
   const outstanding = Number(meta?.outstanding || 0);
@@ -34,12 +36,8 @@ export default function PortalInvoices() {
     <section className="page">
       <div className="page-heading">
         <div>
-          <h1>Bills</h1>
-          {/* Who the money goes to, on the screen where they part with it. At
-              the moment of payment a customer sees the gateway's screen, not
-              ours, and "who am I paying?" is the question that stops a payment
-              halfway. */}
-          <p>Payable to <strong>{payee}</strong></p>
+          <h1>{t("bills.title")}</h1>
+          <p>{t("bills.payable_to")} <strong>{payee}</strong></p>
         </div>
       </div>
 
@@ -50,13 +48,13 @@ export default function PortalInvoices() {
 
       <section className="panel bill-panel">
         <div className="bill-panel-head">
-          <h2>Your bills</h2>
-          <span className="bill-panel-hint">Tap a bill to print or save it</span>
+          <h2>{t("bills.your_bills")}</h2>
+          <span className="bill-panel-hint">{t("bills.tap_bill")}</span>
         </div>
 
-        {loading ? <Loading label="Loading your bills" />
-          : !rows.length ? <Empty title="No bills yet"
-                                  hint="Bills raised on your account will appear here." />
+        {loading ? <Loading label={t("bills.loading")} />
+          : !rows.length ? <Empty title={t("bills.no_bills")}
+                                  hint={t("bills.no_bills_hint")} />
             : (
               /* When any bill on the page can be paid, every row reserves the
                  button's width - otherwise the amounts on settled rows sit
@@ -114,7 +112,7 @@ function BillRow({ invoice, gateway, onPaid, ask }) {
       </div>
 
       <div className="bill-row-money">
-        <strong>{invoice.status === 'cancelled' ? '₹0' : inr(unpaid ? balance : invoice.total_amount)}</strong>
+        <strong>{invoice.status === 'cancelled' ? '\u20b90' : inr(unpaid ? balance : invoice.total_amount)}</strong>
         <span>{invoice.status === 'cancelled' ? 'voided' : !unpaid ? "paid" : overdue ? "overdue" : "to pay"}</span>
       </div>
 

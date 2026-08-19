@@ -172,6 +172,29 @@ body.portal-mode {
 .portal-shell .pt-menu-item:hover { background: #f1f5f9; text-decoration: none; }
 .portal-shell .pt-menu-item.danger { color: #b42318; }
 .portal-shell .pt-menu-item.danger i { color: #b42318; }
+.portal-shell .pt-menu-divider { height: 1px; background: var(--pt-line); margin: 4px 8px; }
+
+.portal-shell .pt-lang-row { flex-wrap: wrap; cursor: default; }
+.portal-shell .pt-lang-row:hover { background: none; }
+.portal-shell .pt-lang-options { display: flex; gap: 4px; width: 100%; margin-left: 28px; }
+.portal-shell .pt-lang-btn {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--pt-line);
+  border-radius: 8px;
+  background: #f8fafc;
+  font: inherit;
+  font-size: .82rem;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.portal-shell .pt-lang-btn:hover { background: #e2e8f0; }
+.portal-shell .pt-lang-btn.active {
+  background: var(--pt-brand);
+  border-color: var(--pt-brand);
+  color: #fff;
+  font-weight: 600;
+}
 
 /* =============================================================== pages === */
 

@@ -412,6 +412,7 @@ def customer_plan_dict(cp):
         'grace_period_days': cp.grace_period_days or 0,
         'last_invoice_date': iso(cp.last_invoice_date),
         'suspension_review_status': cp.suspension_review_status,
+        'payment_mode': (cp._payment_mode or ''),
     }
 
 

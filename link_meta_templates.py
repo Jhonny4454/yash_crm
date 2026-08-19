@@ -126,12 +126,8 @@ UNMAPPED = {
 }
 
 #: Approved templates with nothing in this CRM to send them. Listed so it is
-#: obvious they were considered rather than missed: the complaint and daily
-#: report templates belong to a ticketing module that is not in this build.
-NO_CRM_EQUIVALENT = (
-    'internet_down', 'internet_restored',
-    'complaint_registered', 'issue_resolved', 'new_complaint',
-)
+#: obvious they were considered rather than missed.
+NO_CRM_EQUIVALENT = ()
 
 #: Meta stores a language per template. English templates are registered as
 #: either `en` or `en_US` and the two are NOT interchangeable - sending the
