@@ -269,12 +269,12 @@ def dashboard_summary():
         target = expiry_counts if row.kind == 'expiry' else renewed_counts
         target[day] = target.get(day, 0) + int(row.count or 0)
 
-    def chips(start, counts):
+    def chips(start, counts, label_fmt='%d %b'):
         """Seven days from `start`, each counting only its OWN date."""
         out = []
         for offset in range(LIFECYCLE_DAYS):
             d = start + timedelta(days=offset)
-            out.append({'date': iso(d), 'label': d.strftime('%d %b'),
+            out.append({'date': iso(d), 'label': d.strftime(label_fmt),
                         'count': int(counts.get(d, 0))})
         return out
 
@@ -289,7 +289,8 @@ def dashboard_summary():
     # moves end_date forward, so a customer who renewed drops out of this
     # window on their own - the row does not need a second query to exclude
     # them. Ends yesterday: see `expired_start` above.
-    recently_expired = chips(expired_start, expiry_counts)
+    recently_expired = chips(expired_start, expiry_counts,
+                             label_fmt='%d-%b-%Y')
 
     # Renewals recorded on that day, as distinct customers: somebody with two
     # connections renewed in one visit is one customer renewing, not two.
