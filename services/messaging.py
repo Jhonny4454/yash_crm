@@ -1474,11 +1474,18 @@ DEFAULT_TEMPLATES = [
         template_type='expired',
         description='The day the connection stops.',
         body=(
-            "Dear {{customer_name}}\n\n"
+            "Plan Expired\n"
+            "\n"
+            "Dear {{customer_name}}\n"
+            "\n"
             "Your Internet Connection Has Been Expired.\n"
-            "Kindly renew it now from Our Customer App.\n\n"
+            "Kindly renew it now from Our Customer App.\n"
+            "\n"
             "{{company_name}}\n"
-            "Thank you for choosing us"
+            "Thank you for choosing us\n"
+            "\n"
+            "Visit Account\n"
+            "{{app_link}}"
         ),
     ),
     dict(
