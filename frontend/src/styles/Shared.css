@@ -462,42 +462,40 @@ small.ok { color: #15803d; }
 /* Scroll arrows for wide tables ------------------------------------------ */
 .scroll-arrows-wrap {
   position: relative;
-  padding: 0 2px;
 }
 .scroll-arrows-wrap .table-wrap {
   overflow-x: auto;
   scrollbar-width: thin;
 }
-.scroll-arrow {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 5;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  border: 1px solid var(--border, #d0d5dd);
-  background: rgba(255,255,255,0.92);
-  color: var(--text, #344054);
-  font-size: 18px;
-  line-height: 1;
+.scroll-arrows-bar {
   display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+  padding: 0 4px 4px;
+}
+.scroll-arrow {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #d0d5dd);
+  background: var(--surface, #fff);
+  color: var(--text, #344054);
+  font-size: 16px;
+  line-height: 1;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
-  transition: opacity 0.2s;
+  transition: background 0.15s, color 0.15s;
 }
-.scroll-arrow:hover {
+.scroll-arrow:hover:not(:disabled) {
   background: var(--primary-color, #0073b7);
   color: #fff;
   border-color: var(--primary-color, #0073b7);
 }
-.scroll-arrow-left {
-  left: 2px;
-}
-.scroll-arrow-right {
-  right: 2px;
+.scroll-arrow:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 
 /* iPhone notch / home indicator: keep the footer and any fixed bar clear of

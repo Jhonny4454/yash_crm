@@ -293,23 +293,25 @@ export function ScrollArrows({ children, className = "", wrapClassName = "" }) {
     el.scrollBy({ left: dir * el.clientWidth * 0.7, behavior: "smooth" });
   };
 
+  const showArrows = canLeft || canRight;
+
   return (
     <div className={`scroll-arrows-wrap${className ? " " + className : ""}`}>
-      {canLeft && (
-        <button type="button" className="scroll-arrow scroll-arrow-left"
-                onClick={() => scroll(-1)} aria-label="Scroll left">
-          &#8249;
-        </button>
+      {showArrows && (
+        <div className="scroll-arrows-bar">
+          <button type="button" className="scroll-arrow"
+                  disabled={!canLeft} onClick={() => scroll(-1)} aria-label="Scroll left">
+            &#8249;
+          </button>
+          <button type="button" className="scroll-arrow"
+                  disabled={!canRight} onClick={() => scroll(1)} aria-label="Scroll right">
+            &#8250;
+          </button>
+        </div>
       )}
       <div ref={ref} className={`table-wrap${wrapClassName ? " " + wrapClassName : ""}`}>
         {children}
       </div>
-      {canRight && (
-        <button type="button" className="scroll-arrow scroll-arrow-right"
-                onClick={() => scroll(1)} aria-label="Scroll right">
-          &#8250;
-        </button>
-      )}
     </div>
   );
 }
