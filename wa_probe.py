@@ -93,7 +93,14 @@ def find_key(explicit=None):
         with flask_app.app.app_context():
             row = Setting.query.filter_by(key='wa_api_token').first()
             if row and (row.value or '').strip():
-                return row.value.strip(), 'settings table'
+                token = row.value.strip()
+                try:
+                    from models_ext import ENCRYPTED_SETTINGS, decrypt_setting_value
+                    if 'wa_api_token' in ENCRYPTED_SETTINGS:
+                        token = decrypt_setting_value(token)
+                except Exception:
+                    pass
+                return token, 'settings table'
     except Exception:
         pass
 

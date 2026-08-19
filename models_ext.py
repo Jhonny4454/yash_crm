@@ -151,8 +151,14 @@ class Setting(db.Model):
         row = cls.query.filter_by(key=key).first()
         if row is None or row.value is None:
             return default
+        value = row.value
+        if key in ENCRYPTED_SETTINGS:
+            try:
+                value = decrypt_setting_value(value)
+            except Exception:
+                pass
         try:
-            return cls._CASTS.get(row.value_type or 'str', str)(row.value)
+            return cls._CASTS.get(row.value_type or 'str', str)(value)
         except (ValueError, TypeError, json.JSONDecodeError):
             return default
 
@@ -220,6 +226,10 @@ SETTING_DEFAULTS = [
     ('cloudinary_api_secret',   '',       'str'),
     ('cloudinary_upload_preset','',       'str'),
     ('cloudinary_folder',       '',       'str'),
+
+    # Admin notifications (daily report recipients).
+    ('admin_email',             '',       'str'),
+    ('admin_mobile',            '',       'str'),
 ]
 
 

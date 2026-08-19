@@ -290,6 +290,14 @@ FIELDS = {
         help='Sent in welcome messages.'),
     'web_link': dict(
         group='general', order=11, input='url', label='Website link'),
+
+    # ---------------------------------------------------------- notifications --
+    'admin_email': dict(
+        group='notifications', order=10, input='email', label='Admin email',
+        help='Receives the daily report and system alerts.'),
+    'admin_mobile': dict(
+        group='notifications', order=11, input='text', label='Admin mobile',
+        help='Receives the daily report on WhatsApp.'),
 }
 
 

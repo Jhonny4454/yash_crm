@@ -261,8 +261,11 @@ def send_whatsapp(phone, message, customer_id=None):
     return messaging.send_whatsapp(phone, message, customer_id=customer_id)
 
 def send_email(to, subject, body, attachment=None):
-    # Email is not wired to an SMTP provider yet; log it so nothing is lost.
-    app.logger.info("Email to %s: %s", to, subject)
+    from services import mailer
+    attachments = None
+    if attachment:
+        attachments = [attachment]
+    return mailer.send_email(to, subject, body, attachments=attachments)
 
 #  Template messaging
 def send_template_message(customer, template_type, context=None, *,
@@ -388,7 +391,7 @@ def auto_suspend_overdue():
                            "Your service has been suspended due to non-payment. Please contact support.")
 
 def send_expiry_reminders():
-    """Send templates for plans expiring in 3 days, 2 days, and expired today."""
+    """Send templates for plans expiring in 3 days, 2 days, 1 day, and expired today."""
     with app.app_context():
         today = date.today()
         # 3 days before expiry
@@ -409,6 +412,15 @@ def send_expiry_reminders():
             send_template_message(cp.customer, 'expiry_2d', {'days': 2},
                                   customer_plan=cp)
 
+        # 1 day before expiry
+        expiring_1d = CustomerPlan.query.filter(
+            CustomerPlan.status == 'active',
+            CustomerPlan.end_date == today + timedelta(days=1)
+        ).all()
+        for cp in expiring_1d:
+            send_template_message(cp.customer, 'expiry_1d', {'days': 1},
+                                  customer_plan=cp)
+
         # Expired today
         expired_today = CustomerPlan.query.filter(
             CustomerPlan.status == 'active',
@@ -416,6 +428,102 @@ def send_expiry_reminders():
         ).all()
         for cp in expired_today:
             send_template_message(cp.customer, 'expired', customer_plan=cp)
+
+
+def send_overdue_reminders():
+    """Send due_reminder template to customers with unpaid overdue invoices."""
+    with app.app_context():
+        today = date.today()
+        overdue = Invoice.query.filter(
+            Invoice.status.in_(['sent', 'overdue']),
+            Invoice.due_date < today,
+        ).all()
+        sent = 0
+        for inv in overdue:
+            cust = inv.customer
+            if cust and cust.is_active:
+                result = send_template_message(
+                    cust, 'due_reminder',
+                    invoice=inv,
+                )
+                if getattr(result, 'status', '') in ('sent', 'queued'):
+                    sent += 1
+                inv.status = 'overdue'
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        if sent:
+            log_audit('Due Reminders',
+                      f'Sent {sent} overdue payment reminder(s)')
+
+
+def send_daily_report():
+    """Build and send a daily summary to the admin via email and WhatsApp."""
+    with app.app_context():
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+
+        from models import Customer, CustomerPlan, Invoice, Payment
+
+        total_customers = Customer.query.filter_by(is_active=True).count()
+        active_plans = CustomerPlan.query.filter_by(status='active').count()
+        expiring_3d = CustomerPlan.query.filter(
+            CustomerPlan.status == 'active',
+            CustomerPlan.end_date == today + timedelta(days=3),
+        ).count()
+        expiring_today = CustomerPlan.query.filter(
+            CustomerPlan.status == 'active',
+            CustomerPlan.end_date == today,
+        ).count()
+        new_today = Customer.query.filter(
+            Customer.registration_date == today,
+        ).count()
+        payments_today = Payment.query.filter(
+            Payment.payment_date == today,
+        ).all()
+        payment_total = sum(p.amount for p in payments_today)
+        overdue_count = Invoice.query.filter(
+            Invoice.status.in_(['sent', 'overdue']),
+            Invoice.due_date < today,
+        ).count()
+
+        report = (
+            f"Daily Report - {today.strftime('%d %b %Y')}\n\n"
+            f"Active Customers: {total_customers}\n"
+            f"Active Plans: {active_plans}\n"
+            f"Expiring in 3 days: {expiring_3d}\n"
+            f"Expiring today: {expiring_today}\n"
+            f"New customers today: {new_today}\n"
+            f"Payments today: {len(payments_today)} (Rs. {payment_total:,.2f})\n"
+            f"Overdue invoices: {overdue_count}\n"
+        )
+
+        def _get(key, default=''):
+            try:
+                row = Setting.query.filter_by(key=key).first()
+                if row and row.value:
+                    from models_ext import ENCRYPTED_SETTINGS, decrypt_setting_value
+                    val = row.value
+                    if key in ENCRYPTED_SETTINGS:
+                        val = decrypt_setting_value(val)
+                    return val
+            except Exception:
+                pass
+            return os.environ.get(key.upper(), default)
+
+        from services import mailer
+        admin_email = _get('admin_email') or _get('mail_from', '')
+        if admin_email:
+            mailer.send_email(admin_email, f'Daily Report - {today}', report)
+
+        admin_mobile = _get('admin_mobile') or _get('wa_sender', '')
+        if admin_mobile:
+            messaging.send_whatsapp(admin_mobile, report,
+                                    template_type='daily_report')
+
+        log_audit('Daily Report', f'Report generated for {today}')
+
 
 scheduler = BackgroundScheduler(timezone=os.environ.get('TZ', 'Asia/Kolkata'))
 
@@ -436,6 +544,8 @@ if _should_start_scheduler and not scheduler.running:
     scheduler.add_job(auto_suspend_overdue, CronTrigger(hour=2, minute=0), **job_opts)
     scheduler.add_job(send_grace_period_reminders, CronTrigger(hour=10, minute=0), **job_opts)
     scheduler.add_job(send_expiry_reminders, CronTrigger(hour=9, minute=0), **job_opts)
+    scheduler.add_job(send_overdue_reminders, CronTrigger(hour=11, minute=0), **job_opts)
+    scheduler.add_job(send_daily_report, CronTrigger(hour=8, minute=0), **job_opts)
     scheduler.start()
 
 # ---------- Error handlers ----------
@@ -4748,15 +4858,20 @@ GATEWAY_SETTING_DEFAULTS = {
     'cashfree_env':        app.config.get('CASHFREE_ENV', 'sandbox'),
     'app_link':            app.config.get('APP_LINK', ''),
     'web_link':            app.config.get('WEB_LINK', ''),
+    'admin_email':         app.config.get('ADMIN_EMAIL', ''),
+    'admin_mobile':        app.config.get('ADMIN_MOBILE', ''),
 }
 
 def _seed_gateway_settings():
     """Create any missing settings rows. Never overwrites an edited value."""
-    from models_ext import Setting
+    from models_ext import Setting, ENCRYPTED_SETTINGS, encrypt_setting_value
     added = 0
     for key, value in GATEWAY_SETTING_DEFAULTS.items():
         if not Setting.query.filter_by(key=key).first():
-            db.session.add(Setting(key=key, value=value or ''))
+            stored = value or ''
+            if key in ENCRYPTED_SETTINGS and stored:
+                stored = encrypt_setting_value(stored)
+            db.session.add(Setting(key=key, value=stored))
             added += 1
     if added:
         db.session.commit()

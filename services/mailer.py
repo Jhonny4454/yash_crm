@@ -63,7 +63,14 @@ def _setting(key, default=''):
         from models_ext import Setting
         row = Setting.query.filter_by(key=key).first()
         if row is not None and (row.value or '').strip() != '':
-            return row.value
+            value = row.value
+            try:
+                from models_ext import ENCRYPTED_SETTINGS, decrypt_setting_value
+                if key in ENCRYPTED_SETTINGS:
+                    value = decrypt_setting_value(value)
+            except Exception:
+                pass
+            return value
     except Exception:
         pass
     env = os.environ.get(key.upper())

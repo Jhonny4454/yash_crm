@@ -48,6 +48,8 @@ MAPPING = [
      'customer_name,expiry_date,company_phone,company_name'),
     ('expiry_2d', 'internet_plan_expiring',
      'customer_name,expiry_date,company_phone,company_name'),
+    ('expiry_1d', 'internet_plan_expiring',
+     'customer_name,expiry_date,company_phone,company_name'),
 
     # "Dear {{1}} ... renewed and the invoice has been generated.
     #  Amount Due: Rs. {{2}} ... {{3}} {{4}}"
@@ -127,7 +129,7 @@ UNMAPPED = {
 #: obvious they were considered rather than missed: the complaint and daily
 #: report templates belong to a ticketing module that is not in this build.
 NO_CRM_EQUIVALENT = (
-    'daily_report', 'internet_down', 'internet_restored',
+    'internet_down', 'internet_restored',
     'complaint_registered', 'issue_resolved', 'new_complaint',
 )
 

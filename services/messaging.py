@@ -85,8 +85,16 @@ def _all_settings():
     cached = getattr(g, '_settings_cache', None)
     if cached is None:
         try:
-            from models_ext import Setting
-            cached = {row.key: row.value for row in Setting.query.all()}
+            from models_ext import Setting, ENCRYPTED_SETTINGS, decrypt_setting_value
+            cached = {}
+            for row in Setting.query.all():
+                val = row.value
+                if row.key in ENCRYPTED_SETTINGS and val:
+                    try:
+                        val = decrypt_setting_value(val)
+                    except Exception:
+                        pass
+                cached[row.key] = val
         except Exception:
             # No table yet, or the schema is behind. Fall through to env and
             # defaults rather than failing every send.
@@ -107,11 +115,14 @@ def invalidate_settings_cache():
 
 def _setting(key, default=''):
     """Read a setting from the DB, falling back to env, then to `default`."""
+    value = None
     rows = _all_settings()
     if rows is not None:
         value = rows.get(key)
         if value is not None and (value or '').strip() != '':
-            return value
+            pass
+        else:
+            value = None
     else:
         # Outside an application context - a script, or a worker thread that
         # has not pushed one. Ask the database directly.
@@ -119,9 +130,18 @@ def _setting(key, default=''):
             from models_ext import Setting
             row = Setting.query.filter_by(key=key).first()
             if row is not None and (row.value or '').strip() != '':
-                return row.value
+                value = row.value
         except Exception:
             pass
+
+    if value:
+        try:
+            from models_ext import ENCRYPTED_SETTINGS, decrypt_setting_value
+            if key in ENCRYPTED_SETTINGS:
+                value = decrypt_setting_value(value)
+        except Exception:
+            pass
+        return value
 
     env = os.environ.get(key.upper())
     if env:
@@ -1431,6 +1451,19 @@ DEFAULT_TEMPLATES = [
             "Dear {{customer_name}},\n\n"
             "Your Internet Plan will expire {{expiry_date}}.\n\n"
             "Please renew your plan to avoid any interruption\n\n"
+            "Support No: {{company_phone}}\n"
+            "{{company_name}}\n"
+            "Thank You"
+        ),
+    ),
+    dict(
+        name='Internet Plan Expiring (1 day)',
+        template_type='expiry_1d',
+        description='One day before the plan ends.',
+        body=(
+            "Dear {{customer_name}},\n\n"
+            "Your Internet Plan will expire TOMORROW ({{expiry_date}}).\n\n"
+            "Please renew your plan immediately to avoid any interruption.\n\n"
             "Support No: {{company_phone}}\n"
             "{{company_name}}\n"
             "Thank You"
