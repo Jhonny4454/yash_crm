@@ -634,8 +634,12 @@ def invoice_list():
     status = request.args.get('status')
     if status == 'pending':
         query = query.filter(Invoice.status.in_(('draft', 'sent', 'overdue')))
+    elif status == 'cancelled':
+        query = query.filter(Invoice.status == 'cancelled')
     elif status:
         query = query.filter(Invoice.status == status)
+    else:
+        query = query.filter(Invoice.status != 'cancelled')
 
     customer_id = request.args.get('customer_id')
     if customer_id:
