@@ -87,11 +87,11 @@ export default function Invoices() {
                       </td>
                       <td className="num">{fmtDate(i.issue_date)}</td>
                       <td className="num">{fmtDate(i.due_date)}</td>
-                      <td className="right num">{inr(i.total_amount)}</td>
-                      <td className="right num">{inr(i.paid_amount)}</td>
+                      <td className="right num">{i.status === 'cancelled' ? '₹0' : inr(i.total_amount)}</td>
+                      <td className="right num">{i.status === 'cancelled' ? '₹0' : inr(i.paid_amount)}</td>
                       <td className="right num">
                         <strong style={{ color: i.balance > 0 && i.status !== 'cancelled' ? "#dc2626" : "inherit" }}>
-                          {inr(i.balance)}
+                          {i.status === 'cancelled' ? '₹0' : inr(i.balance)}
                         </strong>
                       </td>
                       <td><StatusPill value={i.status} /></td>

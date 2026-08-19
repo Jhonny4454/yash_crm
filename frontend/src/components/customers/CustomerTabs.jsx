@@ -192,7 +192,7 @@ export function PlanTab({ customer, plans, onAssign, onRenew, onEdit, onRefresh 
           <table className="tbl">
             <thead>
               <tr>
-                <th>#</th><th>Username</th><th>Provider</th><th>Plan</th>
+                <th>Username</th><th>Provider</th><th>Plan</th>
                 <th className="num">Total Amount</th><th>Start Date</th>
                 <th>End Date</th><th className="num">Days Rem</th>
                 <th>Status</th><th>Online Renewal</th><th>Plan Action</th>
@@ -201,7 +201,6 @@ export function PlanTab({ customer, plans, onAssign, onRenew, onEdit, onRefresh 
             <tbody>
               {rows.map((plan, index) => (
                 <tr key={plan.id}>
-                  <td>{index + 1}</td>
                   <td className="mono">{customer.username || "—"}</td>
                   <td>{plan.plan?.service_provider || customer?.service_provider || "—"}</td>
                   <td>{plan.plan_name || "—"}</td>
@@ -776,16 +775,15 @@ function InvoiceTable({ rows, showPending = false }) {
       <table className="tbl">
         <thead>
           <tr>
-            <th>#</th><th>Invoice</th><th>Caption</th><th>Invoice Date</th>
+            <th>Invoice</th><th>Caption</th><th>Invoice Date</th>
             <th>Due Date</th><th>Status</th><th className="num">Amount</th>
             {showPending && <th className="num">Pending</th>}
             <th>Action</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((invoice, index) => (
+          {rows.map((invoice) => (
             <tr key={invoice.id} className={railFor("invoice", invoice.status)}>
-              <td>{index + 1}</td>
               <td className="mono">
                 <Link to={`/invoices/${invoice.id}`}>{invoice.invoice_no}</Link>
               </td>
@@ -793,9 +791,9 @@ function InvoiceTable({ rows, showPending = false }) {
               <td>{fmtDate(invoice.issue_date)}</td>
               <td>{fmtDate(invoice.due_date)}</td>
               <td><StatusPill value={invoice.status} /></td>
-              <td className="num">{inr(invoice.total_amount)}</td>
+              <td className="num">{invoice.status === 'cancelled' ? '₹0' : inr(invoice.total_amount)}</td>
               {showPending && (
-                <td className="num"><strong className="due">{inr(invoice.balance)}</strong></td>
+                <td className="num"><strong className="due">{invoice.status === 'cancelled' ? '₹0' : inr(invoice.balance)}</strong></td>
               )}
               <td><InvoiceActions invoice={invoice} /></td>
             </tr>
@@ -815,17 +813,16 @@ export function PaymentHistoryTab({ payments, onRefresh }) {
         <table className="tbl">
           <thead>
             <tr>
-              <th>#</th><th>Date</th><th>Receipt</th><th>Book Receipt No.</th>
+              <th>Date</th><th>Receipt</th><th>Book Receipt No.</th>
               <th className="num">Received</th><th>Against Invoice</th>
               <th>Mode</th><th>Discount</th><th>Received By</th>
               <th>Status</th><th>Action</th>
             </tr>
           </thead>
           <tbody>
-            {payments.map((payment, index) => (
+            {payments.map((payment) => (
               <tr key={payment.id}
                   className={railFor("payment", payment.status, payment.needs_authorization)}>
-                <td>{index + 1}</td>
                 <td>{fmtDate(payment.payment_date)}</td>
                 <td className="mono">R{payment.id}</td>
                 <td className="mono">{payment.book_receipt_no || "—"}</td>
@@ -875,13 +872,12 @@ export function InventoryTab({ customerId }) {
                 emptyHint="Routers and ONTs assigned to this customer appear here.">
       <table className="tbl">
         <thead>
-          <tr><th>#</th><th>Product</th><th>SKU</th><th>Serial No.</th>
+          <tr><th>Product</th><th>SKU</th><th>Serial No.</th>
             <th>Assigned</th><th>Status</th></tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => (
+          {rows.map((row) => (
             <tr key={row.id}>
-              <td>{index + 1}</td>
               <td>{row.product || "—"}</td>
               <td className="mono">{row.sku || "—"}</td>
               <td className="mono">{row.serial_number || "—"}</td>
@@ -941,13 +937,12 @@ export function PlanHistoryTab({ customerId }) {
                 empty={!rows.length} emptyTitle="No plans on record">
       <table className="tbl">
         <thead>
-          <tr><th>#</th><th>Plan</th><th>Provider</th><th className="num">Price</th>
+          <tr><th>Plan</th><th>Provider</th><th className="num">Price</th>
             <th>Start</th><th>End</th><th>Auto renew</th><th>Status</th></tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => (
+          {rows.map((row) => (
             <tr key={row.id}>
-              <td>{index + 1}</td>
               <td>{row.plan_name || "—"}</td>
               <td>{row.plan?.service_provider || "—"}</td>
               <td className="num">{inr(row.price_monthly)}</td>

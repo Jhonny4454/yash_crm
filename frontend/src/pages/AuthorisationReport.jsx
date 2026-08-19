@@ -308,7 +308,7 @@ export default function AuthorisationReport() {
                              aria-label="Select every row on this page"
                              onChange={toggleAll} />
                     </th>
-                    <th>#</th><th>Name</th><th>Username</th><th>Flat No.</th>
+                    <th>Name</th><th>Username</th><th>Flat No.</th>
                     <th>Building</th><th>Area</th><th>Zone</th><th>Mode</th>
                     <th>Details</th><th>Receipt No</th>
                     <th className="num">Amount</th><th className="num">Discount</th>
@@ -325,7 +325,6 @@ export default function AuthorisationReport() {
                                aria-label={`Select ${row.name}'s payment of ${row.amount}`}
                                onChange={() => toggle(row.id)} />
                       </td>
-                      <td>{((meta?.page || 1) - 1) * (meta?.per_page || 50) + index + 1}</td>
                       <td>
                         <Link to={`/customers/${row.customer_id}`}>{row.name || "—"}</Link>
                       </td>

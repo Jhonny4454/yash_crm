@@ -114,8 +114,8 @@ function BillRow({ invoice, gateway, onPaid, ask }) {
       </div>
 
       <div className="bill-row-money">
-        <strong>{inr(unpaid ? balance : invoice.total_amount)}</strong>
-        <span>{!unpaid ? "paid" : overdue ? "overdue" : "to pay"}</span>
+        <strong>{invoice.status === 'cancelled' ? '₹0' : inr(unpaid ? balance : invoice.total_amount)}</strong>
+        <span>{invoice.status === 'cancelled' ? 'voided' : !unpaid ? "paid" : overdue ? "overdue" : "to pay"}</span>
       </div>
 
       {canPay(gateway)(invoice) && (

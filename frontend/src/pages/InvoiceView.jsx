@@ -132,11 +132,11 @@ export default function InvoiceView() {
 
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
             <div style={{ minWidth: 280 }}>
-              <Line label="Subtotal" value={inr(inv.total_amount)} />
-              {inv.tax_amount > 0 && <Line label="Tax" value={inr(inv.tax_amount)} />}
-              {inv.discount_amount > 0 && <Line label="Discount" value={`− ${inr(inv.discount_amount)}`} />}
-              <Line label="Net payable" value={inr(inv.net_amount)} bold />
-              <Line label="Paid" value={inr(inv.paid_amount)} />
+              <Line label="Subtotal" value={inv.status === 'cancelled' ? '₹0' : inr(inv.total_amount)} />
+              {inv.tax_amount > 0 && <Line label="Tax" value={inv.status === 'cancelled' ? '₹0' : inr(inv.tax_amount)} />}
+              {inv.discount_amount > 0 && <Line label="Discount" value={inv.status === 'cancelled' ? '₹0' : `− ${inr(inv.discount_amount)}`} />}
+              <Line label="Net payable" value={inv.status === 'cancelled' ? '₹0' : inr(inv.net_amount)} bold />
+              <Line label="Paid" value={inv.status === 'cancelled' ? '₹0' : inr(inv.paid_amount)} />
               <Line label="Balance due" value={inv.status === 'cancelled' ? '₹0 — Voided' : inr(inv.balance)} bold danger={inv.balance > 0 && inv.status !== 'cancelled'} />
             </div>
           </div>

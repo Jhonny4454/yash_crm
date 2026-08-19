@@ -121,7 +121,6 @@ export default function Customers() {
           <table className="data cards-sm">
             <thead>
               <tr>
-                <th>#</th>
                 <th>Name</th>
                 <th>Mobile</th>
                 <th>Email</th>
@@ -134,9 +133,6 @@ export default function Customers() {
             <tbody>
               {data.map((c, i) => (
                 <tr key={c.id}>
-                  <td className="num" data-label="#">
-                    {((meta?.page || 1) - 1) * (meta?.per_page || 25) + i + 1}
-                  </td>
                   <td data-label="Name">
                     <Link to={`/customers/${c.id}`}>
                       <strong>{c.full_name}</strong>

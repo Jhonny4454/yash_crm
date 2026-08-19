@@ -462,6 +462,7 @@ small.ok { color: #15803d; }
 /* Scroll arrows for wide tables ------------------------------------------ */
 .scroll-arrows-wrap {
   position: relative;
+  padding: 0 2px;
 }
 .scroll-arrows-wrap .table-wrap {
   overflow-x: auto;
@@ -472,11 +473,11 @@ small.ok { color: #15803d; }
   top: 50%;
   transform: translateY(-50%);
   z-index: 5;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   border: 1px solid var(--border, #d0d5dd);
-  background: var(--surface, #fff);
+  background: rgba(255,255,255,0.92);
   color: var(--text, #344054);
   font-size: 18px;
   line-height: 1;
@@ -493,10 +494,10 @@ small.ok { color: #15803d; }
   border-color: var(--primary-color, #0073b7);
 }
 .scroll-arrow-left {
-  left: -8px;
+  left: 2px;
 }
 .scroll-arrow-right {
-  right: -8px;
+  right: 2px;
 }
 
 /* iPhone notch / home indicator: keep the footer and any fixed bar clear of
