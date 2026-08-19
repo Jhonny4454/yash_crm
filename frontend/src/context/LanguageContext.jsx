@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from "react
 import translations from "../i18n/translations";
 
 const STORAGE_KEY = "yash.lang";
-const VALID = ["en", "hi", "mr"];
+const VALID = ["en", "mr"];
 
 function readLang() {
   try {

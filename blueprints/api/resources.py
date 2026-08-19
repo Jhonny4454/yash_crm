@@ -313,6 +313,15 @@ def customer_create():
     # halfway through, leaving a customer with no service attached.
     assigned, plan_error = _assign_initial_plan(customer, data)
 
+    # Send welcome message (best-effort, never blocks the response)
+    try:
+        from app import send_template_message
+        send_template_message(customer, 'welcome',
+                              plan=assigned.plan if assigned else None,
+                              customer_plan=assigned)
+    except Exception:
+        pass
+
     payload = customer_dict(customer, detail=True)
     payload['assigned_plan'] = customer_plan_dict(assigned) if assigned else None
     if plan_error:

@@ -40,7 +40,6 @@ const TITLES = {
 
 const LANG_OPTIONS = [
   { code: "en", label: "English" },
-  { code: "hi", label: "\u0939\u093f\u0928\u094d\u0926\u0940" },
   { code: "mr", label: "\u092e\u0930\u093e\u0920\u0940" },
 ];
 
