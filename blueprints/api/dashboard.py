@@ -302,7 +302,8 @@ def dashboard_summary():
         func.count(Invoice.id),
         func.coalesce(func.sum(Invoice.total_amount), 0)
     ).filter(Invoice.issue_date >= month_start,
-             Invoice.issue_date <= month_end).group_by(Invoice.status).all()
+             Invoice.issue_date <= month_end,
+             Invoice.status != 'cancelled').group_by(Invoice.status).all()
 
     total_bills = sum(r[1] for r in inv_rows)
     total_amount = float(sum(r[2] or 0 for r in inv_rows))
@@ -485,7 +486,8 @@ def dashboard_monthly():
         Invoice.status,
         func.count(Invoice.id),
         func.coalesce(func.sum(Invoice.total_amount), 0)
-    ).filter(Invoice.issue_date >= start).group_by('m', Invoice.status).all()
+    ).filter(Invoice.issue_date >= start,
+             Invoice.status != 'cancelled').group_by('m', Invoice.status).all()
 
     totals = defaultdict(lambda: {
         'total_bills': 0, 'total_amount': 0.0,
