@@ -4,7 +4,7 @@ import { useFetch } from "../api/useFetch";
 import { useLookup } from "../api/useLookup";
 import { useToast } from "../context/ToastContext";
 import {
-  Empty, ErrorNote, Loading, Pager, fmtDate, readableError,
+  Empty, ErrorNote, Loading, Pager, ScrollArrows, fmtDate, readableError,
 } from "../components/ui";
 import "../styles/Forms.css";
 
@@ -268,7 +268,7 @@ function MessageLog() {
     <section className="panel" style={{ marginTop: "1.25rem" }}>
       <h2>Recent messages</h2>
       <ErrorNote error={error} onRetry={refetch} />
-      <div className="table-wrap">
+      <ScrollArrows>
         {loading ? (
           <Loading label="Loading message log" />
         ) : !rows.length ? (
@@ -294,7 +294,7 @@ function MessageLog() {
             </tbody>
           </table>
         )}
-      </div>
+      </ScrollArrows>
       <Pager meta={meta} onPage={setPage} />
     </section>
   );

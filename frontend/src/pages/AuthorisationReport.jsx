@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { get, post } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
-import { Empty, ErrorNote, fmtDate, inr, Loading, Pager, readableError } from "../components/ui";
+import { Empty, ErrorNote, fmtDate, inr, Loading, Pager, readableError, ScrollArrows } from "../components/ui";
 import "../styles/AuthorisationReport.css";
 
 /**
@@ -299,7 +299,7 @@ export default function AuthorisationReport() {
                      ? "Every collected payment has been signed off."
                      : "No entries match these filters. Try widening them."} />
           ) : (
-            <div className="table-wrap">
+            <ScrollArrows>
               <table className="tbl auth-table">
                 <thead>
                   <tr>
@@ -348,7 +348,7 @@ export default function AuthorisationReport() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollArrows>
           )}
 
         <Pager meta={meta} onPage={setPage} />

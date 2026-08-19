@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { post } from "../api/client";
 import { useFetch } from "../api/useFetch";
-import { Empty, ErrorNote, Pager, fmtDate, inr, Loading, StatusPill } from "../components/ui";
+import { Empty, ErrorNote, Pager, ScrollArrows, fmtDate, inr, Loading, StatusPill } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 
@@ -55,7 +55,7 @@ export default function PaymentsPage({ review = false }) {
       <ErrorNote error={error || actionError} onRetry={refetch} />
 
       <div className="card" style={{ borderRadius: 12, overflow: "hidden" }}>
-        <div className="table-wrap">
+        <ScrollArrows>
           {loading ? (
             <Loading label="Loading payments" />
           ) : !data?.length ? (
@@ -110,7 +110,7 @@ export default function PaymentsPage({ review = false }) {
               </tbody>
             </table>
           )}
-        </div>
+        </ScrollArrows>
         <Pager meta={meta} onPage={setPage} />
       </div>
     </section>

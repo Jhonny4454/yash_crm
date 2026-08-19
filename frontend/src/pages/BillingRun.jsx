@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { get, post } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
-import { Empty, ErrorNote, fmtDate, inr, Loading, Pager, readableError } from "../components/ui";
+import { Empty, ErrorNote, fmtDate, inr, Loading, Pager, readableError, ScrollArrows } from "../components/ui";
 import "../styles/BillingRun.css";
 import MoneyInput from "../components/MoneyInput";
 
@@ -282,7 +282,7 @@ export default function BillingRun() {
             <Empty title="Nobody is due in that window"
                    hint="The list opens on plans expiring within seven days. Widen the expiry dates to see more." />
           ) : (
-            <div className="table-wrap">
+            <ScrollArrows>
               <table className="tbl run-table">
                 <thead>
                   <tr>
@@ -334,7 +334,7 @@ export default function BillingRun() {
                   })}
                 </tbody>
               </table>
-            </div>
+            </ScrollArrows>
           )}
 
         <Pager meta={meta} onPage={setPage} />

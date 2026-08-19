@@ -6,7 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import MoneyInput from "./MoneyInput";
 import {
-  Empty, ErrorNote, Loading, Pager, TableSkeleton, fmtDate, inr, readableError,
+  Empty, ErrorNote, Loading, Pager, ScrollArrows, TableSkeleton, fmtDate, inr, readableError,
 } from "./ui";
 
 /**
@@ -240,7 +240,7 @@ export default function CrudPage({
         {/* `refreshing` dims the existing rows; `loading` means there are no
             rows yet. Searching and paging now land in the first case, so the
             table stays on screen instead of being replaced by a spinner. */}
-        <div className={`table-wrap${refreshing ? " is-refreshing" : ""}`}>
+        <ScrollArrows wrapClassName={`table-wrap${refreshing ? " is-refreshing" : ""}`}>
           {loading ? (
             <TableSkeleton rows={6} cols={tableCols.length + 2}
               label={`Loading ${title.toLowerCase()}`} />
@@ -335,7 +335,7 @@ export default function CrudPage({
               </tbody>
             </table>
           )}
-        </div>
+        </ScrollArrows>
         <Pager meta={meta} onPage={setPage} />
       </div>
 

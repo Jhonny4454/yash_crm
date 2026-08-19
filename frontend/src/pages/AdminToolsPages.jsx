@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { get, post, upload } from "../api/client";
 import { useFetch } from "../api/useFetch";
-import { Empty, ErrorNote, fmtDate, Loading } from "../components/ui";
+import { Empty, ErrorNote, fmtDate, Loading, ScrollArrows } from "../components/ui";
 
 export function BackupsPage() {
   const { data, meta, loading, error, refetch } = useFetch("/settings/backups");
@@ -40,7 +40,7 @@ export function BackupsPage() {
       {message && <div className="alert info" style={{ borderRadius: 8 }}>{message}</div>}
 
       <div className="card" style={{ borderRadius: 12, overflow: "hidden" }}>
-        <div className="table-wrap">
+        <ScrollArrows>
           {loading ? <Loading /> : error ? <ErrorNote error={error} onRetry={refetch} />
             : !data?.length ? (
               <Empty title="No backups yet" hint="Create a backup before making a major data change." />
@@ -66,7 +66,7 @@ export function BackupsPage() {
                 </tbody>
               </table>
             )}
-        </div>
+        </ScrollArrows>
       </div>
       {meta && <p className="muted" style={{ marginTop: 8 }}>{meta.total} backups</p>}
     </section>
@@ -180,7 +180,7 @@ export function ReportsPage({ endpoint, title }) {
       </div>
 
       <div className="card" style={{ borderRadius: 12, overflow: "hidden" }}>
-        <div className="table-wrap">
+        <ScrollArrows>
           {loading ? <Loading label="Preparing report" />
             : error ? <ErrorNote error={error} onRetry={refetch} />
             : !rows.length ? (
@@ -205,7 +205,7 @@ export function ReportsPage({ endpoint, title }) {
                 </tbody>
               </table>
             )}
-        </div>
+        </ScrollArrows>
       </div>
     </section>
   );

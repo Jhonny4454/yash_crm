@@ -5,7 +5,7 @@ import { useLookup } from "../api/useLookup";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import {
-  Empty, ErrorNote, Loading, Pager, StatusPill, fmtDate, readableError,
+  Empty, ErrorNote, Loading, Pager, ScrollArrows, StatusPill, fmtDate, readableError,
 } from "../components/ui";
 import "../styles/Forms.css";
 
@@ -122,7 +122,7 @@ export default function LeavesPage() {
       {actionError && <div className="alert error">{readableError(actionError)}</div>}
 
       <div className="card">
-        <div className="table-wrap">
+        <ScrollArrows>
           {loading ? (
             <Loading label="Loading leave requests" />
           ) : !rows.length ? (
@@ -184,7 +184,7 @@ export default function LeavesPage() {
               </tbody>
             </table>
           )}
-        </div>
+        </ScrollArrows>
         <Pager meta={meta} onPage={setPage} />
       </div>
 

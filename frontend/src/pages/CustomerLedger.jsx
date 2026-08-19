@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { get } from "../api/client";
-import { Empty, ErrorNote, fmtDate, inr, Loading } from "../components/ui";
+import { Empty, ErrorNote, fmtDate, inr, Loading, ScrollArrows } from "../components/ui";
 import "../styles/Forms.css";
 
 /**
@@ -230,7 +230,7 @@ function Statement({ customerId }) {
           </button>
         </div>
 
-        <div className="table-wrap">
+        <ScrollArrows>
           {entries.length === 0 ? (
             <Empty
               title="No entries"
@@ -263,7 +263,7 @@ function Statement({ customerId }) {
               </tbody>
             </table>
           )}
-        </div>
+        </ScrollArrows>
       </section>
     </>
   );

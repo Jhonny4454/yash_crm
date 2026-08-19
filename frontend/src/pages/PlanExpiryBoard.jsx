@@ -5,7 +5,7 @@ import { useLookup } from "../api/useLookup";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import {
-  Empty, ErrorNote, Loading, Pager, fmtDate, inr, readableError,
+  Empty, ErrorNote, Loading, Pager, ScrollArrows, fmtDate, inr, readableError,
 } from "../components/ui";
 import "../styles/Forms.css";
 
@@ -540,7 +540,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
       <ErrorNote error={error} onRetry={() => setReloadKey((k) => k + 1)} />
 
       <div className="card">
-        <div className="table-wrap">
+        <ScrollArrows>
           {loading ? (
             <Loading label={`Loading ${config.title.toLowerCase()}`} />
           ) : !rows.length ? (
@@ -668,7 +668,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
               </tfoot>
             </table>
           )}
-        </div>
+        </ScrollArrows>
         <Pager meta={meta} onPage={(next) => patch({ page: next > 1 ? next : "" })} />
       </div>
     </section>

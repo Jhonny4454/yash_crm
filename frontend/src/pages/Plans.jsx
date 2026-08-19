@@ -4,7 +4,7 @@ import { useFetch } from "../api/useFetch";
 import { useLookup } from "../api/useLookup";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
-import { Empty, ErrorNote, Loading, inr, readableError } from "../components/ui";
+import { Empty, ErrorNote, Loading, ScrollArrows, inr, readableError } from "../components/ui";
 import MoneyInput from "../components/MoneyInput";
 
 const BLANK = {
@@ -130,7 +130,7 @@ export default function Plans() {
       <ErrorNote error={error} onRetry={refetch} />
 
       <div className="card" style={{ borderRadius: 12, overflow: "hidden" }}>
-        <div className="table-wrap">
+        <ScrollArrows>
           {loading ? <Loading label="Loading plans" />
             : !data?.length ? <Empty title="No plans yet" hint="Add your first plan to start billing." />
             : (
@@ -190,7 +190,7 @@ export default function Plans() {
                 </tbody>
               </table>
             )}
-        </div>
+        </ScrollArrows>
       </div>
 
       {editing && (

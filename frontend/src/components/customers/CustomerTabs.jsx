@@ -5,7 +5,7 @@ import { useFetch } from "../../api/useFetch";
 import { useToast } from "../../context/ToastContext";
 import {
   currentPlan, Empty, ErrorNote, fmtDate, inr, rupees, Loading, Pager, railFor,
-  readableError, StatusPill,
+  readableError, ScrollArrows, StatusPill,
 } from "../ui";
 import { InvoiceActions, ReceiptActions } from "./DocumentActions";
 import AddonInvoice from "./AddonInvoice";
@@ -188,7 +188,7 @@ export function PlanTab({ customer, plans, onAssign, onRenew, onEdit, onRefresh 
                action={<button type="button" className="btn primary"
                                onClick={() => onAssign?.()}>Assign a plan</button>} />
       ) : (
-        <div className="table-wrap">
+        <ScrollArrows wrapClassName="table-wrap">
           <table className="tbl">
             <thead>
               <tr>
@@ -230,7 +230,7 @@ export function PlanTab({ customer, plans, onAssign, onRenew, onEdit, onRefresh 
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollArrows>
       )}
 
       {plans.length > rows.length && (
@@ -531,7 +531,7 @@ export function PendingInvoiceTab({ customer, onRefresh }) {
                  hint="Every invoice on this account is settled." />
         ) : (
           <form onSubmit={submit} className="pay-entry">
-            <div className="table-wrap">
+            <ScrollArrows wrapClassName="table-wrap">
               <table className="tbl pending-table">
                 <thead>
                   <tr>
@@ -585,7 +585,7 @@ export function PendingInvoiceTab({ customer, onRefresh }) {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollArrows>
 
             {errors.invoices && <p className="field-error">{errors.invoices}</p>}
 
@@ -772,7 +772,7 @@ export function InvoiceHistoryTab({ invoices }) {
 
 function InvoiceTable({ rows, showPending = false }) {
   return (
-    <div className="table-wrap">
+    <ScrollArrows wrapClassName="table-wrap">
       <table className="tbl">
         <thead>
           <tr>
@@ -802,7 +802,7 @@ function InvoiceTable({ rows, showPending = false }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollArrows>
   );
 }
 
@@ -811,7 +811,7 @@ export function PaymentHistoryTab({ payments, onRefresh }) {
   return (
     <section className="panel-card">
       <div className="panel-head">Payment history</div>
-      <div className="table-wrap">
+      <ScrollArrows wrapClassName="table-wrap">
         <table className="tbl">
           <thead>
             <tr>
@@ -854,8 +854,8 @@ export function PaymentHistoryTab({ payments, onRefresh }) {
               </tr>
             ))}
           </tbody>
-        </table>
-      </div>
+          </table>
+      </ScrollArrows>
     </section>
   );
 }
@@ -1057,7 +1057,7 @@ function TablePanel({ title, loading, error, onRetry, empty, emptyTitle,
       <ErrorNote error={error} onRetry={onRetry} />
       {loading ? <Loading label={`Loading ${String(title).toLowerCase()}`} />
         : empty ? <Empty title={emptyTitle} hint={emptyHint} />
-          : <div className="table-wrap">{children}</div>}
+          : <ScrollArrows wrapClassName="table-wrap">{children}</ScrollArrows>}
       {footer}
     </section>
   );

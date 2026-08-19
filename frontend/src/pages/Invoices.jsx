@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useDebounced, useFetch } from "../api/useFetch";
 import {
-  Empty, ErrorNote, Loading, Pager, StatusPill, fmtDate, inr, railFor,
+  Empty, ErrorNote, Loading, Pager, ScrollArrows, StatusPill, fmtDate, inr, railFor,
 } from "../components/ui";
 
 export default function Invoices() {
@@ -67,7 +67,7 @@ export default function Invoices() {
       <ErrorNote error={error} onRetry={refetch} />
 
       <div className="card" style={{ borderRadius: 12, overflow: "hidden" }}>
-        <div className="table-wrap">
+        <ScrollArrows>
           {loading ? <Loading label="Loading invoices" />
             : !data?.length ? <Empty title="No invoices match" hint="Try clearing the filters." />
             : (
@@ -100,7 +100,7 @@ export default function Invoices() {
                 </tbody>
               </table>
             )}
-        </div>
+        </ScrollArrows>
         <Pager meta={meta} onPage={setPage} />
       </div>
     </>

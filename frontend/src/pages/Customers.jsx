@@ -4,7 +4,7 @@ import { del } from "../api/client";
 import { useDebounced, useFetch } from "../api/useFetch";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
-import { Empty, ErrorNote, Pager, TableSkeleton, readableError } from "../components/ui";
+import { Empty, ErrorNote, Pager, ScrollArrows, TableSkeleton, readableError } from "../components/ui";
 
 /** Mirrors templates/customers/list.html - same columns, same icon actions. */
 export default function Customers() {
@@ -109,7 +109,7 @@ export default function Customers() {
       <ErrorNote error={error} onRetry={refetch} />
       {actionError && <div className="alert error" style={{ borderRadius: 8 }}>{readableError(actionError)}</div>}
 
-      <div className={`table-wrap${refreshing ? " is-refreshing" : ""}`} style={{ borderRadius: 12, overflow: "hidden" }}>
+      <ScrollArrows wrapClassName={`table-wrap${refreshing ? " is-refreshing" : ""}`} style={{ borderRadius: 12, overflow: "hidden" }}>
         {loading ? (
           <TableSkeleton rows={8} cols={8} label="Loading customers" />
         ) : !data?.length ? (
@@ -191,7 +191,7 @@ export default function Customers() {
             </tbody>
           </table>
         )}
-      </div>
+      </ScrollArrows>
 
       <Pager meta={meta} onPage={setPage} />
     </div>

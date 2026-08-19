@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { del, get, post, put } from "../../api/client";
 import { useToast } from "../../context/ToastContext";
-import { fmtDate, inr, rupees, readableError } from "../ui";
+import { fmtDate, inr, rupees, readableError, ScrollArrows } from "../ui";
 import PlanPicker from "./PlanPicker";
 import DateField from "../../components/DateField";
 import MoneyInput from "../MoneyInput";
@@ -525,7 +525,7 @@ export function RenewPlanDialog({ customer, plan, onClose, onDone }) {
           <span className="is-total">Total <strong>{inr(total)}</strong></span>
         </div>
 
-        <div className="table-wrap">
+        <ScrollArrows wrapClassName="table-wrap">
           <table className="data cards-sm renew-plan-table">
             <thead>
               <tr>
@@ -554,7 +554,7 @@ export function RenewPlanDialog({ customer, plan, onClose, onDone }) {
               </tr>
             </tbody>
           </table>
-        </div>
+        </ScrollArrows>
 
         {/* Read-only, and the one fact the operator is committing to. */}
         <p className="renew-note">

@@ -262,3 +262,54 @@ export function ProtectedRoute({ children, audience, adminOnly = false }) {
   if (adminOnly && !auth.isAdmin) return <Navigate to="/forbidden" replace />;
   return children;
 }
+
+import { useRef, useState, useCallback, useEffect } from "react";
+
+export function ScrollArrows({ children, className = "", wrapClassName = "" }) {
+  const ref = useRef(null);
+  const [canLeft, setCanLeft] = useState(false);
+  const [canRight, setCanRight] = useState(false);
+
+  const check = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    setCanLeft(el.scrollLeft > 2);
+    setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+  }, []);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    check();
+    el.addEventListener("scroll", check, { passive: true });
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => { el.removeEventListener("scroll", check); ro.disconnect(); };
+  }, [check]);
+
+  const scroll = (dir) => {
+    const el = ref.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * el.clientWidth * 0.7, behavior: "smooth" });
+  };
+
+  return (
+    <div className={`scroll-arrows-wrap${className ? " " + className : ""}`}>
+      {canLeft && (
+        <button type="button" className="scroll-arrow scroll-arrow-left"
+                onClick={() => scroll(-1)} aria-label="Scroll left">
+          &#8249;
+        </button>
+      )}
+      <div ref={ref} className={`table-wrap${wrapClassName ? " " + wrapClassName : ""}`}>
+        {children}
+      </div>
+      {canRight && (
+        <button type="button" className="scroll-arrow scroll-arrow-right"
+                onClick={() => scroll(1)} aria-label="Scroll right">
+          &#8250;
+        </button>
+      )}
+    </div>
+  );
+}

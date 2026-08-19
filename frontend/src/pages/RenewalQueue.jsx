@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { get, post } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
-import { Empty, ErrorNote, fmtDate, inr, Loading, Pager, readableError } from "../components/ui";
+import { Empty, ErrorNote, fmtDate, inr, Loading, Pager, readableError, ScrollArrows } from "../components/ui";
 import "../styles/RenewalQueue.css";
 
 /**
@@ -309,7 +309,7 @@ export default function RenewalQueue() {
                      ? "Renewals customers raise from the portal appear here."
                      : "Try another tab."} />
           ) : (
-            <div className="table-wrap">
+            <ScrollArrows>
               <table className="tbl renewal-table">
                 <thead>
                   <tr>
@@ -394,7 +394,7 @@ export default function RenewalQueue() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollArrows>
           )}
 
         <Pager meta={meta} onPage={setPage} />
@@ -520,7 +520,7 @@ function ExpiryReminders({ isAdmin }) {
         </div>
 
         {due?.rows?.length > 0 && (
-          <div className="table-wrap">
+          <ScrollArrows>
             <table className="tbl">
               <thead>
                 <tr><th>Customer</th><th>Plan</th><th>Zone</th><th>Expires</th><th>Days left</th></tr>
@@ -545,7 +545,7 @@ function ExpiryReminders({ isAdmin }) {
                 Showing 10 of {due.totals.count}. The send covers all of them.
               </p>
             )}
-          </div>
+          </ScrollArrows>
         )}
 
         {result && (

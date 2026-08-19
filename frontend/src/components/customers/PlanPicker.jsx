@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { get } from "../../api/client";
-import { inr } from "../ui";
+import { inr, ScrollArrows } from "../ui";
 import MoneyInput from "../MoneyInput";
 
 /**
@@ -73,46 +73,48 @@ export default function PlanPicker({ value, onChange, overrides, onOverride }) {
                 No {kind} packages match “{query}”.
               </p>
               : (
-                <table className="tbl">
-                  <thead>
-                    <tr>
-                      <th aria-label="Select" />
-                      <th>Package Name</th>
-                      <th>Service Provider</th>
-                      <th className="num">Base Amount</th>
-                      <th className="num">Total Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {plans.map((plan) => {
-                      const chosen = String(plan.id) === String(value);
-                      return (
-                        <tr key={plan.id} className={chosen ? "is-chosen" : undefined}
-                            onClick={() => onChange(String(plan.id))}>
-                          <td>
-                            <input type="radio" name="plan_id" value={plan.id}
-                                   checked={chosen}
-                                   onChange={() => onChange(String(plan.id))} />
-                          </td>
-                          <td>{plan.name}</td>
-                          <td>{plan.service_provider || "—"}</td>
-                          <td className="num">
-                            <AmountCell disabled={!chosen}
-                                        value={amountFor(plan, "base_amount")}
-                                        onChange={(next) =>
-                                          onOverride?.(plan.id, "base_amount", next)} />
-                          </td>
-                          <td className="num">
-                            <AmountCell disabled={!chosen}
-                                        value={amountFor(plan, "total_amount")}
-                                        onChange={(next) =>
-                                          onOverride?.(plan.id, "total_amount", next)} />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <ScrollArrows>
+                  <table className="tbl">
+                    <thead>
+                      <tr>
+                        <th aria-label="Select" />
+                        <th>Package Name</th>
+                        <th>Service Provider</th>
+                        <th className="num">Base Amount</th>
+                        <th className="num">Total Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {plans.map((plan) => {
+                        const chosen = String(plan.id) === String(value);
+                        return (
+                          <tr key={plan.id} className={chosen ? "is-chosen" : undefined}
+                              onClick={() => onChange(String(plan.id))}>
+                            <td>
+                              <input type="radio" name="plan_id" value={plan.id}
+                                     checked={chosen}
+                                     onChange={() => onChange(String(plan.id))} />
+                            </td>
+                            <td>{plan.name}</td>
+                            <td>{plan.service_provider || "—"}</td>
+                            <td className="num">
+                              <AmountCell disabled={!chosen}
+                                          value={amountFor(plan, "base_amount")}
+                                          onChange={(next) =>
+                                            onOverride?.(plan.id, "base_amount", next)} />
+                            </td>
+                            <td className="num">
+                              <AmountCell disabled={!chosen}
+                                          value={amountFor(plan, "total_amount")}
+                                          onChange={(next) =>
+                                            onOverride?.(plan.id, "total_amount", next)} />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </ScrollArrows>
               )}
       </div>
 

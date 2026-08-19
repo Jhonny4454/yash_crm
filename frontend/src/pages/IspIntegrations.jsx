@@ -5,7 +5,7 @@ import { useLookup } from "../api/useLookup";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import {
-  Empty, ErrorNote, Loading, Pager, fmtDate, readableError,
+  Empty, ErrorNote, Loading, Pager, ScrollArrows, fmtDate, readableError,
 } from "../components/ui";
 import "../styles/Forms.css";
 import MoneyInput from "../components/MoneyInput";
@@ -96,7 +96,7 @@ export default function IspIntegrations() {
         <>
           <ErrorNote error={error} onRetry={refetch} />
           <div className="card" style={{ borderRadius: 12, overflow: "hidden" }}>
-            <div className="table-wrap">
+            <ScrollArrows>
               {loading ? (
                 <Loading label="Loading integrations" />
               ) : !rows.length ? (
@@ -163,7 +163,7 @@ export default function IspIntegrations() {
                   </tbody>
                 </table>
               )}
-            </div>
+            </ScrollArrows>
           </div>
         </>
       )}
@@ -412,7 +412,7 @@ function SyncLogs() {
     <>
       <ErrorNote error={error} onRetry={refetch} />
       <div className="card">
-        <div className="table-wrap">
+        <ScrollArrows>
           {loading ? (
             <Loading label="Loading sync log" />
           ) : !rows.length ? (
@@ -453,7 +453,7 @@ function SyncLogs() {
               </tbody>
             </table>
           )}
-        </div>
+        </ScrollArrows>
         <Pager meta={meta} onPage={setPage} />
       </div>
     </>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { post, put } from "../api/client";
 import { useFetch } from "../api/useFetch";
 import { useAuth } from "../context/AuthContext";
-import { Empty, ErrorNote, Loading, fmtDate, readableError } from "../components/ui";
+import { Empty, ErrorNote, Loading, ScrollArrows, fmtDate, readableError } from "../components/ui";
 
 export default function Notifications() {
   const [tab, setTab] = useState("templates");
@@ -162,7 +162,7 @@ function LogPanel() {
 
   return (
     <div className="card">
-      <div className="table-wrap">
+      <ScrollArrows>
         <table className="data">
           <thead><tr><th>Sent</th><th>Title</th><th>Message</th><th>Channel</th><th>Status</th></tr></thead>
           <tbody>
@@ -177,7 +177,7 @@ function LogPanel() {
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollArrows>
     </div>
   );
 }

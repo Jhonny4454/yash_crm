@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useFetch } from "../api/useFetch";
-import { Empty, ErrorNote, Loading, Skeleton, fmtDate, inr, inrShort } from "../components/ui";
+import { Empty, ErrorNote, Loading, ScrollArrows, Skeleton, fmtDate, inr, inrShort } from "../components/ui";
 import "../styles/DashboardBoard.css";
 
 /**
@@ -409,7 +409,7 @@ function MonthlySummary() {
     <div className="panel-card">
       <div className="panel-head">New customers, sales &amp; collection summary</div>
       <ErrorNote error={error} onRetry={refetch} />
-      <div className="table-wrap scroll-y">
+      <ScrollArrows wrapClassName="scroll-y">
         {loading ? (
           <Loading label="Loading monthly summary" />
         ) : !rows.length ? (
@@ -474,7 +474,7 @@ function MonthlySummary() {
             </tbody>
           </table>
         )}
-      </div>
+      </ScrollArrows>
     </div>
   );
 }
@@ -528,7 +528,7 @@ function ZonePanels() {
       </div>
 
       <ErrorNote error={error} onRetry={refetch} />
-      <div className="table-wrap">
+      <ScrollArrows>
         {loading ? (
           <Loading label="Loading zones" />
         ) : !rows.length ? (
@@ -571,7 +571,7 @@ function ZonePanels() {
             </tfoot>
           </table>
         )}
-      </div>
+      </ScrollArrows>
     </div>
   );
 }
