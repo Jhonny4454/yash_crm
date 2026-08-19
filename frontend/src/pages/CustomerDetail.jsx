@@ -7,7 +7,7 @@ import { useToast } from "../context/ToastContext";
 import {
   AssignPlanDialog, clearDiscount, DiscountDialog, DueReminderBell,
   EditPlanDialog, OptionsMenu, RenewPlanDialog, ResetMacDialog,
-  ResetPasswordResult, SmsDialog,
+  ResetPasswordResult,
 } from "../components/customers/CustomerOptions";
 import {
   CustomerLogTab, InvoiceHistoryTab, LedgerTab, MessageLogTab,
@@ -36,7 +36,6 @@ const TABS = [
   { key: "pending", label: "Pending Invoice" },
   { key: "invoices", label: "Invoice History" },
   { key: "payments", label: "Payment History" },
-  { key: "messages", label: "SMS Log" },
   { key: "plan-history", label: "Plan History" },
   { key: "logs", label: "Customer Log" },
   { key: "ledger", label: "Payment Ledger" },
@@ -176,8 +175,6 @@ export default function CustomerDetail() {
         return setTab("ledger");
       case "discount":
         return setDialog({ type: "discount" });
-      case "sms":
-        return setDialog({ type: "sms" });
       case "reset-mac":
         return setDialog({ type: "reset-mac" });
       default:
@@ -266,10 +263,6 @@ export default function CustomerDetail() {
       {dialog?.type === "discount" && (
         <DiscountDialog customer={customer} onDone={refetch}
                         onClose={() => setDialog(null)} />
-      )}
-      {dialog?.type === "sms" && (
-        <SmsDialog customer={customer} onDone={refetch}
-                   onClose={() => setDialog(null)} />
       )}
       {dialog?.type === "reset-mac" && (
         <ResetMacDialog customer={customer} onDone={refetch}

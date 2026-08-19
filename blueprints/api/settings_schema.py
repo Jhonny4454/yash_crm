@@ -44,9 +44,6 @@ GROUPS = [
     ('payment', 'Online payments',
      'Cashfree credentials for the customer portal. Leave the App ID blank to '
      'hide the Pay button entirely.'),
-    ('sms', 'SMS templates',
-     'Plain-text fallbacks. WhatsApp templates live under Masters → Message '
-     'templates.'),
     ('branding', 'Branding & links',
      'The banner in the customer portal and the app/website links used in '
      'messages.'),
@@ -243,14 +240,6 @@ FIELDS = {
         group='payment', order=12, input='password', label='Cashfree secret key',
         secret=True),
 
-    # ------------------------------------------------------------------ sms --
-    'sms_template_renewal': dict(
-        group='sms', order=10, input='textarea', label='Renewal SMS', rows=3,
-        help='Placeholders: {name} {plan} {expiry}.'),
-    'sms_template_expiry': dict(
-        group='sms', order=11, input='textarea', label='Expiry reminder SMS',
-        rows=3, help='Placeholders: {name} {plan} {expiry}.'),
-
     # ------------------------------------------------------------- branding --
     'banner_link': dict(
         group='branding', order=10, input='text', label='Portal banner link',
@@ -336,7 +325,7 @@ def describe(key, value_type='str'):
 
 
 def _fallback_group(key):
-    for prefix, group in (('wa_', 'whatsapp'), ('sms_', 'sms'), ('mail_', 'email'),
+    for prefix, group in (('wa_', 'whatsapp'), ('mail_', 'email'),
                           ('cashfree_', 'payment'), ('invoice_', 'billing'),
                           ('receipt_', 'billing'), ('staff_', 'numbering'),
                           ('customer_', 'numbering'), ('coll_', 'collection'),

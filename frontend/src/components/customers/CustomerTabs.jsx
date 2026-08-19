@@ -898,7 +898,7 @@ export function MessageLogTab({ customerId }) {
   const rows = Array.isArray(data) ? data : [];
 
   return (
-    <TablePanel title="SMS & WhatsApp log" loading={loading} error={error}
+    <TablePanel title="Message log" loading={loading} error={error}
                 onRetry={refetch} empty={!rows.length}
                 emptyTitle="Nothing sent yet"
                 emptyHint="Every message this customer is sent is logged here."

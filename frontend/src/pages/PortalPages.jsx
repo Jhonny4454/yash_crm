@@ -626,7 +626,6 @@ export function PortalProfile() {
     ["Mobile", user?.mobile],
     ["Email", user?.email],
     ["Connection", user?.connection_type],
-    ["Zone", user?.zone],
     ["Address", user?.primary_address || user?.billing_address],
     ["Status", account?.account_status?.label],
   ].filter(([, value]) => value !== null && value !== undefined && value !== "");

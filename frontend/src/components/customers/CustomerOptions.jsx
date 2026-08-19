@@ -116,7 +116,6 @@ export function OptionsMenu({ customer, isAdmin, outstanding, onPick }) {
       title: hasDiscount ? undefined : "No discount is set on this account.",
     },
     { key: "notes", label: "Add Notes" },
-    { key: "sms", label: "Send SMS", admin: true },
     { key: "ledger", label: "Payment Ledger" },
     { divider: true },
     { key: "reset-mac", label: "Reset Mac", admin: true },
@@ -288,30 +287,6 @@ export function DiscountDialog({ customer, onClose, onDone }) {
           Taken off every bill raised for this customer, in rupees.
         </p>
         <DialogButtons busy={busy} onClose={onClose} disabled={!(numeric >= 0)} />
-      </form>
-    </Modal>
-  );
-}
-
-export function SmsDialog({ customer, onClose, onDone }) {
-  const { busy, run } = useSubmit({ onDone, onClose });
-  const [message, setMessage] = useState("");
-
-  return (
-    <Modal title={`Send SMS to ${customer.mobile || "this customer"}`} onClose={onClose}>
-      <form onSubmit={(event) => {
-        event.preventDefault();
-        run(() => post(`/customers/${customer.id}/send-sms`, { message }),
-            "Message sent.");
-      }}>
-        <label className="dlg-block">
-          <span>Message</span>
-          <textarea rows={5} value={message} maxLength={640} required
-                    onChange={(e) => setMessage(e.target.value)} />
-        </label>
-        <p className="hint">{message.length}/640 characters.</p>
-        <DialogButtons busy={busy} onClose={onClose} disabled={!message.trim()}
-                       label="Send" />
       </form>
     </Modal>
   );
@@ -657,8 +632,8 @@ export function ResetPasswordResult({ password, onClose }) {
         <span>Read this out to the customer</span>
         <code>{password}</code>
         <small>
-          It is shown once and is not stored in plain text. An SMS and email
-          were attempted as well.
+          It is shown once and is not stored in plain text. An email was sent
+          as well.
         </small>
       </div>
       <DialogButtons onClose={onClose} label={null} closeLabel="Done" />
