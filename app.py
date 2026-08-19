@@ -272,7 +272,7 @@ def send_template_message(customer, template_type, context=None, *,
                           plan=None, customer_plan=None, invoice=None,
                           payment=None):
     """
-    Render the named template for `customer` and send it over WhatsApp.
+    Render the named template for `customer` and send it over WhatsApp AND email.
 
     Returns a messaging.SendResult. Never raises, so a gateway outage can
     never roll back a renewal or a payment entry.
@@ -286,6 +286,24 @@ def send_template_message(customer, template_type, context=None, *,
         log_audit('Send Message',
                   f"{template_type} -> {getattr(customer, 'full_name', '?')} "
                   f"({result.status})")
+
+    # Also send email if customer has an address
+    email = getattr(customer, 'email', None)
+    if email:
+        from services import mailer
+        ctx = messaging.build_context(
+            customer=customer, plan=plan, customer_plan=customer_plan,
+            invoice=invoice, payment=payment, extra=context,
+        )
+        body = messaging.render_template_type(template_type, ctx) or ''
+        if body.strip():
+            subject = template_type.replace('_', ' ').replace(
+                'expiry', 'Plan Expiry Reminder'
+            ).replace('expired', 'Plan Expired'
+            ).replace('due_reminder', 'Payment Reminder'
+            ).replace('daily_report', 'Daily Report').title()
+            mailer.send_email(email, subject, body.strip())
+
     return result
 
 
@@ -394,6 +412,8 @@ def send_expiry_reminders():
     """Send templates for plans expiring in 3 days, 2 days, 1 day, and expired today."""
     with app.app_context():
         today = date.today()
+        total_sent = 0
+
         # 3 days before expiry
         expiring_3d = CustomerPlan.query.filter(
             CustomerPlan.status == 'active',
@@ -402,6 +422,7 @@ def send_expiry_reminders():
         for cp in expiring_3d:
             send_template_message(cp.customer, 'expiry_3d', {'days': 3},
                                   customer_plan=cp)
+            total_sent += 1
 
         # 2 days before expiry
         expiring_2d = CustomerPlan.query.filter(
@@ -411,6 +432,7 @@ def send_expiry_reminders():
         for cp in expiring_2d:
             send_template_message(cp.customer, 'expiry_2d', {'days': 2},
                                   customer_plan=cp)
+            total_sent += 1
 
         # 1 day before expiry
         expiring_1d = CustomerPlan.query.filter(
@@ -420,6 +442,7 @@ def send_expiry_reminders():
         for cp in expiring_1d:
             send_template_message(cp.customer, 'expiry_1d', {'days': 1},
                                   customer_plan=cp)
+            total_sent += 1
 
         # Expired today
         expired_today = CustomerPlan.query.filter(
@@ -428,6 +451,46 @@ def send_expiry_reminders():
         ).all()
         for cp in expired_today:
             send_template_message(cp.customer, 'expired', customer_plan=cp)
+            total_sent += 1
+
+        # Notify admin of expiry summary
+        if total_sent:
+            summary = (
+                f"Expiry Reminder Summary - {today.strftime('%d %b %Y')}\n\n"
+                f"Expiring in 3 days: {len(expiring_3d)}\n"
+                f"Expiring in 2 days: {len(expiring_2d)}\n"
+                f"Expiring tomorrow: {len(expiring_1d)}\n"
+                f"Expired today: {len(expired_today)}\n"
+                f"Total messages sent: {total_sent}"
+            )
+
+            def _get(key, default=''):
+                try:
+                    row = Setting.query.filter_by(key=key).first()
+                    if row and row.value:
+                        from models_ext import ENCRYPTED_SETTINGS, decrypt_setting_value
+                        val = row.value
+                        if key in ENCRYPTED_SETTINGS:
+                            val = decrypt_setting_value(val)
+                        return val
+                except Exception:
+                    pass
+                return os.environ.get(key.upper(), default)
+
+            admin_email = _get('admin_email')
+            if admin_email:
+                from services import mailer
+                mailer.send_email(admin_email,
+                                  f'Expiry Reminders - {today.strftime("%d %b %Y")}',
+                                  summary)
+            admin_mobile = _get('admin_mobile')
+            if admin_mobile:
+                messaging.send_whatsapp(admin_mobile, summary)
+
+            log_audit('Expiry Reminders',
+                      f'Sent {total_sent} expiry reminder(s): '
+                      f'3d={len(expiring_3d)}, 2d={len(expiring_2d)}, '
+                      f'1d={len(expiring_1d)}, expired={len(expired_today)}')
 
 
 def send_overdue_reminders():
