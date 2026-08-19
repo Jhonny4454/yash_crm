@@ -59,17 +59,15 @@ const VIEWS = {
     key: "expiring",
     title: "Expiring soon",
     blurb: "Connections about to run out. Edit a date and press Save to renew "
-      + "one before it drops.",
+      + "one before it drops, or tick rows to send a reminder on WhatsApp.",
     ranges: [
       { key: "7", days: 7, label: "Next 7 days" },
       { key: "15", days: 15, label: "Next 15 days" },
       { key: "30", days: 30, label: "Next 30 days" },
-      // No far edge: every plan still to run out, however far off. A 30-day
-      // cap silently answered "and after that?" wrong for anyone on a
-      // quarterly or yearly plan.
       { key: "all", days: "all", label: "All upcoming" },
     ],
     editableDates: true,
+    selectable: true,
     daysLabel: "Days left",
     emptyTitle: "Nothing expiring in this window",
   },
@@ -347,12 +345,17 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
   async function sendExpiryNotice() {
     if (!canSelect || !canMessage || sending || !selectedCount) return;
 
+    const isExpired = view === "expired";
     const confirmed = await confirm({
-      title: `Send the expiry notice to ${selectedCount} customer${selectedCount === 1 ? "" : "s"}?`,
+      title: isExpired
+        ? `Send the expiry notice to ${selectedCount} customer${selectedCount === 1 ? "" : "s"}?`
+        : `Send a reminder to ${selectedCount} customer${selectedCount === 1 ? "" : "s"}?`,
       message: (allMatching
-        ? `Every expired customer the current filter matches${zone ? ` in ${zone}` : ""} `
+        ? `Every customer the current filter matches${zone ? ` in ${zone}` : ""} `
         : "They ")
-        + "will get the approved “plan expired” WhatsApp template. "
+        + (isExpired
+          ? "will get the approved plan expired WhatsApp template. "
+          : "will get the appropriate expiry reminder WhatsApp template. ")
         + "WhatsApp messages cannot be recalled once sent.",
       confirmLabel: "Send now",
       tone: "danger",
@@ -516,7 +519,9 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
             {canMessage && (
               <button type="button" className="btn sm"
                       disabled={sending} onClick={sendExpiryNotice}>
-                {sending ? "Sending…" : "Send expiry notice on WhatsApp"}
+                {sending ? "Sending…" : view === "expired"
+                  ? "Send expiry notice on WhatsApp"
+                  : "Send reminder on WhatsApp"}
               </button>
             )}
           </div>

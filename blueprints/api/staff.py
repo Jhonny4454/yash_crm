@@ -475,7 +475,7 @@ def report_plan_expiry_renew():
 @bp.post('/reports/plan-expiry/notify')
 @staff_required
 def report_plan_expiry_notify():
-    """WhatsApp the selected expired customers that their plan has lapsed.
+    """WhatsApp the selected customers about their plan status.
 
     Two ways to choose who:
       ``{"customer_plan_ids": [12, 44]}``  - the ticked rows
@@ -496,10 +496,7 @@ def report_plan_expiry_notify():
     mode, days, unbounded, zone, today, on = _expiry_args()
     if mode == 'renewed':
         return fail('not_for_this_view', 400,
-                    detail='Expiry notices can only be sent from the expired list.')
-    if on or (days >= 0 and not unbounded):
-        return fail('not_for_this_view', 400,
-                    detail='Expiry notices can only be sent from the expired list.')
+                    detail='Expiry notices cannot be sent from the renewed list.')
 
     query = _expiry_query(mode, days, unbounded, zone, today, on)
     query, err = _selected_plans(query, data)
@@ -533,17 +530,32 @@ def report_plan_expiry_notify():
                            f"({running['done']} of {running['total']} done). "
                            f"Wait for it to finish.")
 
+    from datetime import date as _date
+    def _expiry_template(cp):
+        """Pick the right template based on days until expiry."""
+        today = _date.today()
+        days_left = (cp.end_date - today).days if cp.end_date else 0
+        if days_left <= 0:
+            return 'expired'
+        elif days_left == 1:
+            return 'expiry_1d'
+        elif days_left == 2:
+            return 'expiry_2d'
+        else:
+            return 'expiry_3d'
+
     def send_one(cp):
         from app import send_template_message
-        result = send_template_message(cp.customer, 'expired', customer_plan=cp)
+        template_type = _expiry_template(cp)
+        result = send_template_message(cp.customer, template_type, customer_plan=cp)
         return getattr(result, 'ok', False)
 
     job = outbox.start(current_app._get_current_object(), 'expiry-notice',
-                       f'{len(recipients)} expired customers',
+                       f'{len(recipients)} customers',
                        recipients, send_one)
 
     return ok({'recipients': len(recipients), 'job': job,
-               'detail': f'Sending the expiry notice to {len(recipients)} '
+               'detail': f'Sending to {len(recipients)} '
                          f'customer(s) in the background. Every attempt is '
                          f'recorded in the message log.'})
 
