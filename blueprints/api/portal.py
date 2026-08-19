@@ -231,7 +231,7 @@ def portal_invoices():
     from sqlalchemy.orm import joinedload, selectinload
     query = Invoice.query.options(
         joinedload(Invoice.customer), selectinload(Invoice.payments)
-    ).filter_by(customer_id=cid)
+    ).filter(Invoice.customer_id == cid, Invoice.status != 'cancelled')
     rows, meta = paginate(query.order_by(Invoice.issue_date.desc(),
                                          Invoice.id.desc()),
                           default_per_page=BILLS_PER_PAGE)
