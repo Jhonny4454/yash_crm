@@ -218,8 +218,8 @@ def dashboard_summary():
     # row's own count ABOVE the total sitting next to it - the dashboard read
     # "Expired (1) ... View all 0", which is not a rounding disagreement, it is
     # the panel contradicting itself in the space of four words.
-    expired_start = today - timedelta(days=LIFECYCLE_DAYS)
-    expired_end = today - timedelta(days=1)
+    expired_start = today
+    expired_end = today + timedelta(days=LIFECYCLE_DAYS - 1)
 
     # One query spans every window below; each row reads its own slice of it.
     expiry_query = db.session.query(
