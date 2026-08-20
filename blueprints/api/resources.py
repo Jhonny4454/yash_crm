@@ -54,9 +54,17 @@ CUSTOMER_NULLABLE_UNIQUE = ('username', 'reference_id')
 
 def _assign_customer_fields(customer, data):
     """Copy the writable fields off the payload, normalising empties."""
+    import re
     email = data.get('email')
-    if email and '@' not in str(email).strip():
-        return None, 'Invalid email address format.'
+    if email:
+        email = str(email).strip()
+        if not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
+            return None, 'Invalid email address format.'
+    mobile = data.get('mobile')
+    if mobile:
+        mobile_str = str(mobile).strip()
+        if mobile_str and not re.match(r'^[6-9]\d{9}$', mobile_str):
+            return None, 'Enter a valid 10-digit Indian mobile number.'
     for field in CUSTOMER_WRITABLE:
         if field not in data:
             continue
