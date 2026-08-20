@@ -231,10 +231,20 @@ def log_audit(action, details):
         app.logger.warning("Could not write audit log for %r", action, exc_info=True)
 
 def enable_connection_on_network(customer):
-    log_audit('Network Enable (stub)', f"Requested network enable for {customer.full_name}")
+    log_audit('Network Enable', f"Requested network enable for {customer.full_name}")
+    try:
+        from services import isp_providers
+        isp_providers.provision(customer, 'enable')
+    except Exception as exc:
+        app.logger.warning('ISP enable failed for %s: %s', customer.full_name, exc)
 
 def disable_connection_on_network(customer):
-    log_audit('Network Disable (stub)', f"Requested network disable for {customer.full_name}")
+    log_audit('Network Disable', f"Requested network disable for {customer.full_name}")
+    try:
+        from services import isp_providers
+        isp_providers.provision(customer, 'disable')
+    except Exception as exc:
+        app.logger.warning('ISP disable failed for %s: %s', customer.full_name, exc)
 
 def reset_mac_on_log2space(mac_address, customer_reference):
     """Call the log2space API to change this device's authenticated MAC.
@@ -427,31 +437,28 @@ def auto_suspend_overdue():
         today = date.today()
         plans = CustomerPlan.query.filter(CustomerPlan.status == 'active', CustomerPlan.auto_renew == True).all()
         for cp in plans:
-            grace = cp.grace_period_days or 1
-            unpaid = Invoice.query.filter(
-                Invoice.customer_id == cp.customer_id,
-                Invoice.status.in_(['sent', 'overdue']),
-                Invoice.due_date + timedelta(days=grace) < today
-            ).all()
-            if unpaid and cp.customer.is_active:
-                customer = cp.customer
-                customer.is_active = False
-                cp.suspension_review_status = 'pending_review'
-                cp.suspended_at = datetime.utcnow()
-                db.session.commit()
-                try:
+            try:
+                grace = cp.grace_period_days or 1
+                unpaid = Invoice.query.filter(
+                    Invoice.customer_id == cp.customer_id,
+                    Invoice.status.in_(['sent', 'overdue']),
+                    Invoice.due_date + timedelta(days=grace) < today
+                ).all()
+                if unpaid and cp.customer.is_active:
+                    customer = cp.customer
+                    customer.is_active = False
+                    cp.suspension_review_status = 'pending_review'
+                    cp.suspended_at = datetime.utcnow()
+                    db.session.commit()
                     disable_connection_on_network(customer)
-                except Exception as exc:
-                    app.logger.warning('ISP disable failed for %s: %s',
-                                       customer.id, exc)
-                log_audit('Auto-Suspend', f"Suspended customer {customer.full_name} due to unpaid invoices. "
-                                           f"Moved to Pending Review.")
-                try:
+                    log_audit('Auto-Suspend', f"Suspended customer {customer.full_name} due to unpaid invoices. "
+                                               f"Moved to Pending Review.")
                     send_sms(customer.mobile, "Your service has been suspended due to non-payment. Please contact support.")
                     send_email(customer.email, "Service Suspended",
                                "Your service has been suspended due to non-payment. Please contact support.")
-                except Exception:
-                    pass
+            except Exception as exc:
+                db.session.rollback()
+                app.logger.warning('Auto-suspend failed for plan %s: %s', cp.id, exc)
 
 def send_expiry_reminders():
     """Send templates for plans expiring in 3 days, 2 days, 1 day, and expired today."""

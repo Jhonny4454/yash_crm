@@ -1491,21 +1491,26 @@ DEFAULT_TEMPLATES = [
         template_type='expiry_1d',
         description='One day before the plan ends.',
         body=(
-            "Internet Plan Expiring\n"
+            "🔔 Internet Plan Expiry Reminder\n"
             "\n"
             "Dear {{first_name}},\n"
             "\n"
-            "Your Internet Plan will expire In 1 Day.\n"
+            "⏳ This is a friendly reminder that your internet plan is scheduled to expire on {{expiry_date}}.\n"
             "\n"
-            "Please renew your plan to avoid any interruption\n"
+            "📦 Current Plan: {{plan_name}}\n"
+            "💰 Renewal Amount: ₹{{amount}}\n"
             "\n"
-            "Support No: {{company_phone}}\n"
-            "{{company_name}}\n"
-            "Thank You\n"
+            "⚠️ To avoid any interruption to your internet service, please renew your plan on or before the expiry date.\n"
             "\n"
-            "Visit Account\n"
-            "Customer App\n"
-            "{{app_link}}"
+            "🚀 Renew now to continue enjoying fast, secure, and uninterrupted internet connectivity.\n"
+            "\n"
+            "📞 Need assistance? Contact us:\n"
+            "📱 {{company_phone}}\n"
+            "\n"
+            "🙏 Thank you for choosing {{company_name}}.\n"
+            "\n"
+            "Warm Regards,\n"
+            "🌐 {{company_name}}"
         ),
     ),
     dict(

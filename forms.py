@@ -396,6 +396,7 @@ class MessageTemplateForm(FlaskForm):
         ('payment_received', 'Payment Received'),
         ('expiry_3d', 'Expiry Reminder (3 Days)'),
         ('expiry_2d', 'Expiry Reminder (2 Days)'),
+        ('expiry_1d', 'Expiry Reminder (1 Day)'),
         ('expired', 'Plan Expired')
     ], validators=[DataRequired()])
     body = TextAreaField('Message Body', validators=[DataRequired()], 
