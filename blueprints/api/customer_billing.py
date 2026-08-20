@@ -27,8 +27,8 @@ from models import (AuditLog, Customer, CustomerPlan, DiscountReason, Invoice,
                     InventoryAssignment, MessageLog, Payment, Plan, db)
 
 from .serializers import customer_plan_dict, invoice_dict, payment_dict
-from .utils import (admin_required, body, current_staff_id, escape_like,
-                    fail, iso, money, ok, paginate, staff_required)
+from .utils import (admin_required, body, current_staff_id, fail, iso, money,
+                    ok, paginate, staff_required)
 
 bp = Blueprint('api_customer_billing', __name__)
 
@@ -94,14 +94,8 @@ def _next_invoice_no():
         from app import generate_invoice_no
         return generate_invoice_no()
     except Exception:
-        for _ in range(20):
-            seq = (db.session.query(db.func.count(Invoice.id)).scalar() or 0) + 1
-            candidate = f'INV-{date.today():%y%m}-{seq:05d}'
-            if not Invoice.query.filter_by(invoice_no=candidate).first():
-                return candidate
-            db.session.rollback()
-        import secrets
-        return f'INV-{date.today():%y%m}-{secrets.token_hex(4).upper()}'
+        seq = (db.session.query(db.func.count(Invoice.id)).scalar() or 0) + 1
+        return f'INV-{date.today():%y%m}-{seq:05d}'
 
 
 def _mode_detail(data):
@@ -465,9 +459,8 @@ def payment_entry(cid):
     except (TypeError, ValueError):
         return fail('invalid_invoice_ids', 400)
 
-    invoices = (db.session.query(Invoice)
+    invoices = (Invoice.query
                 .filter(Invoice.id.in_(ids), Invoice.customer_id == cid)
-                .with_for_update()
                 .order_by(Invoice.issue_date.asc(), Invoice.id.asc())
                 .all())
     if len(invoices) != len(set(ids)):
@@ -750,10 +743,10 @@ def customer_log(cid):
     name = customer.full_name or ''
     conditions = [AuditLog.customer_id == cid]
     if name.strip():
-        conditions.append(AuditLog.details.ilike(f'%{escape_like(name)}%'))
+        conditions.append(AuditLog.details.ilike(f'%{name}%'))
     for handle in (customer.username, customer.reference_id):
         if handle:
-            conditions.append(AuditLog.details.ilike(f'%{escape_like(handle)}%'))
+            conditions.append(AuditLog.details.ilike(f'%{handle}%'))
 
     query = AuditLog.query.filter(or_(*conditions)).order_by(
         AuditLog.created_at.desc(), AuditLog.id.desc())
@@ -983,15 +976,13 @@ def customer_documents_upload(cid):
     import os
     import secrets
 
-    from flask import current_app
     from werkzeug.utils import secure_filename
+
+    from services import cloud_storage
 
     customer, missing = _customer_or_404(cid)
     if missing:
         return missing
-
-    folder = os.path.join(current_app.root_path, 'static', 'uploads', 'kyc')
-    os.makedirs(folder, exist_ok=True)
 
     saved, rejected = [], []
 
@@ -1027,35 +1018,27 @@ def customer_documents_upload(cid):
 
         # Prefix with the customer and a random token: two customers uploading
         # "aadhaar.jpg" must not overwrite one another.
-        from services.cloudinary import is_enabled, upload as _cloudinary_upload
-        if is_enabled():
-            url = _cloudinary_upload(upload, public_id=f'kyc-c{cid}-{field}-{secrets.token_hex(4)}')
-            if url:
-                stored = url
-            else:
-                rejected.append({'field': field, 'filename': original,
-                                 'reason': 'Cloudinary upload failed.'})
-                continue
-        else:
-            stored = f'c{cid}-{field}-{secrets.token_hex(4)}{extension}'
-            try:
-                upload.save(os.path.join(folder, stored))
-            except OSError as exc:
-                rejected.append({'field': field, 'filename': original,
-                                 'reason': 'Could not be saved: file system error.'})
-                continue
+        stored = f'c{cid}-{field}-{secrets.token_hex(4)}{extension}'
+
+        # Goes to the configured bucket when there is one and to
+        # static/uploads/kyc when there is not. The column stores the same
+        # bare filename either way, so a proof uploaded before cloud storage
+        # was switched on is still found afterwards.
+        where, error = cloud_storage.save_upload(
+            'kyc', stored, upload.stream, upload.mimetype)
+        if error:
+            rejected.append({'field': field, 'filename': original,
+                             'reason': f'Could not be saved: {error[:120]}'})
+            continue
 
         previous = getattr(customer, column, None)
         setattr(customer, column, stored)
-        saved.append({'field': field, 'filename': stored})
+        saved.append({'field': field, 'filename': stored, 'stored_in': where})
 
         # Replaced files are removed so the uploads folder does not grow a
         # copy of every superseded proof.
         if previous and previous != stored:
-            try:
-                os.remove(os.path.join(folder, os.path.basename(previous)))
-            except OSError:
-                pass
+            cloud_storage.delete_upload('kyc', previous)
 
     db.session.commit()
 
@@ -1076,9 +1059,7 @@ def customer_documents_upload(cid):
 @admin_required
 def customer_document_delete(cid, field):
     """Remove one KYC file. Admin-only: proofs are compliance records."""
-    import os
-
-    from flask import current_app
+    from services import cloud_storage
 
     customer, missing = _customer_or_404(cid)
     if missing:
@@ -1096,11 +1077,10 @@ def customer_document_delete(cid, field):
     setattr(customer, column, None)
     db.session.commit()
 
-    try:
-        os.remove(os.path.join(current_app.root_path, 'static', 'uploads',
-                               'kyc', os.path.basename(filename)))
-    except OSError:
-        pass
+    # Removes it from the bucket and from the local disk - a proof uploaded
+    # before cloud storage was switched on lives in the second place, and
+    # deleting a compliance record has to actually delete it.
+    cloud_storage.delete_upload('kyc', filename)
 
     _audit('Delete KYC', f'{field} for {customer.full_name}', customer_id=cid)
 
@@ -1183,7 +1163,7 @@ def payment_cancel(pid):
 @admin_required
 def payment_sales_return(pid):
     """Refund some or all of a payment, keeping both halves on the ledger."""
-    original = db.session.query(Payment).with_for_update().get(pid)
+    original = db.session.get(Payment, pid)
     if not original:
         return fail('not_found', 404)
     if original.status != 'approved':
@@ -1281,7 +1261,7 @@ def payment_receipt(pid):
     try:
         pdf = build_receipt_pdf(payment, logo_path=_logo_path())
     except Exception as exc:
-        return fail('pdf_failed', 500, detail='An error occurred while generating the receipt PDF.')
+        return fail('pdf_failed', 500, detail=str(exc)[:200])
 
     name = payment.receipt_no
     return Response(pdf, mimetype='application/pdf', headers={
@@ -1323,12 +1303,77 @@ def public_payment_receipt(pid):
         # traceback about logging it.
         from flask import current_app
         current_app.logger.exception('Public receipt PDF failed')
-        return fail('pdf_failed', 500, detail='An error occurred while generating the receipt PDF.')
+        return fail('pdf_failed', 500, detail=str(exc)[:200])
 
     name = payment.receipt_no
     return Response(pdf, mimetype='application/pdf', headers={
         'Content-Disposition': f'inline; filename="receipt-{name}.pdf"',
         'Cache-Control': 'private, max-age=300',
+    })
+
+
+#: Folders this route will serve. An allow-list, not a block-list: without it
+#: a crafted folder name is a way to read any file the process can open.
+SERVABLE_FOLDERS = {'kyc', 'payment_proofs', 'logos', 'banners'}
+
+
+@bp.get('/public/files/<folder>/<path:name>')
+def public_upload_file(folder, name):
+    """One uploaded file, from wherever it is actually stored.
+
+    Two things brought this into existence.
+
+    The first is that uploads now live in a private bucket, and a private
+    bucket has no URL a browser can open. Something has to fetch the object
+    and hand it over; this is that something, and it falls back to the local
+    disk so files uploaded before the switch keep working.
+
+    The second is that the old answer - serving these out of /static/uploads -
+    meant every Aadhaar scan and payment screenshot was readable by anyone who
+    had the URL, with no login and no expiry. The signature here is over the
+    folder and filename together with an expiry, so a link stops working on
+    its own and one cannot be replayed against a different file.
+
+    Unauthenticated by design: it has to work in an <img> tag and in a new tab,
+    neither of which can carry a bearer token.
+    """
+    import os
+    import posixpath
+
+    from werkzeug.utils import secure_filename
+
+    from services import cloud_storage
+    from services.signed_links import verify
+
+    if folder not in SERVABLE_FOLDERS:
+        return fail('not_found', 404)
+
+    # secure_filename after taking the basename: <path:name> matches slashes,
+    # and "../../config.py" must not resolve to anything but a filename.
+    safe = secure_filename(posixpath.basename(name))
+    if not safe:
+        return fail('not_found', 404)
+
+    if not verify('upload', f'{folder}/{safe}',
+                  request.args.get('exp'), request.args.get('sig')):
+        return fail('link_invalid_or_expired', 403,
+                    detail='This file link has expired. Reload the page to get '
+                           'a fresh one.')
+
+    data, _source = cloud_storage.read_upload(folder, safe)
+    if data is None:
+        return fail('file_missing', 404,
+                    detail='The record names this file but it is not in '
+                           'storage. Files uploaded to the server disk are '
+                           'lost when the application is redeployed.')
+
+    import mimetypes
+    content_type = mimetypes.guess_type(safe)[0] or 'application/octet-stream'
+    return Response(data, mimetype=content_type, headers={
+        'Content-Disposition': f'inline; filename="{os.path.basename(safe)}"',
+        # private: a proxy or CDN must not keep a copy of somebody's ID proof.
+        'Cache-Control': 'private, max-age=300',
+        'X-Content-Type-Options': 'nosniff',
     })
 
 
@@ -1353,7 +1398,7 @@ def payment_send(pid):
             customer, 'payment_received',
             invoice=payment.invoice, payment=payment)
     except Exception as exc:
-        return fail('send_failed', 424, detail='An error occurred while sending the receipt.')
+        return fail('send_failed', 424, detail=str(exc)[:200])
 
     status = getattr(result, 'status', 'unknown')
     from services.messaging import DELIVERABLE_STATUSES
@@ -1387,11 +1432,10 @@ def plan_picker():
 
     q = (request.args.get('q') or '').strip()
     if q:
-        from .utils import escape_like
-        like = f'%{escape_like(q)}%'
-        query = query.filter(or_(Plan.name.ilike(like, escape='\\'),
-                                 Plan.plan_code.ilike(like, escape='\\'),
-                                 Plan.plan_type.ilike(like, escape='\\')))
+        like = f'%{q}%'
+        query = query.filter(or_(Plan.name.ilike(like),
+                                 Plan.plan_code.ilike(like),
+                                 Plan.plan_type.ilike(like)))
 
     rows = query.order_by(Plan.name).all()
 

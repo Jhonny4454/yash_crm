@@ -1,117 +1,81 @@
 /* Settings
    ---------------------------------------------------------------------------
-   Modern, polished settings page with clear visual hierarchy. */
+   Label and help on the left, the control on the right. A settings row is a
+   sentence about what the system will do, not a form field - so the
+   explanation sits with the label rather than being hidden in a tooltip, and
+   the control column is narrow enough that the eye can run down it. */
 
 .set-page form { padding-bottom: 24px; }
 
-.set-alert {
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  border-radius: 10px;
-  font-size: 0.88rem;
-  line-height: 1.5;
-}
+.set-alert { margin-bottom: 16px; }
 .set-alert ul { margin: 8px 0 0; padding-left: 18px; }
 .set-alert li { margin: 2px 0; }
 .set-alert p { margin: 4px 0 0; }
-.alert.success.set-alert { background: #f0fdf6; border: 1px solid #a3cfbb; color: #0f5132; }
-.alert.error.set-alert { background: #fff7f7; border: 1px solid #f1aeb5; color: #b42318; }
 
-/* Group panels ----------------------------------------------------------- */
-.set-group {
-  margin-bottom: 20px;
-  padding: 0;
-  border: 1px solid var(--line, #e2e8f0);
-  border-radius: 12px;
-  overflow: hidden;
-  background: #fff;
-}
+.set-group { margin-bottom: 16px; padding: 0; overflow: hidden; }
 
 .set-group-head {
-  padding: 18px 24px 14px;
-  border-bottom: 1px solid var(--line, #e2e8f0);
-  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  background: #f8fafc;
 }
 .set-group-head h2 {
   margin: 0;
-  font-size: 1.05rem;
-  font-weight: 700;
+  font-size: 1rem;
   text-transform: none;
-  letter-spacing: -0.01em;
-  color: #0f172a;
+  letter-spacing: 0;
 }
 .set-group-head p {
-  margin: 6px 0 0;
-  color: var(--muted, #64748b);
-  font-size: 0.82rem;
-  line-height: 1.5;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: .84rem;
   max-width: 70ch;
 }
 
 .set-fields { display: grid; }
 
-/* Setting rows ----------------------------------------------------------- */
 .set-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 340px);
-  gap: 12px 28px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 320px);
+  gap: 12px 24px;
   align-items: start;
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--line, #f1f5f9);
-  transition: background 0.15s ease;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
 }
 .set-row:last-child { border-bottom: 0; }
-.set-row:hover { background: #fafbfc; }
 
-.set-row.is-dirty {
-  background: #fffbeb;
-  box-shadow: inset 3px 0 0 #f59e0b;
-  border-left: 3px solid #f59e0b;
-}
+/* A changed-but-unsaved row is marked, so the count in the save bar can be
+   traced back to the fields it refers to without hunting. */
+.set-row.is-dirty { background: #fffbeb; box-shadow: inset 3px 0 0 #f59e0b; }
 
 .set-row-text label {
   display: block;
   font-weight: 600;
-  font-size: 0.88rem;
-  color: #1e293b;
-  line-height: 1.4;
+  font-size: .9rem;
+  color: #344054;
 }
 .set-help {
-  margin: 5px 0 0;
-  color: var(--muted, #64748b);
-  font-size: 0.8rem;
-  line-height: 1.5;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: .81rem;
+  line-height: 1.45;
   max-width: 62ch;
 }
 .set-unknown { font-style: italic; }
 
 .set-control { display: grid; gap: 6px; justify-items: stretch; }
-.set-control .input {
-  width: 100%;
-  padding: 9px 12px;
-  border: 1px solid #d0d5dd;
-  border-radius: 8px;
-  font-size: 0.88rem;
-  color: #1e293b;
-  background: #fff;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-.set-control .input:focus {
-  outline: none;
-  border-color: var(--primary-color, #0073b7);
-  box-shadow: 0 0 0 3px rgba(0, 115, 183, 0.12);
-}
+.set-control .input { width: 100%; }
 
 .set-error {
   margin: 0;
   color: #b42318;
-  font-size: 0.8rem;
+  font-size: .81rem;
   font-weight: 600;
 }
 
 .set-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.82rem;
+  font-size: .82rem;
   line-height: 1.5;
 }
 
@@ -120,7 +84,7 @@
 
 .set-suffixed { display: flex; gap: 8px; align-items: center; }
 .set-suffixed .input { flex: 1 1 auto; }
-.set-suffix { color: var(--muted, #64748b); font-size: 0.84rem; white-space: nowrap; }
+.set-suffix { color: var(--muted); font-size: .84rem; white-space: nowrap; }
 
 /* Switch --------------------------------------------------------------- */
 .set-row-switch .set-switch {
@@ -137,13 +101,13 @@
   height: 1px;
 }
 .set-switch-track {
-  width: 44px;
+  width: 42px;
   height: 24px;
   border-radius: 999px;
   background: #cbd5e1;
   padding: 3px;
   display: block;
-  transition: background 0.2s ease;
+  transition: background .15s ease;
   flex: 0 0 auto;
 }
 .set-switch-track > span {
@@ -152,93 +116,199 @@
   height: 18px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.25);
-  transition: transform 0.2s ease;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .3);
+  transition: transform .15s ease;
 }
-.set-switch input:checked + .set-switch-track {
-  background: var(--brand, #1570ef);
-}
-.set-switch input:checked + .set-switch-track > span {
-  transform: translateX(20px);
-}
-.set-switch input:focus-visible + .set-switch-track {
-  outline: 3px solid #dbeafe;
-  outline-offset: 2px;
-}
-.set-switch-state {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: #475467;
-  min-width: 28px;
-}
+.set-switch input:checked + .set-switch-track { background: var(--brand, #1570ef); }
+.set-switch input:checked + .set-switch-track > span { transform: translateX(18px); }
+.set-switch input:focus-visible + .set-switch-track { outline: 3px solid #dbeafe; }
+.set-switch-state { font-size: .85rem; font-weight: 600; color: #475467; min-width: 26px; }
 
 /* Save bar ------------------------------------------------------------- */
 .set-savebar {
   position: sticky;
+  /* Clear of .app-footer, which is fixed to the bottom of the window with a
+     z-index of 1020 - sticking this at bottom:0 put the Save button behind
+     the copyright line. */
   bottom: calc(var(--footer-h, 34px) + 10px);
   z-index: 6;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 20px;
-  padding: 14px 20px;
-  background: #fff;
-  border: 1px solid var(--line, #e2e8f0);
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--line);
   border-radius: 12px;
-  box-shadow: 0 -4px 16px rgba(16, 24, 40, 0.06), 0 2px 6px rgba(16, 24, 40, 0.04);
-  font-size: 0.86rem;
+  box-shadow: 0 -6px 20px rgba(16, 24, 40, .08);
+  font-size: .88rem;
   font-weight: 600;
   color: #475467;
 }
 .set-savebar-actions { display: flex; gap: 8px; }
 
 @media (max-width: 760px) {
-  .set-group { margin-bottom: 16px; }
-  .set-row { grid-template-columns: 1fr; padding: 14px 16px; }
+  .set-row { grid-template-columns: 1fr; }
   .set-row-switch { grid-template-columns: 1fr auto; align-items: center; }
-  .set-savebar {
-    flex-direction: column;
-    align-items: stretch;
-    padding: 12px 16px;
-  }
+  .set-savebar { flex-direction: column; align-items: stretch; }
   .set-savebar-actions { justify-content: flex-end; }
-  .set-group-head { padding: 14px 16px 12px; }
 }
 
-/* ---- Gateway / Cloudinary status --------------------------------------- */
+/* ---- Gateway status ------------------------------------------------------
+   Sits under the Payment Gateway fields and answers the one question the
+   customer portal deliberately will not: why online payment is off. */
+
 .set-status {
   margin-top: 1rem;
-  margin-left: 24px;
-  margin-right: 24px;
-  margin-bottom: 16px;
-  padding: 1rem 1.2rem;
+  padding: 0.85rem 1rem;
   border-radius: 10px;
   border: 1px solid #e2e8f0;
   background: #f8fafc;
-  font-size: 0.84rem;
-  line-height: 1.55;
+  font-size: 0.86rem;
 }
 .set-status.is-ok { border-color: #a3cfbb; background: #f0fdf6; }
 .set-status.is-blocked { border-color: #f1aeb5; background: #fff7f7; }
 
 .set-status p { margin: 0 0 0.4rem; }
-.set-status p:last-child { margin-bottom: 0; }
-.set-status-head strong { font-size: 0.92rem; }
+.set-status-head strong { font-size: 0.9rem; }
 .set-status.is-blocked .set-status-head strong { color: #b42318; }
 .set-status.is-ok .set-status-head strong { color: #0f5132; }
 
-.set-status-line { line-height: 1.55; color: #334155; }
-.set-status-quiet { color: #64748b; font-size: 0.8rem; }
+.set-status-line { line-height: 1.5; color: #334155; }
+.set-status-quiet { color: #64748b; font-size: 0.82rem; }
 
 .set-status-actions {
   display: flex;
   align-items: center;
   gap: 0.7rem;
   flex-wrap: wrap;
-  margin-top: 0.7rem;
-  padding-top: 0.7rem;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  margin-top: 0.6rem;
 }
-.set-status-ok { color: #0f5132; font-weight: 600; font-size: 0.84rem; }
-.set-status-bad { color: #b42318; font-weight: 600; font-size: 0.84rem; }
+.set-status-ok { color: #0f5132; font-weight: 600; }
+.set-status-bad { color: #b42318; font-weight: 600; }
+
+/* ---- Storage & backups ---------------------------------------------------
+   Sits under the storage fields for the same reason the gateway status sits
+   under the payment ones: the settings say what was chosen, this says what is
+   actually happening. An upload to a disappearing disk succeeds - it is only
+   the next deploy that erases it - so nothing else on the page would ever
+   show a problem. */
+
+.set-backups {
+  margin-top: 0.9rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--line, #e2e8f0);
+}
+
+.set-backups-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+.set-backups-head h3 {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.set-backup-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  margin-top: 0.35rem;
+}
+.set-backup-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted, #64748b);
+  font-size: 0.76rem;
+  padding: 0 0.6rem 0.35rem 0;
+  border-bottom: 1px solid var(--line, #e2e8f0);
+}
+.set-backup-table td {
+  padding: 0.45rem 0.6rem 0.45rem 0;
+  border-bottom: 1px solid var(--line, #eef2f6);
+  vertical-align: top;
+  color: #334155;
+}
+.set-backup-table tr:last-child td { border-bottom: 0; }
+.set-backup-action { text-align: right; white-space: nowrap; }
+
+/* "manual" / "automatic" reads as part of the timestamp rather than a column
+   of its own - it matters only when two runs sit next to each other. */
+.set-backup-kind {
+  display: block;
+  color: var(--muted, #64748b);
+  font-size: 0.72rem;
+}
+.set-backup-failed {
+  display: block;
+  color: #b42318;
+  font-size: 0.74rem;
+  max-width: 46ch;
+}
+
+/* ---- Dark mode -----------------------------------------------------------
+   These panels were written with light hex values baked in, so in dark mode
+   the group headers, the unsaved-row highlight and the status boxes all stayed
+   white - bright rectangles on a dark page. Keyed on the theme this app sets
+   on <html>, NOT on prefers-color-scheme: that asks the device what it is set
+   to rather than what the operator chose here, which is exactly how a phone on
+   system-light showed light panels inside a dark admin panel. */
+
+:root[data-theme="dark"] .set-group-head { background: #1b2537; }
+:root[data-theme="dark"] .set-row-text label { color: #e2e8f0; }
+:root[data-theme="dark"] .set-switch-state { color: #cbd5e1; }
+:root[data-theme="dark"] .set-switch-track { background: #3d4a61; }
+:root[data-theme="dark"] .set-row.is-dirty {
+  background: #2a2313;
+  box-shadow: inset 3px 0 0 #d97706;
+}
+:root[data-theme="dark"] .set-savebar { color: #cbd5e1; }
+:root[data-theme="dark"] .set-error { color: #f8a9a1; }
+
+:root[data-theme="dark"] .set-status {
+  border-color: #33415a;
+  background: #1b2537;
+}
+:root[data-theme="dark"] .set-status.is-ok {
+  border-color: #2f6b4f;
+  background: #14261d;
+}
+:root[data-theme="dark"] .set-status.is-blocked {
+  border-color: #7c3b3b;
+  background: #2a1a1a;
+}
+:root[data-theme="dark"] .set-status-line { color: #cbd5e1; }
+:root[data-theme="dark"] .set-status-quiet { color: #93a3b8; }
+:root[data-theme="dark"] .set-status.is-ok .set-status-head strong,
+:root[data-theme="dark"] .set-status-ok { color: #6ee7a8; }
+:root[data-theme="dark"] .set-status.is-blocked .set-status-head strong,
+:root[data-theme="dark"] .set-status-bad { color: #fca5a5; }
+:root[data-theme="dark"] .set-backup-table td { color: #cbd5e1; }
+:root[data-theme="dark"] .set-backup-failed { color: #fca5a5; }
+
+@media (max-width: 620px) {
+  /* Four columns of a backup row do not fit a phone. Size and location fold
+     under the timestamp, and the download link keeps its own line so it stays
+     a comfortable tap target. */
+  .set-backup-table thead { display: none; }
+  .set-backup-table tr {
+    display: block;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--line, #e2e8f0);
+  }
+  .set-backup-table td {
+    display: inline;
+    border: 0;
+    padding: 0 0.5rem 0 0;
+  }
+  .set-backup-table td:empty { display: none; }
+  .set-backup-action { display: block; text-align: left; padding-top: 0.35rem; }
+}

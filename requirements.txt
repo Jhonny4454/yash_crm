@@ -1,51 +1,41 @@
-annotated-types==0.8.0
-anyio==4.14.2
-APScheduler==3.10.4
-blinker==1.9.0
-certifi==2026.7.22
-cffi==2.1.0
-chardet==7.5.1
-charset-normalizer==3.4.9
-click==8.4.2
-cloudinary==1.45.0
-colorama==0.4.6
-cryptography==42.0.8
-distro==1.9.0
-dnspython==2.8.0
-email_validator==2.1.1
+# ---- Core web stack ----
 Flask==3.0.3
-Flask-Login==0.6.3
 Flask-SQLAlchemy==3.1.1
-Flask-WTF==1.2.1
-greenlet==3.5.4
-gunicorn==22.0.0
-h11==0.16.0
-httpcore==1.0.9
-httpx==0.28.1
-idna==3.18
-itsdangerous==2.2.0
-Jinja2==3.1.4
-MarkupSafe==3.0.3
-packaging==26.2
-pillow==12.3.0
-pycparser==3.0
-pydantic==2.13.4
-pydantic_core==2.46.4
-PyJWT==2.8.0
-PyMySQL==1.1.1
-python-dotenv==1.0.1
-pytz==2026.3.post1
-reportlab==4.2.5
-requests==2.32.3
-setuptools==84.0.0
-six==1.17.0
-sniffio==1.3.1
 SQLAlchemy==2.0.43
-typing-inspection==0.4.4
-typing_extensions==4.16.0
-tzdata==2026.3
-tzlocal==5.4.4
-urllib3==2.7.0
-waitress==3.0.2
-Werkzeug==3.0.3
+Flask-Login==0.6.3
+Flask-WTF==1.2.1
 WTForms==3.1.2
+Werkzeug==3.0.3
+Jinja2==3.1.4
+setuptools>=80
+
+# ---- Database ----
+PyMySQL==1.1.1
+cryptography==42.0.8
+
+# ---- Config / validation ----
+python-dotenv==1.0.1
+email-validator==2.1.1
+
+# ---- Background jobs ----
+APScheduler==3.10.4
+
+# ---- HTTP client (WhatsApp/Cashfree/Razorpay gateways) ----
+requests==2.32.3
+
+# ---- REST API auth (React admin panel + React Native app) ----
+PyJWT==2.8.0
+
+# ---- Invoice PDF generation ----
+# Pure Python, unlike WeasyPrint which needs GTK/Cairo on Windows.
+reportlab==4.2.5
+
+# ---- Cloud file storage (uploads + database backups) ----
+# S3-compatible, so the same client works against Cloudflare R2, Backblaze B2,
+# Wasabi, Amazon S3 or Supabase Storage - only the endpoint URL differs.
+# Optional at runtime: with no bucket configured, services/cloud_storage.py
+# reports "not enabled" and everything writes to the local disk as before.
+boto3==1.34.162
+
+# ---- Production WSGI ----
+gunicorn==22.0.0

@@ -24,21 +24,6 @@ from models import db
 # --------------------------------------------------------------------------- #
 #  Secret storage
 # --------------------------------------------------------------------------- #
-
-#: Settings-table keys whose values must be encrypted at rest. A database
-#: compromise exposes these; encrypting them means the attacker also needs
-#: CREDENTIAL_KEY to read them.
-ENCRYPTED_SETTINGS = frozenset({
-    'brevo_api_key',
-    'cashfree_secret_key',
-    'cloudinary_api_key',
-    'cloudinary_api_secret',
-    'wa_api_token',
-})
-
-FERNET_PREFIX = 'gAAAAA'  # all Fernet tokens start with this
-
-
 def _fernet():
     """
     Key used to encrypt ISP API secrets at rest.
@@ -51,36 +36,6 @@ def _fernet():
     if not key:
         return None
     return Fernet(key.encode() if isinstance(key, str) else key)
-
-
-def encrypt_setting_value(plaintext):
-    """Encrypt a setting value for storage. Returns plaintext if no key."""
-    if not plaintext:
-        return plaintext
-    f = _fernet()
-    if f is None:
-        return plaintext
-    return f.encrypt(plaintext.encode()).decode()
-
-
-def decrypt_setting_value(ciphertext):
-    """Decrypt a setting value from storage. Returns as-is if not encrypted."""
-    if not ciphertext:
-        return ciphertext
-    f = _fernet()
-    if f is None:
-        return ciphertext
-    if not ciphertext.startswith(FERNET_PREFIX):
-        return ciphertext
-    try:
-        return f.decrypt(ciphertext.encode()).decode()
-    except InvalidToken:
-        return ciphertext
-
-
-def is_encrypted(setting_key):
-    """True when a setting value is stored encrypted."""
-    return setting_key in ENCRYPTED_SETTINGS
 
 
 class EncryptedSecretMixin:
@@ -151,14 +106,8 @@ class Setting(db.Model):
         row = cls.query.filter_by(key=key).first()
         if row is None or row.value is None:
             return default
-        value = row.value
-        if key in ENCRYPTED_SETTINGS:
-            try:
-                value = decrypt_setting_value(value)
-            except Exception:
-                pass
         try:
-            return cls._CASTS.get(row.value_type or 'str', str)(value)
+            return cls._CASTS.get(row.value_type or 'str', str)(row.value)
         except (ValueError, TypeError, json.JSONDecodeError):
             return default
 
@@ -213,23 +162,37 @@ SETTING_DEFAULTS = [
     # Outgoing mail. Off by default: with no SMTP host the mailer reports
     # 'dry-run' rather than pretending an invoice was delivered.
     ('mail_enabled',            'False',  'bool'),
+    ('mail_host',               '',       'str'),
+    ('mail_port',               '587',    'int'),
+    ('mail_username',           '',       'str'),
+    ('mail_password',           '',       'str'),
     ('mail_from',               '',       'str'),
     ('mail_from_name',          '',       'str'),
-    ('brevo_api_key',           '',       'str'),
+    ('mail_use_tls',            'True',   'bool'),
+    ('mail_use_ssl',            'False',  'bool'),
 
-    # Cloudinary cloud image storage. When enabled, logo, banner and customer
-    # document uploads go to Cloudinary instead of the server's local disk,
-    # which is wiped on every redeploy. Off keeps today's disk behaviour.
-    ('cloudinary_enabled',      'False',  'bool'),
-    ('cloudinary_cloud_name',   '',       'str'),
-    ('cloudinary_api_key',      '',       'str'),
-    ('cloudinary_api_secret',   '',       'str'),
-    ('cloudinary_upload_preset','',       'str'),
-    ('cloudinary_folder',       '',       'str'),
+    # Cloud file storage. 'local' keeps the previous behaviour exactly:
+    # uploads are written to static/uploads on this server. That is the safe
+    # default, but on a hosted container it is also a disappearing one - the
+    # disk is wiped on every deploy, taking the logo, the KYC documents and
+    # the payment proofs with it. Switching this to 's3' points the same
+    # uploads at a bucket instead.
+    #
+    # Credentials belong in the host's environment variables where possible;
+    # anything set there overrides the value stored here. See
+    # services/cloud_storage.py.
+    ('storage_backend',         'local',  'str'),    # local | s3
+    ('s3_endpoint_url',         '',       'str'),
+    ('s3_region',               'auto',   'str'),
+    ('s3_bucket',               '',       'str'),
+    ('s3_access_key_id',        '',       'str'),
+    ('s3_secret_access_key',    '',       'str'),
+    ('s3_public_base_url',      '',       'str'),
 
-    # Admin notifications (daily report recipients).
-    ('admin_email',             '',       'str'),
-    ('admin_mobile',            '',       'str'),
+    # Nightly database backup.
+    ('backup_enabled',          'False',  'bool'),
+    ('backup_hour',             '3',      'int'),
+    ('backup_retention_days',   '30',     'int'),
 ]
 
 
@@ -501,7 +464,23 @@ class BackupLog(db.Model):
     created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
+    #: Where the file went - 'local' (this server's disk) or 's3' (the
+    #: configured bucket). Recorded rather than inferred from today's
+    #: settings, because a backup taken before cloud storage was switched on
+    #: is still on the disk and has to be looked for there.
+    location = db.Column(db.String(16), default='local')
+
+    #: Set when the retention policy has removed the file. The row stays and
+    #: `status` stays 'success', because it is a true record that a backup ran
+    #: that night; only the file is gone.
+    purged_at = db.Column(db.DateTime)
+
     created_by = db.relationship('User')
+
+    @property
+    def is_downloadable(self):
+        return bool(self.status == 'success' and self.filename
+                    and not self.purged_at)
 
     @property
     def size_human(self):

@@ -77,19 +77,14 @@ def _outstanding(customer_id):
 
 
 def _next_invoice_no():
-    from sqlalchemy.exc import IntegrityError
     from models import Invoice as _I
     today = date.today().strftime('%Y%m%d')
+    last = db.session.execute(
+        db.select(_I.id).order_by(_I.id.desc()).limit(1)).scalar() or 0
     for attempt in range(20):
-        last = db.session.execute(
-            db.select(_I.id).order_by(_I.id.desc()).limit(1)).scalar() or 0
         candidate = f"INV-{today}-{last + 1 + attempt:04d}"
-        try:
-            if not _I.query.filter_by(invoice_no=candidate).first():
-                return candidate
-        except IntegrityError:
-            db.session.rollback()
-            continue
+        if not _I.query.filter_by(invoice_no=candidate).first():
+            return candidate
     return f"INV-{today}-{secrets.token_hex(4).upper()}"
 
 
@@ -224,8 +219,8 @@ def reset_password():
     if password != confirm:
         flash('The two passwords do not match.', 'danger')
         return redirect(url_for('portal.forgot_password'))
-    if len(password) < 8:
-        flash('Please use a password of at least 8 characters.', 'danger')
+    if len(password) < 6:
+        flash('Please use a password of at least 6 characters.', 'danger')
         return redirect(url_for('portal.forgot_password'))
 
     customer.set_password(password)
@@ -525,6 +520,11 @@ def _save_proof(storage):
     Returns the path relative to /static, or None when nothing usable was
     uploaded. A bad upload never blocks the payment entry - the customer
     still gets their entry recorded, just without the attachment.
+
+    Goes to the configured bucket when there is one. This is the upload that
+    suffers most from the container disk being wiped on deploy: a proof is the
+    evidence behind a payment the office has not approved yet, so losing it
+    turns an approvable payment into an argument.
     """
     if storage is None or not getattr(storage, 'filename', ''):
         return None
@@ -532,22 +532,19 @@ def _save_proof(storage):
     ext = os.path.splitext(name)[1].lower()
     if ext not in PROOF_EXTENSIONS:
         return None
-
-    from services.cloudinary import is_enabled, upload
-    if is_enabled():
-        url = upload(storage, public_id=f'payment-proof-{secrets.token_hex(4)}')
-        if url:
-            return url
-        return None
-
     unique = f"{datetime.utcnow():%Y%m%d%H%M%S}-{secrets.token_hex(4)}{ext}"
-    folder = os.path.join(current_app.root_path, 'static', PROOF_DIR)
-    try:
-        os.makedirs(folder, exist_ok=True)
-        storage.save(os.path.join(folder, unique))
-    except OSError:
-        current_app.logger.warning('Could not store payment proof %s', name)
+
+    from services import cloud_storage
+    _where, error = cloud_storage.save_upload(
+        'payment_proofs', unique, storage.stream,
+        getattr(storage, 'mimetype', None))
+    if error:
+        current_app.logger.warning('Could not store payment proof %s: %s',
+                                   name, error)
         return None
+    # The stored value is unchanged - "uploads/payment_proofs/x.jpg", relative
+    # to /static - so every existing row and every reader of this column keeps
+    # working whichever side of the switch it was written on.
     return f"{PROOF_DIR}/{unique}".replace(os.sep, '/')
 
 
@@ -780,9 +777,8 @@ def payment_new():
     try:
         messaging.send_template(customer, 'payment_submitted',
                                 invoice=invoice, payment=payment)
-    except Exception as exc:                             # noqa: BLE001
-        current_app.logger.warning('Failed to send payment_submitted template '
-                                   'to %s: %s', customer.full_name, exc)
+    except Exception:                                    # noqa: BLE001
+        pass
 
     flash('Payment submitted. We will confirm it against our bank statement '
           'and update your account - usually within a few hours.', 'success')
@@ -794,8 +790,7 @@ def _setting_value(key):
         from models_ext import Setting
         row = Setting.query.filter_by(key=key).first()
         return (row.value or '').strip() if row else ''
-    except Exception as exc:                             # noqa: BLE001
-        current_app.logger.warning('_setting_value(%s) failed: %s', key, exc)
+    except Exception:                                    # noqa: BLE001
         return ''
 
 

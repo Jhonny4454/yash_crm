@@ -221,7 +221,10 @@ export default function SettingsPage() {
                   payment is off, so the office has to be able to see it
                   somewhere. This is that somewhere. */}
               {group.key === "payment" && <CashfreeStatus saveCount={saveCount} />}
-              {group.key === "cloudinary" && <CloudinaryStatus saveCount={saveCount} />}
+              {/* Same idea, for the fault that reports itself even more
+                  quietly: uploads keep succeeding when storage is wrong, they
+                  just land somewhere that is about to be erased. */}
+              {group.key === "storage" && <StorageStatus saveCount={saveCount} />}
             </section>
           ))}
 
@@ -341,15 +344,19 @@ function CashfreeStatus({ saveCount }) {
 }
 
 /**
- * Whether image storage on Cloudinary is switched on and usable.
+ * Where files and backups are actually going, and whether that survives a
+ * deploy.
  *
- * Same idea as CashfreeStatus: the stored credentials decide what actually
- * happens, so the office sees the verdict - and a Test button that asks
- * Cloudinary itself - right next to the fields. The test is read-only and
- * creates nothing.
+ * This failure is silent by construction. An upload to the wrong place still
+ * succeeds - the file is written, the record names it, the screen says saved.
+ * It is only the *next deploy* that erases it, and by then nobody connects the
+ * missing KYC document to the release that happened three weeks ago. So the
+ * settings above are not enough on their own: this says what they add up to,
+ * in the tense that matters ("these files will be lost"), and gives the two
+ * buttons that prove it rather than describing it.
  */
-function CloudinaryStatus({ saveCount }) {
-  const { data, loading, refetch } = useFetch("/settings/cloudinary/status", { saveCount });
+function StorageStatus({ saveCount }) {
+  const { data, loading, refetch } = useFetch("/settings/storage/status", { saveCount });
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState(null);
 
@@ -357,7 +364,7 @@ function CloudinaryStatus({ saveCount }) {
     setTesting(true);
     setResult(null);
     try {
-      const response = await post("/settings/cloudinary/test", {});
+      const response = await post("/settings/storage/test", {});
       setResult((response?.data ?? response) || null);
     } catch (err) {
       setResult({ ok: false, detail: readableError(err) });
@@ -369,28 +376,37 @@ function CloudinaryStatus({ saveCount }) {
 
   if (loading || !data) return null;
 
+  const warnings = data.warnings || [];
+
   return (
-    <div className={`set-status${data.ready ? " is-ok" : " is-blocked"}`}>
+    <div className={`set-status${data.enabled ? " is-ok" : " is-blocked"}`}>
       <p className="set-status-head">
         <strong>
-          {data.ready
-            ? "Cloudinary image storage is on."
-            : "Cloudinary image storage is not usable yet."}
+          {data.enabled
+            ? "Uploads are going to the cloud bucket."
+            : "Uploads are being written to this server."}
         </strong>
-        {" "}
-        {data.enabled
-          ? `Cloud: ${data.cloud_name || "—"}`
-          : "Switch on \"Store images on Cloudinary\" above to use it."}
+        {data.enabled && data.bucket && <> Bucket: {data.bucket}</>}
       </p>
 
-      {!data.ready && data.blocking.map((line) => (
+      {warnings.map((line) => (
         <p key={line} className="set-status-line">{line}</p>
       ))}
 
-      {data.enabled && !data.has_upload_preset && (
+      {/* Which values came from the hosting dashboard rather than this
+          screen. Without it, typing a bucket name here and watching it have
+          no effect is baffling - the environment variable silently wins. */}
+      {!!(data.from_environment || []).length && (
         <p className="set-status-line set-status-quiet">
-          No upload preset set — uploads will be signed server-side. An
-          unsigned preset would let the browser upload directly.
+          Set on the server and overriding this page:{" "}
+          {data.from_environment.join(", ")}. Change those in your hosting
+          dashboard - editing them here will not take effect.
+        </p>
+      )}
+
+      {data.enabled && data.access_key_hint && (
+        <p className="set-status-line set-status-quiet">
+          Key {data.access_key_hint} · {data.endpoint || "default AWS endpoint"} · region {data.region}
         </p>
       )}
 
@@ -404,6 +420,121 @@ function CloudinaryStatus({ saveCount }) {
           </span>
         )}
       </div>
+
+      <BackupPanel saveCount={saveCount} storageReady={data.enabled} />
+    </div>
+  );
+}
+
+/**
+ * Take a backup now, and see the ones already taken.
+ *
+ * The list is the point rather than the button. "Backups are switched on" is a
+ * setting; "the last one ran on Tuesday and is 4.2 MB" is evidence, and those
+ * two things drift apart silently - a nightly job that has been failing for a
+ * month looks exactly like one that is working, right up until somebody needs
+ * the file.
+ */
+function BackupPanel({ saveCount, storageReady }) {
+  const [runs, setRuns] = useState(0);
+  const { data, meta, loading, refetch } =
+    useFetch("/settings/backups", { per_page: 6, saveCount, runs });
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState(null);
+
+  const rows = Array.isArray(data) ? data : [];
+
+  async function runNow() {
+    setBusy(true);
+    setNote(null);
+    try {
+      const response = await post("/settings/backups", {});
+      const payload = response?.data ?? response;
+      setNote({
+        ok: true,
+        text: `${payload?.filename || "Backup"} (${payload?.size_human || "done"})`
+          + (payload?.location === "s3" ? " - stored in the bucket." : " - stored on this server."),
+      });
+      setRuns((n) => n + 1);
+    } catch (err) {
+      setNote({ ok: false, text: err?.detail || readableError(err) });
+    } finally {
+      setBusy(false);
+      refetch();
+    }
+  }
+
+  return (
+    <div className="set-backups">
+      <div className="set-backups-head">
+        <h3>Database backups</h3>
+        <button type="button" className="btn sm" onClick={runNow} disabled={busy}>
+          {busy ? "Backing up…" : "Back up now"}
+        </button>
+      </div>
+
+      {note && (
+        <p className={note.ok ? "set-status-ok" : "set-status-bad"}>{note.text}</p>
+      )}
+
+      {!storageReady && (
+        <p className="set-status-line set-status-quiet">
+          With no bucket configured these are written to this server's disk,
+          which is erased on every deploy - so they protect against a mistake in
+          the data, but not against losing the server.
+        </p>
+      )}
+
+      {loading ? (
+        <p className="set-status-quiet">Loading…</p>
+      ) : !rows.length ? (
+        <p className="set-status-quiet">No backup has been taken yet.</p>
+      ) : (
+        <table className="set-backup-table">
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Size</th>
+              <th>Where</th>
+              <th aria-label="Download" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id}>
+                <td>
+                  {row.created_at ? new Date(row.created_at).toLocaleString() : "-"}
+                  <span className="set-backup-kind">
+                    {row.kind === "scheduled" ? "automatic" : "manual"}
+                  </span>
+                  {row.status === "failed" && (
+                    <span className="set-backup-failed" title={row.message}>
+                      failed - {row.message}
+                    </span>
+                  )}
+                </td>
+                <td>{row.status === "success" ? row.size_human : "-"}</td>
+                <td>
+                  {row.purged
+                    ? "deleted (past retention)"
+                    : row.location === "s3" ? "cloud bucket" : "this server"}
+                </td>
+                <td className="set-backup-action">
+                  {row.download_url && (
+                    <a href={row.download_url} download>Download</a>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {!!meta?.total && meta.total > rows.length && (
+        <p className="set-status-quiet">
+          Showing the {rows.length} most recent of {meta.total}.
+        </p>
+      )}
     </div>
   );
 }

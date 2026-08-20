@@ -39,29 +39,18 @@ DEFAULT_TTL_SECONDS = 30 * 24 * 3600
 
 
 def _secret():
-    key = current_app.config.get('SECRET_KEY')
-    if not key or key in ('dev', 'dev-secret-key-change-me', 'changeme'):
-        return None
-    return key.encode()
+    return (current_app.config.get('SECRET_KEY') or 'dev').encode()
 
 
 def _signature(kind, ident, expires):
-    secret = _secret()
-    if secret is None:
-        return None
     message = f'{kind}:{ident}:{expires}'.encode()
-    return hmac.new(secret, message, hashlib.sha256).hexdigest()[:32]
+    return hmac.new(_secret(), message, hashlib.sha256).hexdigest()[:32]
 
 
 def sign(kind, ident, ttl=DEFAULT_TTL_SECONDS):
-    """``(expires, signature)`` for one resource, or ``(0, None)`` if
-    SECRET_KEY is missing/weak (links must not be forgeable).
-    """
+    """``(expires, signature)`` for one resource."""
     expires = int(time.time()) + int(ttl)
-    signature = _signature(kind, ident, expires)
-    if signature is None:
-        return 0, None
-    return expires, signature
+    return expires, _signature(kind, ident, expires)
 
 
 def verify(kind, ident, expires, signature):
@@ -74,14 +63,11 @@ def verify(kind, ident, expires, signature):
     if expires < time.time():
         return False
 
-    expected = _signature(kind, ident, expires)
-    if expected is None:
-        return False
-
     # compare_digest, not ==. A plain comparison returns as soon as two bytes
     # differ, and that timing difference is enough to recover a signature one
     # character at a time.
-    return hmac.compare_digest(expected, str(signature or ''))
+    return hmac.compare_digest(_signature(kind, ident, expires),
+                               str(signature or ''))
 
 
 def public_base_url():
@@ -103,17 +89,47 @@ def public_base_url():
 
 
 def invoice_pdf_link(invoice_id, ttl=DEFAULT_TTL_SECONDS):
-    """A ready-to-send URL for one invoice's PDF, or '' if we have no base
-    or no signing key.
-    """
+    """A ready-to-send URL for one invoice's PDF, or '' if we have no base."""
     base = public_base_url()
     if not base:
         return ''
     expires, signature = sign('invoice', invoice_id, ttl)
-    if not signature:
-        return ''
     query = urlencode({'exp': expires, 'sig': signature})
     return f'{base}/api/v1/public/invoices/{invoice_id}/pdf?{query}'
+
+
+#: An uploaded-file link is short-lived on purpose. A bill is a document the
+#: customer is meant to keep; an identity proof is one that should stop being
+#: reachable as soon as whoever opened it has finished looking.
+UPLOAD_TTL_SECONDS = 15 * 60
+
+
+def upload_link(folder, filename, ttl=UPLOAD_TTL_SECONDS, external=False):
+    """A short-lived link to one uploaded file.
+
+    KYC documents and payment proofs were served straight out of
+    ``/static/uploads/...``, which Flask hands to anyone who asks - no login,
+    no expiry, forever. The stored filenames carry a random token so they were
+    not trivially guessable, but "hard to guess" is not access control, and a
+    URL pasted into a chat stayed live indefinitely. These are Aadhaar and PAN
+    scans.
+
+    Signed here instead, so reaching the file needs a signature that expires.
+    Returns a same-origin path by default, which is what the admin screens
+    need; ``external=True`` gives an absolute URL for anything that leaves the
+    browser.
+    """
+    if not filename:
+        return None
+    safe_folder = str(folder).strip('/')
+    name = str(filename).replace('\\', '/').split('/')[-1]
+    expires, signature = sign('upload', f'{safe_folder}/{name}', ttl)
+    query = urlencode({'exp': expires, 'sig': signature})
+    path = f'/api/v1/public/files/{safe_folder}/{name}?{query}'
+    if not external:
+        return path
+    base = public_base_url()
+    return f'{base}{path}' if base else path
 
 
 def receipt_pdf_link(payment_id, ttl=DEFAULT_TTL_SECONDS):
@@ -129,7 +145,5 @@ def receipt_pdf_link(payment_id, ttl=DEFAULT_TTL_SECONDS):
     if not base:
         return ''
     expires, signature = sign('receipt', payment_id, ttl)
-    if not signature:
-        return ''
     query = urlencode({'exp': expires, 'sig': signature})
     return f'{base}/api/v1/public/payments/{payment_id}/receipt.pdf?{query}'

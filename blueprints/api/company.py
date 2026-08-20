@@ -14,7 +14,7 @@ so the logo appears on the bill, in the app, and in the PDF from one upload.
 import os
 from datetime import datetime
 
-from flask import Blueprint, current_app, request
+from flask import Blueprint, request
 from werkzeug.utils import secure_filename
 
 from models import Company, Customer, db
@@ -27,6 +27,9 @@ from .utils import (admin_required, body, current_customer_id,
 
 bp = Blueprint('api_company', __name__)
 
+#: Kept for anything that still imports it. The upload itself no longer
+#: builds a path here - services/cloud_storage.py owns where a file goes,
+#: because that decision now depends on whether a bucket is configured.
 UPLOAD_SUBDIR = os.path.join('uploads', 'logos')
 ALLOWED_LOGO_EXT = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'}
 
@@ -124,28 +127,25 @@ def company_logo_upload(cid):
     if ext not in ALLOWED_LOGO_EXT:
         return fail('unsupported_file_type', 400)
 
-    from services.cloudinary import is_enabled, upload
-    if is_enabled():
-        url = upload(file, public_id=f'company-{cid}-logo')
-        if not url:
-            return fail('upload_failed', 500,
-                        detail='Cloudinary upload failed. Check credentials '
-                               'in Settings > Cloudinary.')
-        company.company_logo = url
-        db.session.commit()
-        return ok({'company_logo': url, 'logo_url': url})
-
     stamp = datetime.utcnow().strftime('%Y%m%d%H%M%S')
     filename = secure_filename(f'company-{cid}-{stamp}.{ext}')
-    folder = os.path.join(current_app.root_path, 'static', UPLOAD_SUBDIR)
-    os.makedirs(folder, exist_ok=True)
-    file.save(os.path.join(folder, filename))
+
+    # The logo is the upload whose disappearance is most visible - it prints
+    # on every bill and sits in the sidebar and the portal header - because the
+    # server disk it was being written to is rebuilt on each deploy. With cloud
+    # storage configured it goes to the bucket instead and stops vanishing.
+    from services import cloud_storage
+    where, error = cloud_storage.save_upload(
+        'logos', filename, file.stream, file.mimetype)
+    if error:
+        return fail('logo_save_failed', 500, detail=error)
 
     # Only the bare filename is stored - logo_url() resolves the rest.
     company.company_logo = filename
     db.session.commit()
 
-    return ok({'company_logo': filename, 'logo_url': logo_url(filename)})
+    return ok({'company_logo': filename, 'logo_url': logo_url(filename),
+               'stored_in': where})
 
 
 # --------------------------------------------------------------------------- #

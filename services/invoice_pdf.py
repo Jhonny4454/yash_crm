@@ -13,7 +13,6 @@ Usage:
     pdf_bytes = build_invoice_pdf(invoice)
 """
 from io import BytesIO
-import html as _html
 import os
 
 from reportlab.lib import colors
@@ -163,12 +162,8 @@ def _logo_path(explicit=None):
         # than a blank box - this returned None and printed nothing.
         return _bundled_logo(_root())
     if stored.startswith(('http://', 'https://')):
-        # A remote URL (e.g. Cloudinary) — download to a temp file for ReportLab.
-        from services.cloudinary import download_to_temp
-        path = download_to_temp(stored)
-        if path and os.path.exists(path):
-            return path
-        return _bundled_logo(_root(), missing=stored)
+        # A remote URL cannot be handed to ReportLab as a local file.
+        return _bundled_logo(_root())
 
     bare = stored.lstrip('/').split('/')[-1]
     root = _root()
@@ -184,7 +179,46 @@ def _logo_path(explicit=None):
         if os.path.exists(candidate):
             return candidate
 
+    # Not on this disk. With cloud storage configured it is in the bucket -
+    # fetch it to a temporary file, because ReportLab needs a real path and
+    # will not take a URL or a stream.
+    from_bucket = _logo_from_storage(bare)
+    if from_bucket:
+        return from_bucket
+
     return _bundled_logo(root, missing=stored)
+
+
+#: Where the logo pulled out of the bucket was written, per process. A billing
+#: run renders hundreds of PDFs, and without this each one would download the
+#: same object again.
+_STORAGE_LOGO_CACHE = {}
+
+
+def _logo_from_storage(bare):
+    """The company logo from the configured bucket, cached on local disk."""
+    cached = _STORAGE_LOGO_CACHE.get(bare)
+    if cached and os.path.exists(cached):
+        return cached
+
+    try:
+        import tempfile
+
+        from services import cloud_storage
+        if not cloud_storage.is_enabled():
+            return None
+        data = cloud_storage.get_bytes(cloud_storage.upload_key('logos', bare))
+        if not data:
+            return None
+        folder = os.path.join(tempfile.gettempdir(), 'yis-logo-cache')
+        os.makedirs(folder, exist_ok=True)
+        path = os.path.join(folder, os.path.basename(bare))
+        with open(path, 'wb') as handle:
+            handle.write(data)
+        _STORAGE_LOGO_CACHE[bare] = path
+        return path
+    except Exception:                                       # noqa: BLE001
+        return None
 
 
 def _bundled_logo(root, missing=''):
@@ -218,25 +252,19 @@ def _bundled_logo(root, missing=''):
     return None
 
 
-def _logo_flowable(explicit=None, width=28, height=22):
+def _logo_flowable(explicit=None, width=30, height=18):
     """The letterhead image, or '' when there is genuinely no logo to print.
 
     One helper for both documents: the invoice and the receipt each had their
     own copy of resolve-then-guard, which is how one of them can quietly stop
     printing a letterhead while the other keeps working.
-
-    The image is scaled proportionally within the given bounding box so it
-    never overflows its table cell. ``hAlign='CENTER'`` centres a
-    landscape image in a portrait cell (or vice-versa).
     """
     resolved = _logo_path(explicit)
     if not resolved:
         return ''
     try:
-        img = Image(resolved, width=width * mm, height=height * mm,
+        return Image(resolved, width=width * mm, height=height * mm,
                      kind='proportional')
-        img.hAlign = 'CENTER'
-        return img
     except Exception:                                       # noqa: BLE001
         # A corrupt or unreadable image must not take the whole bill down.
         return ''
@@ -392,24 +420,19 @@ def build_invoice_pdf(invoice, logo_path=None, detailed=False):
         ('LEFTPADDING', (0, 0), (-1, -1), 5),
         ('TOPPADDING', (0, 0), (-1, -1), 5),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
     ])
     # No logo means no empty box: a third of the letterhead ruled off around
     # nothing looks like a missing image, which is precisely what it was.
-    if logo_cell:
-        lt = Table([[logo_cell, company_block]],
-                    colWidths=[W * 0.28, W * 0.72], style=letterhead)
-        lt._argW[0] = W * 0.28
-        story.append(lt)
-    else:
-        story.append(Table([[company_block]], colWidths=[W], style=letterhead))
+    story.append(Table([[logo_cell, company_block]],
+                       colWidths=[W * 0.28, W * 0.72], style=letterhead)
+                 if logo_cell else
+                 Table([[company_block]], colWidths=[W], style=letterhead))
 
     # ---- GSTIN / state row ---------------------------------------------
     grid = TableStyle([
         ('GRID', (0, 0), (-1, -1), 0.6, colors.black),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('LEFTPADDING', (0, 0), (-1, -1), 5),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
         ('TOPPADDING', (0, 0), (-1, -1), 4),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
     ])
@@ -428,9 +451,9 @@ def build_invoice_pdf(invoice, logo_path=None, detailed=False):
         story.append(Table([seller], colWidths=[W * 0.62, W * 0.38], style=grid))
 
     story.append(Table([[
-        Paragraph(f"<b>Customer Name:</b> {_html.escape(customer.full_name if customer else '')}", wrap),
-        Paragraph(f"<b>Tel:</b> {_html.escape(getattr(customer, 'mobile', '') or '')}", small),
-        Paragraph(f"<b>Email:</b> {_html.escape(getattr(customer, 'email', '') or '')}", wrap),
+        Paragraph(f"<b>Customer Name:</b> {customer.full_name if customer else ''}", wrap),
+        Paragraph(f"<b>Tel:</b> {getattr(customer, 'mobile', '') or ''}", small),
+        Paragraph(f"<b>Email:</b> {getattr(customer, 'email', '') or ''}", wrap),
     ]], colWidths=[W * 0.38, W * 0.24, W * 0.38], style=grid))
 
     address = ', '.join(filter(None, [
@@ -440,14 +463,14 @@ def build_invoice_pdf(invoice, logo_path=None, detailed=False):
     # `Address:, 1008, Rabale...` - that comma was hard-coded, so every bill
     # for a customer with no flat number opened its address with a comma.
     story.append(Table([[Paragraph(
-        f"<b>Address:</b> {_html.escape(address) if address else '-'}", wrap)]], colWidths=[W], style=grid))
+        f"<b>Address:</b> {address or '-'}", wrap)]], colWidths=[W], style=grid))
 
     invoice_row = [
         Paragraph(f"<b>Invoice No:</b> {invoice.invoice_no}", wrap),
         Paragraph(f"<b>Invoice Date:</b> {_date(invoice.issue_date)}", small),
     ]
     if getattr(customer, 'gstin', ''):
-        invoice_row.append(Paragraph(f"<b>Customer GSTIN:</b> {_html.escape(customer.gstin)}", wrap))
+        invoice_row.append(Paragraph(f"<b>Customer GSTIN:</b> {customer.gstin}", wrap))
         widths = [W * 0.40, W * 0.32, W * 0.28]
     else:
         widths = [W * 0.58, W * 0.42]
@@ -516,12 +539,13 @@ def build_invoice_pdf(invoice, logo_path=None, detailed=False):
     # The amount in words goes in the space beside the figures rather than in
     # a row of its own underneath. It is the same information a printed bill
     # puts there, and it fills what was a third of a page of ruled-off blank.
-    # The inner table must be NARROWER than the 0.36 outer column to leave
-    # room for padding (5pt each side = 10pt ≈ 3.5mm).  0.17 + 0.155 = 0.325
-    # which safely fits inside 0.36.
+    # The inner table has to fit INSIDE its cell, padding included: at
+    # 0.20 + 0.16 it was exactly as wide as the 0.36 column holding it, so
+    # every figure and the rule above the total pushed out through the right
+    # border of the bill. 0.19 + 0.145 leaves room for the 5pt padding.
     story.append(Table(
         [[Paragraph(f"<b>Rupees in words:</b> {amount_in_words(net)}", wrap),
-          Table(totals, colWidths=[W * 0.17, W * 0.155], style=TableStyle([
+          Table(totals, colWidths=[W * 0.19, W * 0.145], style=TableStyle([
               ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
               ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
               ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
@@ -530,7 +554,6 @@ def build_invoice_pdf(invoice, logo_path=None, detailed=False):
               ('LINEABOVE', (0, -1), (-1, -1), 0.6, colors.black),
               ('TOPPADDING', (0, 0), (-1, -1), 2),
               ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-              ('RIGHTPADDING', (0, 0), (-1, -1), 3),
           ]))]],
         colWidths=[W * 0.64, W * 0.36],
         style=TableStyle([
@@ -554,8 +577,7 @@ def build_invoice_pdf(invoice, logo_path=None, detailed=False):
         body.append(Paragraph(f'{index}) {text}', term))
         body.append(Spacer(1, 5))
 
-    terms_cell = Table([[body]], colWidths=[W - 10], style=grid)
-    story.append(terms_cell)
+    story.append(Table([[body]], colWidths=[W], style=grid))
     story.append(Table([[Paragraph(
         '<b>This is a computer generated invoice and does not require any signature.</b>',
         heading)]], colWidths=[W], style=grid))
@@ -600,7 +622,6 @@ def build_receipt_pdf(payment, logo_path=None):
         ('GRID', (0, 0), (-1, -1), 0.6, colors.black),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('LEFTPADDING', (0, 0), (-1, -1), 5),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
         ('TOPPADDING', (0, 0), (-1, -1), 4),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
     ])
@@ -628,12 +649,12 @@ def build_receipt_pdf(payment, logo_path=None):
     ]], colWidths=[W * 0.5, W * 0.5], style=grid))
 
     story.append(Table([[
-        Paragraph(f"Received From: {_html.escape(customer.full_name if customer else '')}", small),
-        Paragraph(f"Username: {_html.escape(getattr(customer, 'username', '') or '')}", small),
+        Paragraph(f"Received From: {customer.full_name if customer else ''}", small),
+        Paragraph(f"Username: {getattr(customer, 'username', '') or ''}", small),
     ]], colWidths=[W * 0.6, W * 0.4], style=grid))
 
     story.append(Table([[
-        Paragraph(f"Tel: {_html.escape(getattr(customer, 'mobile', '') or '')}", small),
+        Paragraph(f"Tel: {getattr(customer, 'mobile', '') or ''}", small),
         Paragraph(f"Against Invoice: {invoice.invoice_no if invoice else '-'}", small),
     ]], colWidths=[W * 0.4, W * 0.6], style=grid))
 

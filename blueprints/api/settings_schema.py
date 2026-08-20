@@ -37,20 +37,21 @@ GROUPS = [
      'Where outgoing WhatsApp messages are sent. Use the tester below after '
      'changing anything here.'),
     ('email', 'Outgoing email',
-     'Brevo sends emailed invoices and receipts over a plain HTTPS API - no '
-     'SMTP port to open, so it keeps working on Render. With no API key set, '
-     'the mailer reports "dry-run" instead of pretending a message was '
-     'delivered.'),
+     'SMTP for emailed invoices and receipts. With no host set, the mailer '
+     'reports "dry-run" instead of pretending a message was delivered.'),
     ('payment', 'Online payments',
      'Cashfree credentials for the customer portal. Leave the App ID blank to '
      'hide the Pay button entirely.'),
+    ('sms', 'SMS templates',
+     'Plain-text fallbacks. WhatsApp templates live under Masters → Message '
+     'templates.'),
     ('branding', 'Branding & links',
      'The banner in the customer portal and the app/website links used in '
      'messages.'),
-    ('cloudinary', 'Cloudinary',
-     'Cloud image storage for the logo, portal banner and customer documents. '
-     'Files live on Cloudinary, not on the server disk, so they survive '
-     'redeploys.'),
+    ('storage', 'File storage & backups',
+     'Where uploaded files and database backups are kept. On a hosted server '
+     'the container disk is wiped on every deploy, taking the logo, the KYC '
+     'documents and the payment proofs with it - a bucket is the fix.'),
     ('general', 'Other', ''),
 ]
 
@@ -213,12 +214,26 @@ FIELDS = {
         group='email', order=10, input='switch', label='Send email',
         help='Off means the mailer reports "dry-run" rather than pretending an '
              'invoice was delivered.'),
-    'brevo_api_key': dict(
-        group='email', order=12, input='password', label='Brevo API key',
-        secret=True,
-        help='Create one at brevo.com → SMTP & API → API Keys. Verify the '
-             'From address under Senders & IP → Senders first; a verified '
-             'email address works without owning a domain.'),
+    'mail_host': dict(
+        group='email', order=20, input='text', label='SMTP host',
+        placeholder='smtp.gmail.com'),
+    'mail_port': dict(
+        group='email', order=21, input='select', label='SMTP port',
+        options=[_opt('587', '587 - STARTTLS (most common)'),
+                 _opt('465', '465 - SSL'),
+                 _opt('25', '25 - unencrypted'),
+                 _opt('2525', '2525 - alternate')]),
+    'mail_use_tls': dict(
+        group='email', order=22, input='switch', label='Use STARTTLS',
+        help='On for port 587. Do not switch this on together with SSL.'),
+    'mail_use_ssl': dict(
+        group='email', order=23, input='switch', label='Use SSL',
+        help='On for port 465 only.'),
+    'mail_username': dict(
+        group='email', order=30, input='text', label='SMTP username'),
+    'mail_password': dict(
+        group='email', order=31, input='password', label='SMTP password',
+        secret=True),
     'mail_from': dict(
         group='email', order=40, input='email', label='From address',
         placeholder='billing@yashinternetservices.in'),
@@ -240,38 +255,79 @@ FIELDS = {
         group='payment', order=12, input='password', label='Cashfree secret key',
         secret=True),
 
+    # ------------------------------------------------------------------ sms --
+    'sms_template_renewal': dict(
+        group='sms', order=10, input='textarea', label='Renewal SMS', rows=3,
+        help='Placeholders: {name} {plan} {expiry}.'),
+    'sms_template_expiry': dict(
+        group='sms', order=11, input='textarea', label='Expiry reminder SMS',
+        rows=3, help='Placeholders: {name} {plan} {expiry}.'),
+
     # ------------------------------------------------------------- branding --
     'banner_link': dict(
         group='branding', order=10, input='text', label='Portal banner link',
         help='Where the portal banner takes the customer.'),
     'banner_image': dict(
         group='branding', order=11, input='text', label='Portal banner image',
-        help='URL or filename of the portal banner image.'),
+        help='Filename of an image already uploaded to static/uploads.'),
 
-    # ---------------------------------------------------------- cloudinary --
-    'cloudinary_enabled': dict(
-        group='cloudinary', order=10, input='switch', label='Store images on Cloudinary',
-        help='Off keeps uploads on the server disk, where a redeploy wipes them.'),
-    'cloudinary_cloud_name': dict(
-        group='cloudinary', order=11, input='text', label='Cloud name',
-        help='From the Cloudinary Dashboard. It is the first part of every '
-             'delivery URL, so it is not a secret.'),
-    'cloudinary_api_key': dict(
-        group='cloudinary', order=12, input='password', label='API key',
-        help='From Cloudinary Dashboard > Settings > Access Keys.'),
-    'cloudinary_api_secret': dict(
-        group='cloudinary', order=13, input='password', label='API secret',
-        secret=True,
-        help='From Cloudinary Dashboard > Settings > Access Keys.'),
-    'cloudinary_upload_preset': dict(
-        group='cloudinary', order=20, input='text', label='Upload preset',
-        help='Optional. An unsigned preset lets the browser upload directly '
-             'without exposing the API secret. Blank falls back to signed '
-             'server-side uploads.'),
-    'cloudinary_folder': dict(
-        group='cloudinary', order=21, input='text', label='Folder',
-        help='Optional. Where uploads are stored inside your Cloudinary '
-             'account, e.g. yash-crm.'),
+    # -------------------------------------------------------------- storage --
+    'storage_backend': dict(
+        group='storage', order=10, input='select', label='Where files are stored',
+        help='The server disk is wiped every time this application is '
+             'deployed. Anything uploaded since the last deploy - logos, KYC '
+             'documents, payment screenshots - is already gone. A bucket keeps '
+             'them.',
+        options=[_opt('local', 'This server (lost on every deploy)'),
+                 _opt('s3', 'Cloud bucket (S3-compatible)')]),
+    's3_endpoint_url': dict(
+        group='storage', order=20, input='url', label='Endpoint URL',
+        help='From your storage dashboard. Cloudflare R2 looks like '
+             'https://<account>.r2.cloudflarestorage.com. Leave blank only for '
+             'Amazon S3 itself.',
+        placeholder='https://<account-id>.r2.cloudflarestorage.com'),
+    's3_bucket': dict(
+        group='storage', order=21, input='text', label='Bucket name',
+        help='The bucket must already exist - this does not create one.',
+        maxlength=200),
+    's3_region': dict(
+        group='storage', order=22, input='text', label='Region',
+        help='"auto" is right for Cloudflare R2. Amazon S3 wants its real '
+             'region, e.g. ap-south-1.',
+        placeholder='auto', maxlength=40),
+    's3_access_key_id': dict(
+        group='storage', order=23, input='text', label='Access key ID',
+        help='The public half of the API token. The secret half goes below.',
+        secret=False, maxlength=200),
+    's3_secret_access_key': dict(
+        group='storage', order=24, input='password', label='Secret access key',
+        help='Shown once when the token is created. If you have lost it, issue '
+             'a new token rather than guessing - the two halves only work as a '
+             'pair.',
+        secret=True),
+    's3_public_base_url': dict(
+        group='storage', order=25, input='url', label='Public URL for the logo',
+        help='Optional, and only used for the company logo, which is printed '
+             'on bills and is not confidential. Leave blank and the logo is '
+             'served by this application instead. KYC documents and payment '
+             'proofs never use this - they always go through an expiring link.',
+        placeholder='https://files.yashinternetservices.in'),
+
+    'backup_enabled': dict(
+        group='storage', order=40, input='switch', label='Nightly database backup',
+        help='Takes a dump of the whole database once a day and puts it '
+             'wherever files are stored above. A backup on the server disk is '
+             'lost with the server, so this is worth far more with a bucket '
+             'configured.'),
+    'backup_hour': dict(
+        group='storage', order=41, input='number', label='Run backup at',
+        help='Hour of the day, 0-23, in the server timezone. Pick a quiet hour.',
+        min=0, max=23, suffix=':00'),
+    'backup_retention_days': dict(
+        group='storage', order=42, input='number', label='Keep backups for',
+        help='Older copies are deleted to stop the bucket growing forever. '
+             'The three most recent are always kept, whatever this says.',
+        min=1, max=3650, suffix='days'),
 
     # -------------------------------------------------------------- general --
     'app_link': dict(
@@ -279,14 +335,6 @@ FIELDS = {
         help='Sent in welcome messages.'),
     'web_link': dict(
         group='general', order=11, input='url', label='Website link'),
-
-    # ---------------------------------------------------------- notifications --
-    'admin_email': dict(
-        group='notifications', order=10, input='email', label='Admin email',
-        help='Receives the daily report and system alerts.'),
-    'admin_mobile': dict(
-        group='notifications', order=11, input='text', label='Admin mobile',
-        help='Receives the daily report on WhatsApp.'),
 }
 
 
@@ -325,7 +373,7 @@ def describe(key, value_type='str'):
 
 
 def _fallback_group(key):
-    for prefix, group in (('wa_', 'whatsapp'), ('mail_', 'email'),
+    for prefix, group in (('wa_', 'whatsapp'), ('sms_', 'sms'), ('mail_', 'email'),
                           ('cashfree_', 'payment'), ('invoice_', 'billing'),
                           ('receipt_', 'billing'), ('staff_', 'numbering'),
                           ('customer_', 'numbering'), ('coll_', 'collection'),

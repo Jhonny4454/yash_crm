@@ -16,7 +16,6 @@ Nothing here re-implements business logic; it only exposes what exists.
 """
 import csv
 import io
-import os
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
@@ -119,7 +118,6 @@ def settings_update():
     reloaded.
     """
     from .settings_schema import FIELDS, coerce, is_secret
-    from models_ext import ENCRYPTED_SETTINGS, encrypt_setting_value
 
     data = body()
     items = data.get('settings')
@@ -174,7 +172,7 @@ def settings_update():
         if not row:
             row = Setting(key=key, value_type=value_type)
             db.session.add(row)
-        row.value = encrypt_setting_value(value) if key in ENCRYPTED_SETTINGS else value
+        row.value = value
         row.updated_by_id = current_staff_id()
         saved += 1
 
@@ -183,6 +181,11 @@ def settings_update():
     # response would otherwise report the values we just replaced.
     from services.messaging import invalidate_settings_cache
     invalidate_settings_cache()
+    # Storage keeps its own snapshot, taken at the first upload of the
+    # request. Without this, saving a new bucket and immediately pressing
+    # "Test connection" would test the previous one.
+    from services import cloud_storage
+    cloud_storage.invalidate_cache()
     return ok({'status': 'saved', 'count': saved,
                'unchanged_secrets': skipped})
 
@@ -202,7 +205,7 @@ def restore_templates():
         result = restore_default_templates()
     except Exception as exc:
         db.session.rollback()
-        return fail('restore_failed', 500, detail='An error occurred while restoring templates.')
+        return fail('restore_failed', 500, detail=str(exc)[:200])
 
     changed = len(result['created']) + len(result['reactivated']) + len(result['refilled'])
     result['changed'] = changed
@@ -330,111 +333,6 @@ def cashfree_test():
         return ok(cashfree.check_credentials())
     except Exception as exc:
         return ok({'ok': False, 'environment': _safe(cashfree.environment),
-                   'detail': f'The check itself failed: {exc}'})
-
-
-@bp.get('/settings/cloudinary/status')
-@staff_required
-def cloudinary_status():
-    """Whether image storage on Cloudinary is switched on and usable.
-
-    Mirrors the Cashfree/WhatsApp status blocks: the operator needs to see,
-    on the same screen as the fields, whether the stored credentials can
-    actually be used - and why not, when they cannot.
-    """
-    enabled = _setting_value('cloudinary_enabled') in ('1', 'true', 'True',
-                                                       'yes', 'on')
-    cloud_name = (_setting_value('cloudinary_cloud_name') or '').strip()
-    api_key = (_setting_value('cloudinary_api_key') or '').strip()
-    api_secret = (_setting_value('cloudinary_api_secret') or '').strip()
-    preset = (_setting_value('cloudinary_upload_preset') or '').strip()
-
-    blocking = []
-    if not enabled:
-        blocking.append('Cloudinary storage is switched off. Uploads stay on '
-                        'the server disk, where a redeploy wipes them.')
-    if not cloud_name:
-        blocking.append('No cloud name is set.')
-    if not api_key:
-        blocking.append('No API key is set.')
-    if not api_secret:
-        blocking.append('No API secret is set.')
-
-    return ok({
-        'enabled': enabled,
-        'cloud_name': cloud_name,
-        'has_api_key': bool(api_key),
-        'has_api_secret': bool(api_secret),
-        'has_upload_preset': bool(preset),
-        'ready': enabled and bool(cloud_name) and bool(api_key) and bool(api_secret),
-        'blocking': blocking,
-    })
-
-
-@bp.post('/settings/cloudinary/test')
-@admin_required
-def cloudinary_test():
-    """Ask Cloudinary whether these credentials work. Creates nothing.
-
-    A read-only Admin API call (list up to one image) that authenticates with
-    the stored key/secret over HTTPS. A wrong key, a wrong secret or a
-    wrong environment all come back 401/403 from Cloudinary itself, which is
-    what this endpoint reports verbatim.
-    """
-    import base64
-    import json as _json
-    import urllib.error
-    import urllib.request
-
-    from services.messaging import invalidate_settings_cache
-
-    cloud_name = (_setting_value('cloudinary_cloud_name') or '').strip()
-    api_key = (_setting_value('cloudinary_api_key') or '').strip()
-    api_secret = (_setting_value('cloudinary_api_secret') or '').strip()
-
-    missing = []
-    if not cloud_name:
-        missing.append('cloud name')
-    if not api_key:
-        missing.append('API key')
-    if not api_secret:
-        missing.append('API secret')
-    if missing:
-        return ok({'ok': False,
-                   'detail': f"Not configured: {' and '.join(missing)} not set."})
-
-    token = base64.b64encode(f'{api_key}:{api_secret}'.encode('utf-8')).decode('ascii')
-    url = (f'https://api.cloudinary.com/v1_1/{cloud_name}/resources/image'
-           f'?max_results=1')
-    req = urllib.request.Request(url, headers={
-        'Authorization': f'Basic {token}',
-        'Accept': 'application/json',
-    })
-
-    try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            body = resp.read().decode('utf-8', 'replace')
-        return ok({
-            'ok': True,
-            'cloud': cloud_name,
-            'http_status': resp.status,
-            'detail': f'Connected to Cloudinary as {cloud_name}. Credentials '
-                      f'are valid.',
-        })
-    except urllib.error.HTTPError as exc:
-        raw = exc.read().decode('utf-8', 'replace')[:500]
-        reason = ''
-        try:
-            reason = _json.loads(raw).get('error', {}).get('message', '')
-        except Exception:                                   # noqa: BLE001
-            reason = ''
-        detail = f'Cloudinary refused the request (HTTP {exc.code}).'
-        if reason:
-            detail += f' {reason}'
-        return ok({'ok': False, 'cloud': cloud_name,
-                   'http_status': exc.code, 'detail': detail})
-    except Exception as exc:                                # noqa: BLE001
-        return ok({'ok': False, 'cloud': cloud_name,
                    'detail': f'The check itself failed: {exc}'})
 
 
@@ -633,10 +531,8 @@ def whatsapp_configure():
 
 
 def _setting_value(key):
-    from models_ext import decrypt_setting_value
     row = Setting.query.filter_by(key=key).first()
-    val = (row.value or '').strip() if row else ''
-    return decrypt_setting_value(val)
+    return (row.value or '').strip() if row else ''
 
 
 @bp.post('/settings/whatsapp/test')
@@ -671,21 +567,92 @@ def whatsapp_test():
 
 
 # --------------------------------------------------------------------------- #
+#  File storage
+# --------------------------------------------------------------------------- #
+@bp.get('/settings/storage/status')
+@staff_required
+def storage_status():
+    """Whether uploads are going somewhere that survives a deploy.
+
+    The failure this reports is silent by nature: uploads keep succeeding
+    when storage is misconfigured, they just land on a disk that is about to
+    be thrown away. Nobody finds out until a customer asks for their KYC copy
+    months later.
+    """
+    from services import backups, cloud_storage
+
+    state = cloud_storage.status()
+
+    warnings = []
+    if not state['enabled']:
+        if state['backend'] != 's3':
+            warnings.append(
+                'Uploads are being written to this server. On a hosted '
+                'container that disk is erased on every deploy, so the company '
+                'logo, KYC documents and payment proofs are lost each time the '
+                'application is redeployed.')
+        elif not state['library_installed']:
+            warnings.append(
+                'The cloud bucket is selected but the boto3 library is not '
+                'installed on the server. Add boto3 to requirements.txt and '
+                'redeploy.')
+        else:
+            warnings.append('Cloud storage is selected but not finished: '
+                            + ', '.join(state['missing']) + ' still needed.')
+
+    try:
+        scheduled = backups.is_scheduled_on()
+        hour = backups.scheduled_hour()
+        keep = backups.retention_days()
+    except Exception:                                    # noqa: BLE001
+        scheduled, hour, keep = False, 3, 30
+
+    if scheduled and not state['enabled']:
+        warnings.append(
+            'Nightly backups are on, but they are being written to the same '
+            'disappearing disk as everything else. A backup stored on the '
+            'server it is backing up does not survive that server.')
+
+    return ok({
+        **state,
+        'backup_enabled': scheduled,
+        'backup_hour': hour,
+        'retention_days': keep,
+        'warnings': warnings,
+    })
+
+
+@bp.post('/settings/storage/test')
+@admin_required
+def storage_test():
+    """Write, read back and delete a probe object.
+
+    Deliberately exercises all three permissions rather than just listing the
+    bucket: a read-only token passes a list check and then fails on every
+    upload, which is a much more confusing way to find out.
+    """
+    from services import cloud_storage
+
+    cloud_storage.invalidate_cache()
+    try:
+        result = cloud_storage.test_connection()
+    except Exception as exc:                             # noqa: BLE001
+        current_app.logger.exception('Storage test failed')
+        result = {'ok': False, 'detail': f'{type(exc).__name__}: {str(exc)[:200]}'}
+
+    # Always 200 - a rejected connection is a successful diagnosis, and the
+    # screen needs the reason either way.
+    return ok(result)
+
+
+# --------------------------------------------------------------------------- #
 #  Backups
 # --------------------------------------------------------------------------- #
-def _backup_dir():
-    try:
-        from blueprints.settings_bp import _backup_dir as real
-        return real()
-    except Exception:
-        folder = os.path.join(current_app.root_path, 'backups')
-        os.makedirs(folder, exist_ok=True)
-        return folder
-
-
 @bp.get('/settings/backups')
 @staff_required
 def backup_list():
+    from services import backups as backup_service
+
     rows, meta = paginate(BackupLog.query.order_by(BackupLog.created_at.desc()))
     return ok([{
         'id': b.id,
@@ -694,71 +661,84 @@ def backup_list():
         'size_human': b.size_human,
         'kind': b.kind,
         'status': b.status,
+        'location': b.location or 'local',
+        'purged': bool(b.purged_at),
         'message': b.message or '',
         'created_at': iso(b.created_at),
         'download_url': (f'/api/v1/settings/backups/{b.id}/download'
-                         if b.status == 'success' else None),
-    } for b in rows], meta=meta)
+                         if b.is_downloadable else None),
+    } for b in rows], meta=meta,
+        retention_days=backup_service.retention_days())
 
 
 @bp.post('/settings/backups')
 @admin_required
 def backup_create():
+    """Take a backup now.
+
+    This used to import ``_run_backup`` from blueprints.settings_bp, where no
+    such function exists. The ImportError sent it down the "copy the SQLite
+    file" branch, which on MySQL answers "Backup requires mysqldump/pg_dump on
+    the server" - so this button reported a failure every time it was pressed,
+    for a reason that had nothing to do with mysqldump.
+    """
+    from services.backups import prune, run_backup
+
     log = BackupLog(kind='manual', status='running',
                     created_by_id=current_staff_id())
     db.session.add(log)
     db.session.commit()
 
     try:
-        from blueprints.settings_bp import _run_backup
-        _run_backup(log)
-    except ImportError:
-        # Fall back to copying the SQLite file if that is the database.
-        try:
-            uri = current_app.config.get('SQLALCHEMY_DATABASE_URI', '')
-            if uri.startswith('sqlite:///'):
-                import shutil
-                src = uri.replace('sqlite:///', '')
-                if not os.path.isabs(src):
-                    src = os.path.join(current_app.root_path, src)
-                stamp = datetime.utcnow().strftime('%Y%m%d-%H%M%S')
-                name = f'backup-{stamp}.db'
-                dst = os.path.join(_backup_dir(), name)
-                shutil.copy2(src, dst)
-                log.filename = name
-                log.size_bytes = os.path.getsize(dst)
-                log.status = 'success'
-            else:
-                log.status = 'failed'
-                log.message = 'Backup requires mysqldump/pg_dump on the server.'
-        except Exception as exc:
-            log.status = 'failed'
-            log.message = str(exc)[:500]
-    except Exception as exc:
-        log.status = 'failed'
-        log.message = str(exc)[:500]
+        run_backup(log)
+        db.session.commit()
+    except Exception as exc:                             # noqa: BLE001
+        db.session.rollback()
+        row = db.session.get(BackupLog, log.id)
+        if row is not None:
+            row.status = 'failed'
+            row.message = str(exc)[:500]
+            db.session.commit()
+        current_app.logger.exception('Manual backup failed')
+        return fail('backup_failed', 500, detail=str(exc)[:300])
 
-    db.session.commit()
-    if log.status != 'success':
-        return fail('backup_failed', 500, detail=log.message or '')
+    try:
+        prune()
+    except Exception:                                    # noqa: BLE001
+        current_app.logger.exception('Backup pruning failed')
+
     return ok({'id': log.id, 'filename': log.filename,
-               'size_human': log.size_human})
+               'size_human': log.size_human, 'location': log.location,
+               'detail': log.message})
 
 
 @bp.get('/settings/backups/<int:bid>/download')
 @admin_required
 def backup_download(bid):
+    """Stream one backup to the browser.
+
+    A database dump is every customer record this business holds, so it is
+    served through this route - admin token required - rather than from a
+    public URL or a shareable bucket link.
+    """
+    from services.backups import open_backup
+
     log = db.session.get(BackupLog, bid)
     if not log or not log.filename:
         return fail('not_found', 404)
-    from werkzeug.utils import secure_filename as _sf
-    safe_name = _sf(log.filename)
-    if not safe_name:
-        return fail('not_found', 404)
-    path = os.path.join(_backup_dir(), safe_name)
-    if not os.path.exists(path):
-        return fail('file_missing', 404)
-    return send_file(path, as_attachment=True, download_name=safe_name)
+    if log.purged_at:
+        return fail('file_expired', 410,
+                    detail='This backup has passed its retention period and '
+                           'the file has been deleted.')
+
+    stream, _size = open_backup(log)
+    if stream is None:
+        return fail('file_missing', 404,
+                    detail='The record exists but the file is not on the '
+                           'server disk or in the bucket. A backup written to '
+                           'the server disk does not survive a redeploy.')
+    return send_file(stream, as_attachment=True, download_name=log.filename,
+                     mimetype='application/gzip')
 
 
 # --------------------------------------------------------------------------- #
@@ -774,24 +754,6 @@ EXPORT_FIELDS = {
                  'total_amount', 'discount_amount', 'status', 'invoice_type'),
     'payments': ('id', 'invoice_id', 'customer_id', 'amount', 'payment_date',
                  'payment_mode', 'mode_detail', 'status', 'source'),
-}
-
-#: Columns that can be written via CSV import per entity.  Keeps mass-assignment
-#: attacks out: even if the CSV header includes ``password_hash``, ``role`` or
-#: any other sensitive column, only whitelisted fields reach setattr().
-#: Fields listed here must also exist on the model.
-IMPORT_FIELDS = {
-    'customers': ('first_name', 'middle_name', 'last_name', 'mobile',
-                  'email', 'zone', 'area', 'locality',
-                  'connection_type', 'reference_id', 'is_active'),
-    'plans': ('name', 'plan_code', 'plan_type', 'speed_mbps',
-              'price_monthly', 'validity_days', 'is_active'),
-    'invoices': ('invoice_no', 'customer_id', 'issue_date', 'due_date',
-                 'total_amount', 'discount_amount', 'status', 'invoice_type'),
-    'payments': ('invoice_id', 'customer_id', 'amount', 'payment_date',
-                 'payment_mode', 'mode_detail', 'status', 'source'),
-    'products': ('name', 'sku', 'price', 'tax_rate', 'is_active'),
-    'expenses': ('description', 'amount', 'category', 'expense_date'),
 }
 
 ENTITY_MODELS = {
@@ -818,10 +780,7 @@ def export_csv():
                     allowed=sorted(ENTITY_MODELS.keys()))
 
     fields = EXPORT_FIELDS.get(
-        entity, tuple(c.key for c in model.__mapper__.columns
-                      if c.key not in ('password_hash', 'password',
-                                       'created_at', 'updated_at',
-                                       'updated_by_id')))
+        entity, tuple(c.key for c in model.__mapper__.columns))
 
     buffer = io.StringIO()
     writer = csv.writer(buffer)
@@ -862,23 +821,18 @@ def import_csv():
     except UnicodeDecodeError:
         return fail('bad_encoding', 400)
 
-    from werkzeug.utils import secure_filename as _sf
-    job = ImportJob(target=entity, filename=_sf(file.filename or 'import.csv'),
-                    status='running', created_by_id=current_staff_id())
+    job = ImportJob(target=entity, filename=file.filename, status='running',
+                    created_by_id=current_staff_id())
     db.session.add(job)
     db.session.commit()
 
     reader = csv.DictReader(io.StringIO(text))
     columns = {c.key for c in model.__mapper__.columns}
-    allowed = set(IMPORT_FIELDS.get(entity, ()))
-    if not allowed:
-        allowed = columns - {'password_hash', 'password', 'created_at',
-                             'updated_at', 'created_by_id'}
     errors, ok_rows, total = [], 0, 0
 
     for index, raw in enumerate(reader, start=2):
         total += 1
-        data = {k: v for k, v in raw.items() if k in columns and k in allowed and v != ''}
+        data = {k: v for k, v in raw.items() if k in columns and v != ''}
         try:
             row_id = data.pop('id', None)
             row = db.session.get(model, int(row_id)) if row_id else None
@@ -900,7 +854,7 @@ def import_csv():
         job.status = 'failed'
         job.error_report = str(exc)[:2000]
         db.session.commit()
-        return fail('import_failed', 500, detail='An error occurred during the import.')
+        return fail('import_failed', 500, detail=str(exc)[:200])
 
     job.total_rows = total
     job.ok_rows = ok_rows
@@ -922,8 +876,7 @@ def message_log():
     query = MessageLog.query
     q = (request.args.get('q') or '').strip()
     if q:
-        from .utils import escape_like
-        query = query.filter(MessageLog.phone.ilike(f'%{escape_like(q)}%', escape='\\'))
+        query = query.filter(MessageLog.phone.ilike(f'%{q}%'))
     status = request.args.get('status')
     if status:
         query = query.filter(MessageLog.status == status)
@@ -1169,7 +1122,7 @@ def isp_test():
     try:
         result = isp_providers.test_credential(cred)
     except Exception as exc:
-        return fail('test_failed', 424, detail='An error occurred while testing the credential.')
+        return fail('test_failed', 424, detail=str(exc)[:200])
 
     success = bool(getattr(result, 'ok', False))
     message = getattr(result, 'message', '') or 'Connection tested.'

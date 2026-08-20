@@ -113,6 +113,23 @@ def logo_url(filename):
         if _static_file_exists(candidate):
             return static_url(candidate)
 
+    # Not on this disk. It may be in the bucket, which is the whole point of
+    # putting it there - the logo is the one upload that is genuinely public
+    # (it is printed on bills), so a configured public base URL is used
+    # directly and everything else goes through a signed link.
+    try:
+        from services import cloud_storage
+        if cloud_storage.is_enabled() and cloud_storage.exists(
+                cloud_storage.upload_key('logos', bare)):
+            direct = cloud_storage.public_url(
+                cloud_storage.upload_key('logos', bare))
+            if direct:
+                return direct
+            from services.signed_links import upload_link
+            return upload_link('logos', bare, external=True)
+    except Exception:                                       # noqa: BLE001
+        pass
+
     if _static_file_exists(BUNDLED_LOGO):
         return static_url(BUNDLED_LOGO)
     # Nothing to point at. None, not a broken URL - the clients all fall back
@@ -344,7 +361,18 @@ def customer_documents(c):
 
 
 def _upload_url(filename, folder):
-    """Resolve a stored upload filename into a servable static URL."""
+    """A link that opens one uploaded file.
+
+    This used to return ``/static/uploads/kyc/<name>``, which Flask serves to
+    anybody who asks - no login, no expiry. The filenames carry a random token
+    so they were not easy to guess, but these are Aadhaar and PAN scans, and
+    "hard to guess" is not the same as "not readable by strangers". A URL
+    copied out of the address bar also stayed live forever.
+
+    It now returns a signed link that expires in fifteen minutes and is served
+    by the application, which also means it works when the file is in a private
+    bucket instead of on this disk.
+    """
     if not filename:
         return None
     name = str(filename).replace('\\', '/').strip().lstrip('/')
@@ -353,8 +381,21 @@ def _upload_url(filename, folder):
     for prefix in ('static/', '/static/'):
         if name.startswith(prefix):
             name = name[len(prefix):]
+    bare = name.split('/')[-1]
+
+    try:
+        from services.signed_links import upload_link
+        signed = upload_link(folder, bare)
+        if signed:
+            return signed
+    except Exception:                                       # noqa: BLE001
+        # Signing needs an application context. Falling back to the static
+        # path keeps a serializer used outside a request working rather than
+        # returning None and printing "no document" for a file that exists.
+        pass
+
     if not name.startswith('uploads/'):
-        name = f'uploads/{folder}/' + name.split('/')[-1]
+        name = f'uploads/{folder}/' + bare
     return static_url(name)
 
 
@@ -412,7 +453,6 @@ def customer_plan_dict(cp):
         'grace_period_days': cp.grace_period_days or 0,
         'last_invoice_date': iso(cp.last_invoice_date),
         'suspension_review_status': cp.suspension_review_status,
-        'payment_mode': (cp._payment_mode or ''),
     }
 
 

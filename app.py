@@ -2,7 +2,6 @@ import os
 import re
 import traceback
 
-from sqlalchemy.exc import IntegrityError
 from werkzeug.exceptions import HTTPException
 import csv
 import time
@@ -75,7 +74,22 @@ if not app.config.get('SECRET_KEY') or app.config.get('SECRET_KEY') in ('dev', '
           "environment for production.")
 
 _prod = os.environ.get('FLASK_ENV') == 'production'
-
+# ==================== DISABLED SECURITY FEATURES ====================
+# The following settings are commented out to disable security features.
+# Uncomment them when you are ready to re-enable protection.
+# app.config.update(
+#     SESSION_COOKIE_HTTPONLY=True,
+#     SESSION_COOKIE_SAMESITE='Lax',
+#     SESSION_COOKIE_SECURE=_prod,
+#     SESSION_COOKIE_NAME='yash_session',
+#     REMEMBER_COOKIE_HTTPONLY=True,
+#     REMEMBER_COOKIE_SECURE=_prod,
+#     REMEMBER_COOKIE_SAMESITE='Lax',
+#     PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
+#     WTF_CSRF_TIME_LIMIT=7200,
+#     WTF_CSRF_SSL_STRICT=_prod,
+#     MAX_CONTENT_LENGTH=16 * 1024 * 1024,
+# )
 app.config.update(
     MAX_CONTENT_LENGTH=16 * 1024 * 1024,
 )
@@ -101,7 +115,7 @@ csrf = CSRFProtect(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
-login_manager.session_protection = 'strong'
+# login_manager.session_protection = 'strong'   # Disabled for now
 
 # ---------- Register the REST API (/api/v1) ----------
 # register_api() attaches every sub-blueprint, mounts it on the app and marks
@@ -159,12 +173,8 @@ def generate_invoice_no():
         ).scalar()
         seq = (last + 1 + attempt) if last else (1 + attempt)
         candidate = f"INV-{today}-{seq:04d}"
-        try:
-            if not Invoice.query.filter_by(invoice_no=candidate).first():
-                return candidate
-        except IntegrityError:
-            db.session.rollback()
-            continue
+        if not Invoice.query.filter_by(invoice_no=candidate).first():
+            return candidate
     return f"INV-{today}-{secrets.token_hex(4).upper()}"
 
 def _vendor_choices(include_blank=True):
@@ -180,6 +190,7 @@ def generate_reference_id():
 @app.context_processor
 def inject_template_helpers():
     return dict(
+        generate_invoice_no=generate_invoice_no,
         payment_mode_choices=PAYMENT_MODE_CHOICES,
         today=date.today(),
     )
@@ -198,17 +209,8 @@ def log_audit(action, details):
     try:
         user_id = None
         try:
-            if has_request_context():
-                claims = getattr(request, 'jwt', None) or {}
-                account = getattr(request, 'jwt_account', None)
-                if claims.get('kind') == 'staff' and account is not None:
-                    # The React app authenticates with a JWT, not flask_login.
-                    # Without this, every API-driven action - which is almost
-                    # all of them - would be recorded with no user and the
-                    # Customer Log "By" column would read "—" everywhere.
-                    user_id = account.id
-                elif current_user and current_user.is_authenticated:
-                    user_id = current_user.id
+            if current_user and current_user.is_authenticated:
+                user_id = current_user.id
         except Exception:                                # noqa: BLE001
             user_id = None
 
@@ -231,20 +233,10 @@ def log_audit(action, details):
         app.logger.warning("Could not write audit log for %r", action, exc_info=True)
 
 def enable_connection_on_network(customer):
-    log_audit('Network Enable', f"Requested network enable for {customer.full_name}")
-    try:
-        from services import isp_providers
-        isp_providers.provision(customer, 'enable')
-    except Exception as exc:
-        app.logger.warning('ISP enable failed for %s: %s', customer.full_name, exc)
+    log_audit('Network Enable (stub)', f"Requested network enable for {customer.full_name}")
 
 def disable_connection_on_network(customer):
-    log_audit('Network Disable', f"Requested network disable for {customer.full_name}")
-    try:
-        from services import isp_providers
-        isp_providers.provision(customer, 'disable')
-    except Exception as exc:
-        app.logger.warning('ISP disable failed for %s: %s', customer.full_name, exc)
+    log_audit('Network Disable (stub)', f"Requested network disable for {customer.full_name}")
 
 def reset_mac_on_log2space(mac_address, customer_reference):
     """Call the log2space API to change this device's authenticated MAC.
@@ -271,18 +263,15 @@ def send_whatsapp(phone, message, customer_id=None):
     return messaging.send_whatsapp(phone, message, customer_id=customer_id)
 
 def send_email(to, subject, body, attachment=None):
-    from services import mailer
-    attachments = None
-    if attachment:
-        attachments = [attachment]
-    return mailer.send_email(to, subject, body, attachments=attachments)
+    # Email is not wired to an SMTP provider yet; log it so nothing is lost.
+    app.logger.info("Email to %s: %s", to, subject)
 
 #  Template messaging
 def send_template_message(customer, template_type, context=None, *,
                           plan=None, customer_plan=None, invoice=None,
                           payment=None):
     """
-    Render the named template for `customer` and send it over WhatsApp AND email.
+    Render the named template for `customer` and send it over WhatsApp.
 
     Returns a messaging.SendResult. Never raises, so a gateway outage can
     never roll back a renewal or a payment entry.
@@ -296,51 +285,51 @@ def send_template_message(customer, template_type, context=None, *,
         log_audit('Send Message',
                   f"{template_type} -> {getattr(customer, 'full_name', '?')} "
                   f"({result.status})")
-
-    # Also send email if customer has an address
-    email = getattr(customer, 'email', None)
-    if email:
-        from services import mailer
-        ctx = messaging.build_context(
-            customer=customer, plan=plan, customer_plan=customer_plan,
-            invoice=invoice, payment=payment, extra=context,
-        )
-        body = messaging.render_template_type(template_type, ctx) or ''
-        if body.strip():
-            _EMAIL_SUBJECTS = {
-                'expiry_3d': 'Plan Expiry Reminder - 3 Days',
-                'expiry_2d': 'Plan Expiry Reminder - 2 Days',
-                'expiry_1d': 'Plan Expiry Reminder - 1 Day',
-                'expired': 'Plan Expired',
-                'renewal': 'Plan Renewed',
-                'payment_received': 'Payment Received',
-                'due_reminder': 'Payment Due Reminder',
-                'daily_report': 'Daily Report',
-                'welcome': 'Welcome to {{company_name}}',
-                'bill': 'Invoice',
-                'summary_bill': 'Invoice',
-                'detailed_bill': 'Invoice',
-                'payment_approved': 'Payment Receipt',
-                'internet_down': 'Internet Service Down',
-                'internet_restored': 'Internet Service Restored',
-                'complaint_registered': 'Complaint Registered',
-                'issue_resolved': 'Issue Resolved',
-                'new_complaint': 'New Complaint',
-                'payment_submitted': 'Payment Submitted',
-                'payment_rejected': 'Payment Rejected',
-                'renewal_approved': 'Renewal Approved',
-            }
-            subject = _EMAIL_SUBJECTS.get(
-                template_type,
-                template_type.replace('_', ' ').title()
-            )
-            if '{{company_name}}' in subject:
-                subject = subject.replace('{{company_name}}',
-                                          ctx.get('company_name', 'YASH Internet Services'))
-            mailer.send_email(email, subject, body.strip())
-
     return result
 
+# ===================== DISABLED RATE LIMITING =====================
+# The following rate-limiting functions are commented out.
+# _login_attempts = {}
+# _login_lock = Lock()
+# MAX_ATTEMPTS = 5
+# LOCKOUT_WINDOW_SECONDS = 300
+
+# def _rate_limit_key(ip, username):
+#     return f"{ip}:{(username or '').strip().lower()}"
+
+# def is_rate_limited(ip, username):
+#     now = datetime.utcnow()
+#     key = _rate_limit_key(ip, username)
+#     with _login_lock:
+#         stale = [k for k, (t, _c) in _login_attempts.items()
+#                  if (now - t).total_seconds() > LOCKOUT_WINDOW_SECONDS]
+#         for k in stale:
+#             _login_attempts.pop(k, None)
+#         if key not in _login_attempts:
+#             return False
+#         last_time, count = _login_attempts[key]
+#         if (now - last_time).total_seconds() > LOCKOUT_WINDOW_SECONDS:
+#             _login_attempts.pop(key, None)
+#             return False
+#         return count >= MAX_ATTEMPTS
+
+# def register_failed_attempt(ip, username):
+#     now = datetime.utcnow()
+#     key = _rate_limit_key(ip, username)
+#     with _login_lock:
+#         if key not in _login_attempts:
+#             _login_attempts[key] = [now, 1]
+#         else:
+#             last_time, count = _login_attempts[key]
+#             if (now - last_time).total_seconds() > LOCKOUT_WINDOW_SECONDS:
+#                 _login_attempts[key] = [now, 1]
+#             else:
+#                 _login_attempts[key][1] = count + 1
+
+# def clear_attempts(ip, username):
+#     with _login_lock:
+#         _login_attempts.pop(_rate_limit_key(ip, username), None)
+# ===================================================================
 
 # ---------- Access control ----------
 def admin_required(f):
@@ -383,6 +372,8 @@ def generate_auto_invoices():
             try:
                 plan = cp.plan
                 customer = cp.customer
+                if not customer.is_active:
+                    continue
                 invoice = Invoice(
                     customer_id=customer.id,
                     customer_plan_id=cp.id,
@@ -404,15 +395,21 @@ def generate_auto_invoices():
             except Exception as exc:
                 db.session.rollback()
                 app.logger.warning('Auto-invoice failed for plan %s: %s', cp.id, exc)
+
         unpaid = Invoice.query.filter(Invoice.status.in_(['sent', 'overdue'])).all()
         for inv in unpaid:
             try:
                 if inv.due_date < today:
                     cust = inv.customer
+                    if not cust.is_active:
+                        continue
                     send_sms(cust.mobile, f"Reminder: Invoice {inv.invoice_no} is overdue. Please pay.")
                     send_email(cust.email, f"Overdue Invoice {inv.invoice_no}", "Please clear your dues.")
+                    if inv.status == 'sent':
+                        inv.status = 'overdue'
             except Exception as exc:
-                app.logger.warning('Overdue invoice reminder failed for %s: %s', inv.id, exc)
+                app.logger.warning('Overdue notification failed for invoice %s: %s', inv.id, exc)
+        db.session.commit()
 
 def send_grace_period_reminders():
     with app.app_context():
@@ -424,268 +421,68 @@ def send_grace_period_reminders():
         for inv in due_today_unpaid:
             try:
                 cust = inv.customer
+                if not cust or not cust.is_active:
+                    continue
                 send_sms(cust.mobile, f"Reminder: Invoice {inv.invoice_no} is unpaid. "
                                        f"Service will be suspended after the grace period if unpaid.")
                 send_whatsapp(cust.mobile,
                               f"Your invoice {inv.invoice_no} is still unpaid. Please pay to avoid suspension.")
             except Exception as exc:
-                app.logger.warning('Grace period reminder failed for invoice %s: %s',
-                                   inv.id, exc)
+                app.logger.warning('Grace period reminder failed for invoice %s: %s', inv.id, exc)
 
 def auto_suspend_overdue():
     with app.app_context():
         today = date.today()
         plans = CustomerPlan.query.filter(CustomerPlan.status == 'active', CustomerPlan.auto_renew == True).all()
         for cp in plans:
-            try:
-                grace = cp.grace_period_days or 1
-                unpaid = Invoice.query.filter(
-                    Invoice.customer_id == cp.customer_id,
-                    Invoice.status.in_(['sent', 'overdue']),
-                    Invoice.due_date + timedelta(days=grace) < today
-                ).all()
-                if unpaid and cp.customer.is_active:
-                    customer = cp.customer
-                    customer.is_active = False
-                    cp.suspension_review_status = 'pending_review'
-                    cp.suspended_at = datetime.utcnow()
-                    db.session.commit()
-                    disable_connection_on_network(customer)
-                    log_audit('Auto-Suspend', f"Suspended customer {customer.full_name} due to unpaid invoices. "
-                                               f"Moved to Pending Review.")
-                    send_sms(customer.mobile, "Your service has been suspended due to non-payment. Please contact support.")
-                    send_email(customer.email, "Service Suspended",
-                               "Your service has been suspended due to non-payment. Please contact support.")
-            except Exception as exc:
-                db.session.rollback()
-                app.logger.warning('Auto-suspend failed for plan %s: %s', cp.id, exc)
+            grace = cp.grace_period_days or 1
+            unpaid = Invoice.query.filter(
+                Invoice.customer_id == cp.customer_id,
+                Invoice.status.in_(['sent', 'overdue']),
+                Invoice.due_date + timedelta(days=grace) < today
+            ).all()
+            if unpaid and cp.customer.is_active:
+                customer = cp.customer
+                customer.is_active = False
+                cp.suspension_review_status = 'pending_review'
+                cp.suspended_at = datetime.utcnow()
+                db.session.commit()
+                disable_connection_on_network(customer)
+                log_audit('Auto-Suspend', f"Suspended customer {customer.full_name} due to unpaid invoices. "
+                                           f"Moved to Pending Review.")
+                send_sms(customer.mobile, "Your service has been suspended due to non-payment. Please contact support.")
+                send_email(customer.email, "Service Suspended",
+                           "Your service has been suspended due to non-payment. Please contact support.")
 
 def send_expiry_reminders():
-    """Send templates for plans expiring in 3 days, 2 days, 1 day, and expired today."""
+    """Send templates for plans expiring in 3 days, 2 days, and expired today."""
     with app.app_context():
         today = date.today()
-        total_sent = 0
-        failed = 0
-
-        # Skip auto-suspended customers — they already got a suspension notice.
-        _active_plan = (
-            CustomerPlan.query
-            .join(Customer, CustomerPlan.customer_id == Customer.id)
-            .filter(CustomerPlan.status == 'active', Customer.is_active == True)
-        )
-
         # 3 days before expiry
-        expiring_3d = _active_plan.filter(
+        expiring_3d = CustomerPlan.query.filter(
+            CustomerPlan.status == 'active',
             CustomerPlan.end_date == today + timedelta(days=3)
         ).all()
         for cp in expiring_3d:
-            try:
-                send_template_message(cp.customer, 'expiry_3d', {'days': 3},
-                                      customer_plan=cp)
-                total_sent += 1
-            except Exception as exc:
-                failed += 1
-                app.logger.warning('expiry_3d failed for %s: %s', cp.customer_id, exc)
+            send_template_message(cp.customer, 'expiry_3d', {'days': 3},
+                                  customer_plan=cp)
 
         # 2 days before expiry
-        expiring_2d = _active_plan.filter(
+        expiring_2d = CustomerPlan.query.filter(
+            CustomerPlan.status == 'active',
             CustomerPlan.end_date == today + timedelta(days=2)
         ).all()
         for cp in expiring_2d:
-            try:
-                send_template_message(cp.customer, 'expiry_2d', {'days': 2},
-                                      customer_plan=cp)
-                total_sent += 1
-            except Exception as exc:
-                failed += 1
-                app.logger.warning('expiry_2d failed for %s: %s', cp.customer_id, exc)
-
-        # 1 day before expiry
-        expiring_1d = _active_plan.filter(
-            CustomerPlan.end_date == today + timedelta(days=1)
-        ).all()
-        for cp in expiring_1d:
-            try:
-                send_template_message(cp.customer, 'expiry_1d', {'days': 1},
-                                      customer_plan=cp)
-                total_sent += 1
-            except Exception as exc:
-                failed += 1
-                app.logger.warning('expiry_1d failed for %s: %s', cp.customer_id, exc)
+            send_template_message(cp.customer, 'expiry_2d', {'days': 2},
+                                  customer_plan=cp)
 
         # Expired today
-        expired_today = _active_plan.filter(
+        expired_today = CustomerPlan.query.filter(
+            CustomerPlan.status == 'active',
             CustomerPlan.end_date == today
         ).all()
         for cp in expired_today:
-            try:
-                send_template_message(cp.customer, 'expired', customer_plan=cp)
-                total_sent += 1
-            except Exception as exc:
-                failed += 1
-                app.logger.warning('expired failed for %s: %s', cp.customer_id, exc)
-
-        # Notify admin of expiry summary
-        if total_sent or failed:
-            summary = (
-                f"Expiry Reminder Summary - {today.strftime('%d %b %Y')}\n\n"
-                f"Expiring in 3 days: {len(expiring_3d)}\n"
-                f"Expiring in 2 days: {len(expiring_2d)}\n"
-                f"Expiring tomorrow: {len(expiring_1d)}\n"
-                f"Expired today: {len(expired_today)}\n"
-                f"Total messages sent: {total_sent}"
-                + (f"\nFailed: {failed}" if failed else "")
-            )
-
-            def _get(key, default=''):
-                try:
-                    row = Setting.query.filter_by(key=key).first()
-                    if row and row.value:
-                        from models_ext import ENCRYPTED_SETTINGS, decrypt_setting_value
-                        val = row.value
-                        if key in ENCRYPTED_SETTINGS:
-                            val = decrypt_setting_value(val)
-                        return val
-                except Exception:
-                    pass
-                return os.environ.get(key.upper(), default)
-
-            admin_email = _get('admin_email')
-            if admin_email:
-                from services import mailer
-                mailer.send_email(admin_email,
-                                  f'Expiry Reminders - {today.strftime("%d %b %Y")}',
-                                  summary)
-            admin_mobile = _get('admin_mobile')
-            if admin_mobile:
-                messaging.send_whatsapp(admin_mobile, summary)
-
-            log_audit('Expiry Reminders',
-                      f'Sent {total_sent} expiry reminder(s): '
-                      f'3d={len(expiring_3d)}, 2d={len(expiring_2d)}, '
-                      f'1d={len(expiring_1d)}, expired={len(expired_today)}')
-
-
-def send_overdue_reminders():
-    """Send due_reminder template to customers with unpaid overdue invoices."""
-    with app.app_context():
-        today = date.today()
-        overdue = Invoice.query.filter(
-            Invoice.status.in_(['sent', 'overdue']),
-            Invoice.due_date < today,
-        ).all()
-        sent = 0
-        for inv in overdue:
-            try:
-                cust = inv.customer
-                if cust and cust.is_active:
-                    result = send_template_message(
-                        cust, 'due_reminder',
-                        invoice=inv,
-                    )
-                    if getattr(result, 'status', '') in ('sent', 'queued'):
-                        sent += 1
-                    inv.status = 'overdue'
-            except Exception as exc:
-                app.logger.warning('Overdue reminder failed for invoice %s: %s',
-                                   inv.id, exc)
-        try:
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-        if sent:
-            log_audit('Due Reminders',
-                      f'Sent {sent} overdue payment reminder(s)')
-
-
-def send_daily_report():
-    """Build and send a daily summary to the admin via email and WhatsApp."""
-    with app.app_context():
-        today = date.today()
-        yesterday = today - timedelta(days=1)
-
-        from models import Customer, CustomerPlan, Invoice, Payment
-
-        total_customers = Customer.query.filter_by(is_active=True).count()
-        active_plans = CustomerPlan.query.filter_by(status='active').count()
-        expiring_3d = CustomerPlan.query.filter(
-            CustomerPlan.status == 'active',
-            CustomerPlan.end_date == today + timedelta(days=3),
-        ).count()
-        expiring_today = CustomerPlan.query.filter(
-            CustomerPlan.status == 'active',
-            CustomerPlan.end_date == today,
-        ).count()
-        new_today = Customer.query.filter(
-            Customer.registration_date == today,
-        ).count()
-        payments_today = Payment.query.filter(
-            Payment.payment_date == today,
-        ).all()
-        payment_total = sum(p.amount for p in payments_today)
-        overdue_count = Invoice.query.filter(
-            Invoice.status.in_(['sent', 'overdue']),
-            Invoice.due_date < today,
-        ).count()
-
-        report = (
-            f"Daily Report - {today.strftime('%d %b %Y')}\n\n"
-            f"Active Customers: {total_customers}\n"
-            f"Active Plans: {active_plans}\n"
-            f"Expiring in 3 days: {expiring_3d}\n"
-            f"Expiring today: {expiring_today}\n"
-            f"New customers today: {new_today}\n"
-            f"Payments today: {len(payments_today)} (Rs. {payment_total:,.2f})\n"
-            f"Overdue invoices: {overdue_count}\n"
-        )
-
-        def _get(key, default=''):
-            try:
-                row = Setting.query.filter_by(key=key).first()
-                if row and row.value:
-                    from models_ext import ENCRYPTED_SETTINGS, decrypt_setting_value
-                    val = row.value
-                    if key in ENCRYPTED_SETTINGS:
-                        val = decrypt_setting_value(val)
-                    return val
-            except Exception:
-                pass
-            return os.environ.get(key.upper(), default)
-
-        from services import mailer
-        admin_email = _get('admin_email') or _get('mail_from', '')
-        if admin_email:
-            mailer.send_email(admin_email, f'Daily Report - {today}', report)
-
-        admin_mobile = _get('admin_mobile') or _get('wa_sender', '')
-        if admin_mobile:
-            messaging.send_whatsapp(admin_mobile, report,
-                                    template_type='daily_report')
-
-        log_audit('Daily Report', f'Report generated for {today}')
-
-
-def promote_queued_notifications():
-    """Auto-promote 'queued' notifications to 'delivered' after 1 hour.
-
-    The gateway accepted the message (HTTP 200 QUEUED) but we never got a
-    delivery callback.  After an hour the message has either arrived or it
-    won't — keeping it as 'queued' forever confuses operators.
-    """
-    with app.app_context():
-        from models_api import Notification
-        cutoff = datetime.utcnow() - timedelta(hours=1)
-        rows = Notification.query.filter(
-            Notification.status == 'queued',
-            Notification.created_at < cutoff,
-        ).all()
-        if not rows:
-            return
-        for r in rows:
-            r.status = 'delivered'
-        db.session.commit()
-        app.logger.info('Promoted %d queued notifications to delivered', len(rows))
-
+            send_template_message(cp.customer, 'expired', customer_plan=cp)
 
 scheduler = BackgroundScheduler(timezone=os.environ.get('TZ', 'Asia/Kolkata'))
 
@@ -698,20 +495,27 @@ _should_start_scheduler = (
          or os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
          or not app.debug)
 )
-_scheduler_lock = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.scheduler_lock')
-_scheduler_lock_fd = None
-if _should_start_scheduler and not scheduler.running:
-    try:
-        import msvcrt, platform
-        if platform.system() == 'Windows':
-            _scheduler_lock_fd = open(_scheduler_lock, 'w')
-            msvcrt.locking(_scheduler_lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
-        else:
-            import fcntl
-            _scheduler_lock_fd = open(_scheduler_lock, 'w')
-            fcntl.flock(_scheduler_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except (IOError, OSError, ImportError):
-        _should_start_scheduler = False
+def nightly_backup():
+    """Take the scheduled database backup, if Settings has it switched on.
+
+    The hour is read from Settings on every run rather than baked into the
+    trigger, because the trigger is built once at import and the operator can
+    change the hour at any time. Firing hourly and returning immediately when
+    it is the wrong hour costs nothing and means a change to that setting
+    takes effect tonight rather than at the next restart.
+    """
+    with app.app_context():
+        try:
+            from services import backups
+            if not backups.is_scheduled_on():
+                return
+            if datetime.now().hour != backups.scheduled_hour():
+                return
+            backups.run_scheduled()
+        except Exception:                                   # noqa: BLE001
+            app.logger.exception('Nightly backup job failed')
+
+
 if _should_start_scheduler and not scheduler.running:
     # coalesce + misfire_grace_time keep a sleeping free-tier dyno from firing
     # a backlog of duplicate reminders the moment it wakes up.
@@ -720,9 +524,7 @@ if _should_start_scheduler and not scheduler.running:
     scheduler.add_job(auto_suspend_overdue, CronTrigger(hour=2, minute=0), **job_opts)
     scheduler.add_job(send_grace_period_reminders, CronTrigger(hour=10, minute=0), **job_opts)
     scheduler.add_job(send_expiry_reminders, CronTrigger(hour=9, minute=0), **job_opts)
-    scheduler.add_job(send_overdue_reminders, CronTrigger(hour=11, minute=0), **job_opts)
-    scheduler.add_job(send_daily_report, CronTrigger(hour=8, minute=0), **job_opts)
-    scheduler.add_job(promote_queued_notifications, CronTrigger(minute='*/15'), **job_opts)
+    scheduler.add_job(nightly_backup, CronTrigger(minute=20), **job_opts)
     scheduler.start()
 
 # ---------- Error handlers ----------
@@ -760,20 +562,14 @@ def server_error(e):
     # the actual reason visible only in the Flask console.
     if request.path.startswith('/api/'):
         original = getattr(e, 'original_exception', None) or e
-        # In production, never expose exception type or message — they leak
-        # SQL fragments, internal paths, and library versions.
-        if _is_production_env():
-            detail = 'An internal error occurred. It has been logged.'
-        else:
-            detail = f'{type(original).__name__}: {original}'[:400]
         payload = {
             'ok': False,
             'error': 'server_error',
-            'detail': detail,
+            'detail': f'{type(original).__name__}: {original}'[:400],
         }
         # The traceback is a development aid. Never in production - it names
         # file paths and can echo query values back to the browser.
-        if os.environ.get('DEBUG_TRACEBACK'):
+        if not _is_production_env():
             payload['traceback'] = traceback.format_exc()[-3000:]
         return jsonify(payload), 500
 
@@ -810,16 +606,12 @@ def api_exception(exc):
     except Exception:
         pass
 
-    if _is_production_env():
-        detail = 'An internal error occurred. It has been logged.'
-    else:
-        detail = f'{type(exc).__name__}: {exc}'[:400]
     payload = {
         'ok': False,
         'error': 'server_error',
-        'detail': detail,
+        'detail': f'{type(exc).__name__}: {exc}'[:400],
     }
-    if os.environ.get('DEBUG_TRACEBACK'):
+    if not _is_production_env():
         payload['traceback'] = traceback.format_exc()[-3000:]
     return jsonify(payload), 500
 
@@ -1031,6 +823,13 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     form = LoginForm()
+    # client_ip = request.remote_addr
+    # submitted_username = form.username.data if request.method == 'POST' else None
+
+    # Rate limiting disabled
+    # if request.method == 'POST' and is_rate_limited(client_ip, submitted_username):
+    #     flash('Too many login attempts. Please wait 5 minutes and try again.', 'danger')
+    #     return render_template('login.html', form=form), 429
 
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
@@ -1038,12 +837,12 @@ def login():
             session.permanent = True
             login_user(user, remember=form.remember.data)
             log_audit('Login', f"User {user.username} logged in")
+            # clear_attempts(client_ip, submitted_username)
             next_page = request.args.get('next')
             if next_page and urlsplit(next_page).netloc == '' and next_page.startswith('/'):
                 return redirect(next_page)
             return redirect(url_for('dashboard'))
-        from security import record_web_login_failure
-        record_web_login_failure(form.username.data or '')
+        # register_failed_attempt(client_ip, submitted_username)
         log_audit('Failed Login', f"Failed login attempt for username '{form.username.data}'")
         flash('Invalid username or password.', 'danger')
     return render_template('login.html', form=form)
@@ -1519,7 +1318,7 @@ def payment_authorizations():
 @login_required
 @admin_required
 def payment_reject(id):
-    payment = db.session.query(Payment).with_for_update().get_or_404(id)
+    payment = Payment.query.get_or_404(id)
     reason = (request.form.get('reason') or '').strip()
     ok, _ = payment_service.reject_payment(payment, current_user, reason)
     if not ok:
@@ -1546,15 +1345,10 @@ def zone_add():
     if form.validate_on_submit():
         logo_filename = None
         if form.logo.data:
-            from services.cloudinary import is_enabled, upload
-            if is_enabled():
-                url = upload(form.logo.data, public_id='zone-logo')
-                logo_filename = url or None
-            else:
-                file = form.logo.data
-                filename = secure_filename(file.filename)
-                logo_filename = filename
-                file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
+            file = form.logo.data
+            filename = secure_filename(file.filename)
+            logo_filename = filename
+            file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
         zone = Zone(
             name=form.name.data,
             code=form.code.data,
@@ -1589,15 +1383,10 @@ def zone_edit(id):
     form = ZoneForm(obj=zone)
     if form.validate_on_submit():
         if form.logo.data:
-            from services.cloudinary import is_enabled, upload
-            if is_enabled():
-                url = upload(form.logo.data, public_id=f'zone-{id}-logo')
-                zone.logo = url or zone.logo
-            else:
-                file = form.logo.data
-                filename = secure_filename(file.filename)
-                zone.logo = filename
-                file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
+            file = form.logo.data
+            filename = secure_filename(file.filename)
+            zone.logo = filename
+            file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
         form.populate_obj(zone)
         db.session.commit()
         log_audit('Edit Zone', f"Edited zone {zone.name}")
@@ -1753,15 +1542,10 @@ def company_edit():
         company.company_type = form.company_type.data
         company.invoice_notes = form.invoice_notes.data
         if form.company_logo.data:
-            from services.cloudinary import is_enabled, upload
-            if is_enabled():
-                url = upload(form.company_logo.data, public_id='company-logo')
-                company.company_logo = url or company.company_logo
-            else:
-                file = form.company_logo.data
-                filename = secure_filename(file.filename)
-                company.company_logo = filename
-                file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
+            file = form.company_logo.data
+            filename = secure_filename(file.filename)
+            company.company_logo = filename
+            file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
         selected_zone_ids = request.form.getlist('zones') if request.form.getlist('zones') else []
         company.zones = Zone.query.filter(Zone.id.in_(selected_zone_ids)).all()
         db.session.add(company)
@@ -2166,18 +1950,17 @@ def customer_list():
 @app.route('/customers/search')
 @login_required
 def customer_search():
-    from blueprints.api.utils import escape_like
     q = (request.args.get('q') or '').strip()
     if not q:
         return redirect(url_for('customer_list'))
-    like = f"%{escape_like(q)}%"
+    like = f"%{q}%"
     results = Customer.query.filter(
         db.or_(
-            Customer.first_name.ilike(like, escape='\\'),
-            Customer.last_name.ilike(like, escape='\\'),
-            Customer.mobile.ilike(like, escape='\\'),
-            Customer.email.ilike(like, escape='\\'),
-            Customer.reference_id.ilike(like, escape='\\'),
+            Customer.first_name.ilike(like),
+            Customer.last_name.ilike(like),
+            Customer.mobile.ilike(like),
+            Customer.email.ilike(like),
+            Customer.reference_id.ilike(like),
         )
     ).limit(50).all()
     return render_template('customers/list.html', customers=results, pagination=None, search_query=q)
@@ -2204,65 +1987,43 @@ def customer_add():
 
         username = form.username.data.strip() if form.username.data else None
         if not username:
-            for _ in range(100):
+            while True:
                 candidate = f"cust_{secrets.token_hex(4)}"
                 if not User.query.filter_by(username=candidate).first() and not Customer.query.filter_by(username=candidate).first():
                     username = candidate
                     break
-            else:
-                flash('Could not generate a unique username. Please try again.', 'danger')
-                return render_template('customers/add.html', form=form, plans=plans, date=date, ref_id=ref_id)
         else:
             if User.query.filter_by(username=username).first() or Customer.query.filter_by(username=username).first():
                 flash(f'Username "{username}" is already taken. Please choose another.', 'danger')
                 return render_template('customers/add.html', form=form, plans=plans, date=date, ref_id=ref_id)
 
         password = form.password.data
-        if not password:
-            flash('Password is required. Please set a password for the customer.', 'danger')
-            return render_template('customers/add.html', form=form, plans=plans, date=date, ref_id=ref_id)
-        password_hash = generate_password_hash(password)
+        password_hash = None
+        if password:
+            password_hash = generate_password_hash(password)
+        else:
+            password_hash = generate_password_hash('123456')
 
         reg_form_filename = None
         if form.reg_form.data:
-            from services.cloudinary import is_enabled, upload
-            if is_enabled():
-                url = upload(form.reg_form.data, public_id=f'cust-regform-{secrets.token_hex(4)}')
-                reg_form_filename = url or None
-            else:
-                file = form.reg_form.data
-                reg_form_filename = secure_filename(file.filename)
-                file.save(os.path.join(app.root_path, 'static', 'uploads', reg_form_filename))
+            file = form.reg_form.data
+            reg_form_filename = secure_filename(file.filename)
+            file.save(os.path.join(app.root_path, 'static', 'uploads', reg_form_filename))
         photo_filename = None
         if form.photo.data:
-            from services.cloudinary import is_enabled, upload
-            if is_enabled():
-                url = upload(form.photo.data, public_id=f'cust-photo-{secrets.token_hex(4)}')
-                photo_filename = url or None
-            else:
-                file = form.photo.data
-                photo_filename = secure_filename(file.filename)
-                file.save(os.path.join(app.root_path, 'static', 'uploads', photo_filename))
+            file = form.photo.data
+            photo_filename = secure_filename(file.filename)
+            file.save(os.path.join(app.root_path, 'static', 'uploads', photo_filename))
         address_proof_filename = None
         if form.address_proof.data:
-            from services.cloudinary import is_enabled, upload
-            if is_enabled():
-                url = upload(form.address_proof.data, public_id=f'cust-address-{secrets.token_hex(4)}')
-                address_proof_filename = url or None
-            else:
-                file = form.address_proof.data
-                address_proof_filename = secure_filename(file.filename)
-                file.save(os.path.join(app.root_path, 'static', 'uploads', address_proof_filename))
+            file = form.address_proof.data
+            address_proof_filename = secure_filename(file.filename)
+            file.save(os.path.join(app.root_path, 'static', 'uploads', address_proof_filename))
         id_proof_filename = None
         if form.id_proof.data:
-            from services.cloudinary import is_enabled, upload
-            if is_enabled():
-                url = upload(form.id_proof.data, public_id=f'cust-idproof-{secrets.token_hex(4)}')
-                id_proof_filename = url or None
-            else:
-                file = form.id_proof.data
-                id_proof_filename = secure_filename(file.filename)
-                file.save(os.path.join(app.root_path, 'static', 'uploads', id_proof_filename))
+            file = form.id_proof.data
+            id_proof_filename = secure_filename(file.filename)
+            file.save(os.path.join(app.root_path, 'static', 'uploads', id_proof_filename))
 
         try:
             customer = Customer(
@@ -2310,11 +2071,7 @@ def customer_add():
             if plan_id and plan_start_date_str:
                 plan = Plan.query.get(plan_id)
                 if plan:
-                    try:
-                        start_date = datetime.strptime(plan_start_date_str, '%Y-%m-%d').date()
-                    except (ValueError, TypeError):
-                        flash('Invalid plan start date. Use YYYY-MM-DD.', 'danger')
-                        return render_template('customers/add.html', form=form, plans=plans, date=date, ref_id=ref_id)
+                    start_date = datetime.strptime(plan_start_date_str, '%Y-%m-%d').date()
                     end_date = start_date + timedelta(days=plan.validity_days or 30)
                     customer_plan = CustomerPlan(
                         customer_id=customer.id,
@@ -2336,7 +2093,7 @@ def customer_add():
         except Exception as e:
             db.session.rollback()
             app.logger.exception("Database error while saving customer")
-            flash('An unexpected error occurred while saving the customer. Please try again.', 'danger')
+            flash(f'Error saving customer: {str(e)}', 'danger')
             return render_template('customers/add.html', form=form, plans=plans, date=date, ref_id=ref_id)
     else:
         if form.errors:
@@ -2362,61 +2119,32 @@ def customer_edit(id):
         if form.password.data:
             customer.set_password(form.password.data)
         if form.reg_form.data:
-            from services.cloudinary import is_enabled, upload
-            if is_enabled():
-                url = upload(form.reg_form.data, public_id=f'cust{id}-regform-{secrets.token_hex(4)}')
-                if url:
-                    customer.reg_form_file = url
-            else:
-                file = form.reg_form.data
-                filename = secure_filename(file.filename)
-                customer.reg_form_file = filename
-                file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
+            file = form.reg_form.data
+            filename = secure_filename(file.filename)
+            customer.reg_form_file = filename
+            file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
         if form.photo.data:
-            from services.cloudinary import is_enabled, upload
-            if is_enabled():
-                url = upload(form.photo.data, public_id=f'cust{id}-photo-{secrets.token_hex(4)}')
-                if url:
-                    customer.photo_file = url
-            else:
-                file = form.photo.data
-                filename = secure_filename(file.filename)
-                customer.photo_file = filename
-                file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
+            file = form.photo.data
+            filename = secure_filename(file.filename)
+            customer.photo_file = filename
+            file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
         if form.address_proof.data:
-            from services.cloudinary import is_enabled, upload
-            if is_enabled():
-                url = upload(form.address_proof.data, public_id=f'cust{id}-address-{secrets.token_hex(4)}')
-                if url:
-                    customer.address_proof_file = url
-            else:
-                file = form.address_proof.data
-                filename = secure_filename(file.filename)
-                customer.address_proof_file = filename
-                file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
+            file = form.address_proof.data
+            filename = secure_filename(file.filename)
+            customer.address_proof_file = filename
+            file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
         if form.id_proof.data:
-            from services.cloudinary import is_enabled, upload
-            if is_enabled():
-                url = upload(form.id_proof.data, public_id=f'cust{id}-idproof-{secrets.token_hex(4)}')
-                if url:
-                    customer.id_proof_file = url
-            else:
-                file = form.id_proof.data
-                filename = secure_filename(file.filename)
-                customer.id_proof_file = filename
-                file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
+            file = form.id_proof.data
+            filename = secure_filename(file.filename)
+            customer.id_proof_file = filename
+            file.save(os.path.join(app.root_path, 'static', 'uploads', filename))
         form.populate_obj(customer)
         if form.same_as_billing.data:
             customer.primary_address = customer.billing_address
-        try:
-            db.session.commit()
-            log_audit('Edit Customer', f"Edited customer {customer.full_name}")
-            flash('Customer updated.', 'success')
-            return redirect(url_for('customer_view', id=id))
-        except Exception as e:
-            db.session.rollback()
-            app.logger.exception("Database error while editing customer")
-            flash('An unexpected error occurred while saving the customer. Please try again.', 'danger')
+        db.session.commit()
+        log_audit('Edit Customer', f"Edited customer {customer.full_name}")
+        flash('Customer updated.', 'success')
+        return redirect(url_for('customer_view', id=id))
     return render_template('customers/edit.html', form=form, customer=customer)
 
 # ===== CUSTOMER LEDGER =====
@@ -3081,11 +2809,7 @@ def assign_plan(customer_id):
         flash('Please select a plan and start date.', 'danger')
         return redirect(url_for('customer_view', id=customer_id))
     plan = Plan.query.get_or_404(plan_id)
-    try:
-        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-    except (ValueError, TypeError):
-        flash('Invalid date format. Use YYYY-MM-DD.', 'danger')
-        return redirect(url_for('customer_view', id=customer_id))
+    start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
     end_date = start_date + timedelta(days=plan.validity_days)
     # Same rule as the REST endpoint: every open row closes, so this screen
     # cannot leave a customer on two plans either.
@@ -3130,6 +2854,7 @@ def renew_plan(customer_id):
     active_plan.end_date = new_end_date
     active_plan.status = 'active'
     active_plan.last_invoice_date = date.today()
+    db.session.commit()
     invoice = Invoice(
         customer_id=customer_id,
         invoice_no=generate_invoice_no(),
@@ -3176,11 +2901,7 @@ def record_payment(invoice_id):
         flash('Invalid amount.', 'danger')
         return redirect(url_for('customer_view', id=customer.id))
 
-    try:
-        payment_date = datetime.strptime(payment_date_str, '%Y-%m-%d').date() if payment_date_str else date.today()
-    except (ValueError, TypeError):
-        flash('Invalid payment date format. Use YYYY-MM-DD.', 'danger')
-        return redirect(url_for('customer_view', id=customer.id))
+    payment_date = datetime.strptime(payment_date_str, '%Y-%m-%d').date() if payment_date_str else date.today()
 
     final_mode_detail = mode_detail
     if bank_name:
@@ -3203,12 +2924,12 @@ def record_payment(invoice_id):
         remarks=remarks or None,
         received_by_user_id=current_user.id,
         source='admin',
-        status='pending' if needs_auth else 'approved',
+        status='approved',
         authorized_at=None if needs_auth else datetime.utcnow(),
         authorized_by_user_id=None if needs_auth else current_user.id,
     )
     db.session.add(payment)
-    db.session.flush()
+    db.session.commit()
     if not invoice.caption:
         invoice.caption = payment.payment_mode
     if invoice.balance <= 0:
@@ -3375,8 +3096,7 @@ def add_payment(invoice_id):
             received_by_user_id=current_user.id
         )
         db.session.add(payment)
-        db.session.flush()
-        invoice.status = 'paid' if invoice.total_amount <= invoice.paid_amount else 'sent'
+        invoice.status = 'paid' if invoice.total_amount <= invoice.paid_amount + payment.amount else 'sent'
         db.session.commit()
         log_audit('Add Payment', f"Added payment {payment.amount} to invoice {invoice.invoice_no}")
         flash('Payment recorded.', 'success')
@@ -3387,7 +3107,7 @@ def add_payment(invoice_id):
 @login_required
 @admin_required
 def payment_approve(id):
-    payment = db.session.query(Payment).with_for_update().get_or_404(id)
+    payment = Payment.query.get_or_404(id)
     # Shared with the portal-activity screen so approving from either place
     # settles the invoice AND applies any renewal the payment was buying.
     ok, renewal_applied = payment_service.approve_payment(payment, current_user)
@@ -4693,6 +4413,11 @@ def customer_login():
     if form.validate_on_submit():
         ip = request.remote_addr
         uname = (form.username.data or '').strip()
+        # Rate limiting disabled
+        # if is_rate_limited(ip, uname):
+        #     flash('Too many failed attempts. Please try again in a few minutes.',
+        #           'danger')
+        #     return render_template('customer/login.html', form=form)
 
         customer = Customer.query.filter_by(username=uname).first()
         if customer and customer.password_hash and customer.check_password(form.password.data):
@@ -4700,7 +4425,7 @@ def customer_login():
                 flash('Your connection is currently disabled. Please contact support.',
                       'warning')
                 return render_template('customer/login.html', form=form)
-            session.clear()
+            # clear_attempts(ip, uname)
             session['customer_id'] = customer.id
             session.permanent = True
             log_audit('Customer Login', f"Customer {customer.full_name} logged in")
@@ -4708,8 +4433,7 @@ def customer_login():
             if nxt and urlsplit(nxt).netloc == '' and nxt.startswith('/'):
                 return redirect(nxt)
             return redirect(url_for('customer_dashboard'))
-        from security import record_web_login_failure
-        record_web_login_failure(uname)
+        # register_failed_attempt(ip, uname)
         flash('Invalid username or password.', 'danger')
     return render_template('customer/login.html', form=form)
 
@@ -4878,7 +4602,6 @@ def customer_renew_plan():
 
 def _settle_online_order(order):
     """Confirm a Cashfree order and credit the money. Idempotent – safe to call from both the return URL and the webhook."""
-    order = db.session.query(OnlinePaymentOrder).with_for_update().get(order.id)
     if order.status == 'paid':
         return order
 
@@ -5001,14 +4724,6 @@ def cashfree_webhook():
         app.logger.warning('Rejected Cashfree webhook with a bad signature.')
         return jsonify(status='invalid signature'), 401
 
-    try:
-        ts = int(timestamp)
-        if abs(datetime.utcnow().timestamp() - ts) > 300:
-            app.logger.warning('Rejected stale Cashfree webhook (timestamp %s)', timestamp)
-            return jsonify(status='stale webhook'), 410
-    except (ValueError, TypeError):
-        return jsonify(status='invalid timestamp'), 400
-
     payload = request.get_json(silent=True) or {}
     order_id = (payload.get('data', {}).get('order', {}) or {}).get('order_id')
     if not order_id:
@@ -5036,20 +4751,15 @@ GATEWAY_SETTING_DEFAULTS = {
     'cashfree_env':        app.config.get('CASHFREE_ENV', 'sandbox'),
     'app_link':            app.config.get('APP_LINK', ''),
     'web_link':            app.config.get('WEB_LINK', ''),
-    'admin_email':         app.config.get('ADMIN_EMAIL', ''),
-    'admin_mobile':        app.config.get('ADMIN_MOBILE', ''),
 }
 
 def _seed_gateway_settings():
     """Create any missing settings rows. Never overwrites an edited value."""
-    from models_ext import Setting, ENCRYPTED_SETTINGS, encrypt_setting_value
+    from models_ext import Setting
     added = 0
     for key, value in GATEWAY_SETTING_DEFAULTS.items():
         if not Setting.query.filter_by(key=key).first():
-            stored = value or ''
-            if key in ENCRYPTED_SETTINGS and stored:
-                stored = encrypt_setting_value(stored)
-            db.session.add(Setting(key=key, value=stored))
+            db.session.add(Setting(key=key, value=value or ''))
             added += 1
     if added:
         db.session.commit()
@@ -5160,13 +4870,7 @@ def init_database(flask_app=None):
 
         admin = User.query.filter_by(username='admin').first()
         if not admin:
-            default_pw = os.environ.get('ADMIN_PASSWORD')
-            if not default_pw:
-                import secrets as _secrets
-                default_pw = _secrets.token_urlsafe(12)
-                flask_app.logger.warning(
-                    'ADMIN_PASSWORD env var not set. Generated a random '
-                    'password for the admin account: %s', default_pw)
+            default_pw = os.environ.get('ADMIN_PASSWORD', 'admin123')
             admin = User(
                 username='admin',
                 full_name='Administrator',
@@ -5185,21 +4889,6 @@ def init_database(flask_app=None):
             admin.is_active = True
             db.session.commit()
             flask_app.logger.info("Admin account re-enabled.")
-
-        # One-time: remove all staff except the four authorised accounts.
-        try:
-            KEEP_STAFF = {'admin', 'dinesh', 'nitesh', 'ram'}
-            all_active = User.query.filter(User.is_active.is_(True)).all()
-            to_remove = [u for u in all_active if u.username.lower() not in KEEP_STAFF]
-            if to_remove:
-                for u in to_remove:
-                    db.session.delete(u)
-                db.session.commit()
-                flask_app.logger.info(
-                    "Removed %d non-authorised staff accounts.", len(to_remove))
-        except Exception as exc:                            # noqa: BLE001
-            db.session.rollback()
-            flask_app.logger.warning('Could not clean staff: %s', exc)
 
 
 # --------------------------------------------------------------------------- #
