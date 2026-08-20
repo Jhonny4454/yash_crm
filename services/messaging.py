@@ -1813,11 +1813,12 @@ DEFAULT_TEMPLATES = [
 def seed_default_templates():
     """Insert the standard message templates once, on first boot.
 
-    Also updates the body of any existing template whose body was changed
-    in code, and re-activates templates that were deactivated.
+    Also re-activates templates that were deactivated.
+    Does NOT overwrite existing template bodies — use restore_default_templates()
+    to reset to defaults.
     """
     from models import db, MessageTemplate
-    created, updated, reactivated = 0, 0, 0
+    created, reactivated = 0, 0
     for spec in DEFAULT_TEMPLATES:
         exists = MessageTemplate.query.filter_by(
             template_type=spec['template_type']).first()
@@ -1825,13 +1826,10 @@ def seed_default_templates():
             db.session.add(MessageTemplate(is_active=True, **spec))
             created += 1
             continue
-        if (exists.body or '').strip() != (spec['body'] or '').strip():
-            exists.body = spec['body']
-            updated += 1
         if not exists.is_active:
             exists.is_active = True
             reactivated += 1
-    if created or updated or reactivated:
+    if created or reactivated:
         db.session.commit()
     return created
 

@@ -467,9 +467,15 @@ def send_expiry_reminders():
         total_sent = 0
         failed = 0
 
+        # Skip auto-suspended customers — they already got a suspension notice.
+        _active_plan = (
+            CustomerPlan.query
+            .join(Customer, CustomerPlan.customer_id == Customer.id)
+            .filter(CustomerPlan.status == 'active', Customer.is_active == True)
+        )
+
         # 3 days before expiry
-        expiring_3d = CustomerPlan.query.filter(
-            CustomerPlan.status == 'active',
+        expiring_3d = _active_plan.filter(
             CustomerPlan.end_date == today + timedelta(days=3)
         ).all()
         for cp in expiring_3d:
@@ -482,8 +488,7 @@ def send_expiry_reminders():
                 app.logger.warning('expiry_3d failed for %s: %s', cp.customer_id, exc)
 
         # 2 days before expiry
-        expiring_2d = CustomerPlan.query.filter(
-            CustomerPlan.status == 'active',
+        expiring_2d = _active_plan.filter(
             CustomerPlan.end_date == today + timedelta(days=2)
         ).all()
         for cp in expiring_2d:
@@ -496,8 +501,7 @@ def send_expiry_reminders():
                 app.logger.warning('expiry_2d failed for %s: %s', cp.customer_id, exc)
 
         # 1 day before expiry
-        expiring_1d = CustomerPlan.query.filter(
-            CustomerPlan.status == 'active',
+        expiring_1d = _active_plan.filter(
             CustomerPlan.end_date == today + timedelta(days=1)
         ).all()
         for cp in expiring_1d:
@@ -510,8 +514,7 @@ def send_expiry_reminders():
                 app.logger.warning('expiry_1d failed for %s: %s', cp.customer_id, exc)
 
         # Expired today
-        expired_today = CustomerPlan.query.filter(
-            CustomerPlan.status == 'active',
+        expired_today = _active_plan.filter(
             CustomerPlan.end_date == today
         ).all()
         for cp in expired_today:
