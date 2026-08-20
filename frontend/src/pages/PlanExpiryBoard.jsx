@@ -173,13 +173,13 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
   const [allMatching, setAllMatching] = useState(false);
   const [sending, setSending] = useState(false);
   const [renewing, setRenewing] = useState(false);
-  const [renewTo, setRenewTo] = useState(today);
+  const [renewTo, setRenewTo] = useState(today());
   const [fromDate, setFromDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 7);
     return d.toISOString().slice(0, 10);
   });
-  const [toDate, setToDate] = useState(today);
+  const [toDate, setToDate] = useState(today());
   const [job, setJob] = useState(null);
   const jobId = useRef(null);
 
@@ -342,6 +342,10 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
     if (mode) query.set("mode", mode);
     if (zone) query.set("zone", zone);
     if (on) query.set("on", on);
+    if (view === "expired" || view === "renewed") {
+      if (fromDate) query.set("from_date", fromDate);
+      if (toDate) query.set("to_date", toDate);
+    }
     return query.toString();
   }
 

@@ -51,7 +51,7 @@ export default function BillingRun() {
 
   const [filters, setFilters] = useState(INITIAL);
   const [applied, setApplied] = useState(INITIAL);
-  const [issueDate, setIssueDate] = useState(today);
+  const [issueDate, setIssueDate] = useState(today());
   const [dueDays, setDueDays] = useState(15);
   const [sendMessage, setSendMessage] = useState(false);
   const [page, setPage] = useState(1);
