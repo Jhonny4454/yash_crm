@@ -664,6 +664,20 @@ _should_start_scheduler = (
          or os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
          or not app.debug)
 )
+_scheduler_lock = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.scheduler_lock')
+_scheduler_lock_fd = None
+if _should_start_scheduler and not scheduler.running:
+    try:
+        import msvcrt, platform
+        if platform.system() == 'Windows':
+            _scheduler_lock_fd = open(_scheduler_lock, 'w')
+            msvcrt.locking(_scheduler_lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            _scheduler_lock_fd = open(_scheduler_lock, 'w')
+            fcntl.flock(_scheduler_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (IOError, OSError, ImportError):
+        _should_start_scheduler = False
 if _should_start_scheduler and not scheduler.running:
     # coalesce + misfire_grace_time keep a sleeping free-tier dyno from firing
     # a backlog of duplicate reminders the moment it wakes up.
