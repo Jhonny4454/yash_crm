@@ -653,6 +653,28 @@ def send_daily_report():
         log_audit('Daily Report', f'Report generated for {today}')
 
 
+def promote_queued_notifications():
+    """Auto-promote 'queued' notifications to 'delivered' after 1 hour.
+
+    The gateway accepted the message (HTTP 200 QUEUED) but we never got a
+    delivery callback.  After an hour the message has either arrived or it
+    won't — keeping it as 'queued' forever confuses operators.
+    """
+    with app.app_context():
+        from models_api import Notification
+        cutoff = datetime.utcnow() - timedelta(hours=1)
+        rows = Notification.query.filter(
+            Notification.status == 'queued',
+            Notification.created_at < cutoff,
+        ).all()
+        if not rows:
+            return
+        for r in rows:
+            r.status = 'delivered'
+        db.session.commit()
+        app.logger.info('Promoted %d queued notifications to delivered', len(rows))
+
+
 scheduler = BackgroundScheduler(timezone=os.environ.get('TZ', 'Asia/Kolkata'))
 
 #: Set RUN_SCHEDULER=0 on any extra worker so the cron jobs only fire once
@@ -688,6 +710,7 @@ if _should_start_scheduler and not scheduler.running:
     scheduler.add_job(send_expiry_reminders, CronTrigger(hour=9, minute=0), **job_opts)
     scheduler.add_job(send_overdue_reminders, CronTrigger(hour=11, minute=0), **job_opts)
     scheduler.add_job(send_daily_report, CronTrigger(hour=8, minute=0), **job_opts)
+    scheduler.add_job(promote_queued_notifications, CronTrigger(minute='*/15'), **job_opts)
     scheduler.start()
 
 # ---------- Error handlers ----------

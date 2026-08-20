@@ -13,6 +13,7 @@ Usage:
     pdf_bytes = build_invoice_pdf(invoice)
 """
 from io import BytesIO
+import html as _html
 import os
 
 from reportlab.lib import colors
@@ -427,9 +428,9 @@ def build_invoice_pdf(invoice, logo_path=None, detailed=False):
         story.append(Table([seller], colWidths=[W * 0.62, W * 0.38], style=grid))
 
     story.append(Table([[
-        Paragraph(f"<b>Customer Name:</b> {customer.full_name if customer else ''}", wrap),
-        Paragraph(f"<b>Tel:</b> {getattr(customer, 'mobile', '') or ''}", small),
-        Paragraph(f"<b>Email:</b> {getattr(customer, 'email', '') or ''}", wrap),
+        Paragraph(f"<b>Customer Name:</b> {_html.escape(customer.full_name if customer else '')}", wrap),
+        Paragraph(f"<b>Tel:</b> {_html.escape(getattr(customer, 'mobile', '') or '')}", small),
+        Paragraph(f"<b>Email:</b> {_html.escape(getattr(customer, 'email', '') or '')}", wrap),
     ]], colWidths=[W * 0.38, W * 0.24, W * 0.38], style=grid))
 
     address = ', '.join(filter(None, [
@@ -439,14 +440,14 @@ def build_invoice_pdf(invoice, logo_path=None, detailed=False):
     # `Address:, 1008, Rabale...` - that comma was hard-coded, so every bill
     # for a customer with no flat number opened its address with a comma.
     story.append(Table([[Paragraph(
-        f"<b>Address:</b> {address or '-'}", wrap)]], colWidths=[W], style=grid))
+        f"<b>Address:</b> {_html.escape(address) if address else '-'}", wrap)]], colWidths=[W], style=grid))
 
     invoice_row = [
         Paragraph(f"<b>Invoice No:</b> {invoice.invoice_no}", wrap),
         Paragraph(f"<b>Invoice Date:</b> {_date(invoice.issue_date)}", small),
     ]
     if getattr(customer, 'gstin', ''):
-        invoice_row.append(Paragraph(f"<b>Customer GSTIN:</b> {customer.gstin}", wrap))
+        invoice_row.append(Paragraph(f"<b>Customer GSTIN:</b> {_html.escape(customer.gstin)}", wrap))
         widths = [W * 0.40, W * 0.32, W * 0.28]
     else:
         widths = [W * 0.58, W * 0.42]
@@ -627,12 +628,12 @@ def build_receipt_pdf(payment, logo_path=None):
     ]], colWidths=[W * 0.5, W * 0.5], style=grid))
 
     story.append(Table([[
-        Paragraph(f"Received From: {customer.full_name if customer else ''}", small),
-        Paragraph(f"Username: {getattr(customer, 'username', '') or ''}", small),
+        Paragraph(f"Received From: {_html.escape(customer.full_name if customer else '')}", small),
+        Paragraph(f"Username: {_html.escape(getattr(customer, 'username', '') or '')}", small),
     ]], colWidths=[W * 0.6, W * 0.4], style=grid))
 
     story.append(Table([[
-        Paragraph(f"Tel: {getattr(customer, 'mobile', '') or ''}", small),
+        Paragraph(f"Tel: {_html.escape(getattr(customer, 'mobile', '') or '')}", small),
         Paragraph(f"Against Invoice: {invoice.invoice_no if invoice else '-'}", small),
     ]], colWidths=[W * 0.4, W * 0.6], style=grid))
 

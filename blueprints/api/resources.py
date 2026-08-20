@@ -285,6 +285,12 @@ def customer_create():
         if not data.get(field):
             return fail('first_name_last_name_mobile_required', 400)
 
+    mobile = (data.get('mobile') or '').strip()
+    if mobile and Customer.query.filter(
+            db.func.trim(Customer.mobile) == mobile).first():
+        return fail('mobile_duplicate', 409,
+                    detail='A customer with this mobile number already exists.')
+
     from services.usernames import availability, reserve
 
     username = (data.get('username') or '').strip()
@@ -401,6 +407,15 @@ def customer_update(cid):
                     detail='The username cannot be changed once the account '
                            'has been created.')
     data.pop('username', None)
+
+    mobile = (data.get('mobile') or '').strip()
+    if mobile and mobile != (customer.mobile or '').strip():
+        dup = Customer.query.filter(
+            db.func.trim(Customer.mobile) == mobile,
+            Customer.id != customer.id).first()
+        if dup:
+            return fail('mobile_duplicate', 409,
+                        detail='A customer with this mobile number already exists.')
 
     result = _assign_customer_fields(customer, data)
     if isinstance(result, tuple) and result[0] is None:
@@ -769,7 +784,7 @@ def payment_create():
 @bp.post('/payments/<int:pid>/authorize')
 @admin_required
 def payment_authorize(pid):
-    payment = db.session.get(Payment, pid)
+    payment = db.session.query(Payment).with_for_update().get(pid)
     if not payment:
         return fail('not_found', 404)
     if payment.invoice and payment.invoice.status == 'cancelled':

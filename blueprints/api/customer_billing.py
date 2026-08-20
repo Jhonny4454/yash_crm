@@ -94,8 +94,14 @@ def _next_invoice_no():
         from app import generate_invoice_no
         return generate_invoice_no()
     except Exception:
-        seq = (db.session.query(db.func.count(Invoice.id)).scalar() or 0) + 1
-        return f'INV-{date.today():%y%m}-{seq:05d}'
+        for _ in range(20):
+            seq = (db.session.query(db.func.count(Invoice.id)).scalar() or 0) + 1
+            candidate = f'INV-{date.today():%y%m}-{seq:05d}'
+            if not Invoice.query.filter_by(invoice_no=candidate).first():
+                return candidate
+            db.session.rollback()
+        import secrets
+        return f'INV-{date.today():%y%m}-{secrets.token_hex(4).upper()}'
 
 
 def _mode_detail(data):
