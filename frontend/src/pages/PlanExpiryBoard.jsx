@@ -508,6 +508,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
               <div className="quick-renew">
                 <label htmlFor="renew-to">Renew to</label>
                 <input id="renew-to" type="date" className="input" value={renewTo}
+                       readOnly={view === "expired"}
                        min={today()} onChange={(e) => setRenewTo(e.target.value)} />
                 <button type="button" className="btn sm primary"
                         disabled={renewing || !renewTo} onClick={quickRenew}>
@@ -516,12 +517,10 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
               </div>
             )}
 
-            {canMessage && (
+            {canMessage && view !== "expired" && (
               <button type="button" className="btn sm"
                       disabled={sending} onClick={sendExpiryNotice}>
-                {sending ? "Sending…" : view === "expired"
-                  ? "Send expiry notice on WhatsApp"
-                  : "Send reminder on WhatsApp"}
+                {sending ? "Sending…" : "Send reminder on WhatsApp"}
               </button>
             )}
           </div>
