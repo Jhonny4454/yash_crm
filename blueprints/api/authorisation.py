@@ -16,7 +16,7 @@ N+1 that turns a 200-row queue into 200 extra queries.
 """
 from datetime import date, datetime
 
-from flask import Blueprint, request
+from flask import Blueprint, current_app, request
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 
@@ -259,8 +259,9 @@ def authorize_bulk():
         log_audit('Authorise Payments',
                   f'Authorised {len(authorised)} payment(s): '
                   f'{", ".join(str(i) for i in authorised[:20])}')
-    except Exception:
-        pass
+    except Exception as exc:
+        current_app.logger.warning('Audit log failed (Authorise Payments): %s',
+                                   exc)
 
     return ok({
         'authorised': authorised,

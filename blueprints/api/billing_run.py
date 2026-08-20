@@ -25,7 +25,7 @@ selected 250.
 from datetime import date, timedelta
 from decimal import Decimal
 
-from flask import Blueprint, request
+from flask import Blueprint, current_app, request
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 
@@ -48,8 +48,8 @@ def _setting(key, default=''):
         value = Setting.get(key)
         if value is not None and str(value).strip() != '':
             return value
-    except Exception:
-        pass
+    except Exception as exc:
+        current_app.logger.warning('_setting(%s) failed: %s', key, exc)
     return default
 
 
@@ -415,7 +415,7 @@ def billing_generate():
             skipped.append({'customer_plan_id': plan_id,
                             'customer_id': assessment['customer_id'],
                             'name': assessment['name'],
-                            'reason': f'Could not be saved: {str(exc)[:120]}'})
+                            'reason': 'Could not be saved: a database error occurred.'})
             continue
 
         entry = {
@@ -461,4 +461,4 @@ def _notify(customer_id, invoice):
         result = send_template_message(customer, 'bill', invoice=invoice)
         return getattr(result, 'status', 'unknown')
     except Exception as exc:
-        return f'failed: {str(exc)[:80]}'
+        return 'failed: an error occurred while sending the bill.'

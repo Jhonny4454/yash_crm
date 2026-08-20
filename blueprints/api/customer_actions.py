@@ -18,7 +18,7 @@ import re
 import secrets
 from datetime import date, datetime, timedelta
 
-from flask import Blueprint
+from flask import Blueprint, current_app
 
 from models import Customer, CustomerPlan, Invoice, Plan, db
 from services.customer_purge import purge_customer
@@ -42,8 +42,8 @@ def _audit(action, detail):
     try:
         from app import log_audit
         log_audit(action, detail)
-    except Exception:
-        pass
+    except Exception as exc:
+        current_app.logger.warning('Audit log failed (%s): %s', action, exc)
 
 
 # --------------------------------------------------------------------------- #
@@ -150,8 +150,9 @@ def customer_reset_password(cid):
         from app import reset_customer_password_on_log2space
         reset_customer_password_on_log2space(customer, temp_password)
         delivered['network'] = True
-    except Exception:
-        pass
+    except Exception as exc:
+        current_app.logger.warning('Network password reset failed for %s: %s',
+                                   customer.full_name, exc)
 
     if customer.mobile:
         try:
@@ -160,8 +161,9 @@ def customer_reset_password(cid):
                      'Your portal password has been reset. '
                      f'Temporary password: {temp_password}')
             delivered['sms'] = True
-        except Exception:
-            pass
+        except Exception as exc:
+            current_app.logger.warning('SMS password reset failed for %s: %s',
+                                       customer.full_name, exc)
 
     if customer.email:
         try:
@@ -169,8 +171,9 @@ def customer_reset_password(cid):
             send_email(customer.email, 'Password Reset',
                        f'Your new temporary password is: {temp_password}')
             delivered['email'] = True
-        except Exception:
-            pass
+        except Exception as exc:
+            current_app.logger.warning('Email password reset failed for %s: %s',
+                                       customer.full_name, exc)
 
     _audit('Reset Customer Password',
            f"Reset portal password for {customer.full_name}")
@@ -196,7 +199,7 @@ def customer_reset_mac(cid):
         from app import reset_mac_on_log2space
         succeeded = bool(reset_mac_on_log2space(mac, customer.reference_id))
     except Exception as exc:
-        return fail('network_error', 424, detail=str(exc)[:200])
+        return fail('network_error', 424, detail='A network error occurred while resetting the MAC address.')
 
     if not succeeded:
         return fail('mac_reset_failed', 424,
@@ -317,7 +320,7 @@ def customer_send_sms(cid):
         from app import send_sms
         send_sms(customer.mobile, message)
     except Exception as exc:
-        return fail('sms_failed', 424, detail=str(exc)[:200])
+        return fail('sms_failed', 424, detail='An error occurred while sending the SMS.')
 
     _audit('Send SMS', f"Sent SMS to {customer.full_name}: {message[:50]}...")
     return ok({'status': 'sent', 'to': customer.mobile})
@@ -479,7 +482,7 @@ def _notify_renewal(customer, customer_plan, plan, invoice, send=True):
             customer, 'renewal',
             plan=plan, customer_plan=customer_plan, invoice=invoice)
     except Exception as exc:
-        return {'status': 'failed', 'detail': str(exc)[:200]}
+        return {'status': 'failed', 'detail': 'An error occurred while sending the renewal message.'}
 
     status = getattr(result, 'status', 'unknown')
     if status == 'dry-run':
@@ -545,7 +548,7 @@ def customer_delete(cid):
         db.session.rollback()
         return fail('delete_failed', 500,
                     detail=f'{name} could not be removed, so nothing was '
-                           f'changed. {str(exc)[:160]}')
+                           'changed. Please try again later.')
 
     _audit('Delete Customer',
            f'{name} (id {cid}) permanently deleted with {invoices} invoice(s) '

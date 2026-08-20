@@ -1036,7 +1036,7 @@ def customer_documents_upload(cid):
                 upload.save(os.path.join(folder, stored))
             except OSError as exc:
                 rejected.append({'field': field, 'filename': original,
-                                 'reason': f'Could not be saved: {str(exc)[:120]}'})
+                                 'reason': 'Could not be saved: file system error.'})
                 continue
 
         previous = getattr(customer, column, None)
@@ -1275,7 +1275,7 @@ def payment_receipt(pid):
     try:
         pdf = build_receipt_pdf(payment, logo_path=_logo_path())
     except Exception as exc:
-        return fail('pdf_failed', 500, detail=str(exc)[:200])
+        return fail('pdf_failed', 500, detail='An error occurred while generating the receipt PDF.')
 
     name = payment.receipt_no
     return Response(pdf, mimetype='application/pdf', headers={
@@ -1317,7 +1317,7 @@ def public_payment_receipt(pid):
         # traceback about logging it.
         from flask import current_app
         current_app.logger.exception('Public receipt PDF failed')
-        return fail('pdf_failed', 500, detail=str(exc)[:200])
+        return fail('pdf_failed', 500, detail='An error occurred while generating the receipt PDF.')
 
     name = payment.receipt_no
     return Response(pdf, mimetype='application/pdf', headers={
@@ -1347,7 +1347,7 @@ def payment_send(pid):
             customer, 'payment_received',
             invoice=payment.invoice, payment=payment)
     except Exception as exc:
-        return fail('send_failed', 424, detail=str(exc)[:200])
+        return fail('send_failed', 424, detail='An error occurred while sending the receipt.')
 
     status = getattr(result, 'status', 'unknown')
     from services.messaging import DELIVERABLE_STATUSES

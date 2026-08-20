@@ -21,7 +21,7 @@ piled up in a table with no screen.
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
-from flask import Blueprint, request
+from flask import Blueprint, current_app, request
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 
@@ -358,7 +358,7 @@ def renewal_send_reminders():
             status = 'failed'
             outcome = None
             results['failed'].append({'name': customer.full_name,
-                                      'reason': str(exc)[:120]})
+                                      'reason': 'An error occurred while sending the renewal message.'})
             continue
 
         entry = {'name': customer.full_name, 'mobile': customer.mobile,
@@ -456,16 +456,17 @@ def _notify(req, template_type):
                               customer_plan=req.customer_plan,
                               plan=req.requested_plan,
                               invoice=req.invoice)
-    except Exception:
-        pass
+    except Exception as exc:
+        current_app.logger.warning('Renewal notification (%s) failed for %s: %s',
+                                   template_type, req.customer.full_name, exc)
 
 
 def _audit(action, detail):
     try:
         from app import log_audit
         log_audit(action, detail)
-    except Exception:
-        pass
+    except Exception as exc:
+        current_app.logger.warning('Audit log failed (%s): %s', action, exc)
 
 
 # --------------------------------------------------------------------------- #
@@ -822,9 +823,9 @@ def renew_at_counter(cid):
                 tax_percent=(_gst_percent() if tax_mode != 'notax'
                              else Decimal('0')),
                 period_from=start_date, period_to=end_date))
-        except Exception:
+        except Exception as exc:
             # The line item is a nicety; the invoice total is what is owed.
-            pass
+            current_app.logger.warning('Failed to add InvoiceItem line: %s', exc)
 
         reconnected = False
         if not customer.is_active and data.get('reactivate'):
@@ -835,8 +836,8 @@ def renew_at_counter(cid):
     except Exception as exc:
         db.session.rollback()
         return fail('renewal_failed', 500,
-                    detail=f'The renewal could not be saved, so nothing was '
-                           f'charged. {str(exc)[:160]}')
+                    detail='The renewal could not be saved, so nothing was '
+                           'charged. Please try again later.')
 
     if reconnected:
         _reconnect(customer)
@@ -892,8 +893,9 @@ def _reconnect(customer):
     try:
         from app import enable_on_network
         enable_on_network(customer)
-    except Exception:
-        pass
+    except Exception as exc:
+        current_app.logger.warning('Network reconnect failed for %s: %s',
+                                   customer.full_name, exc)
 
 
 def _notify_renewal(customer, plan, customer_plan, invoice):
@@ -906,4 +908,4 @@ def _notify_renewal(customer, plan, customer_plan, invoice):
                                        invoice=invoice)
         return getattr(result, 'status', 'unknown')
     except Exception as exc:
-        return f'failed: {str(exc)[:80]}'
+        return 'failed: an error occurred while sending the renewal message.'

@@ -780,8 +780,9 @@ def payment_new():
     try:
         messaging.send_template(customer, 'payment_submitted',
                                 invoice=invoice, payment=payment)
-    except Exception:                                    # noqa: BLE001
-        pass
+    except Exception as exc:                             # noqa: BLE001
+        current_app.logger.warning('Failed to send payment_submitted template '
+                                   'to %s: %s', customer.full_name, exc)
 
     flash('Payment submitted. We will confirm it against our bank statement '
           'and update your account - usually within a few hours.', 'success')
@@ -793,7 +794,8 @@ def _setting_value(key):
         from models_ext import Setting
         row = Setting.query.filter_by(key=key).first()
         return (row.value or '').strip() if row else ''
-    except Exception:                                    # noqa: BLE001
+    except Exception as exc:                             # noqa: BLE001
+        current_app.logger.warning('_setting_value(%s) failed: %s', key, exc)
         return ''
 
 

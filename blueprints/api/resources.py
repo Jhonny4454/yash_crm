@@ -259,14 +259,13 @@ def _commit_customer(customer, created):
         db.session.rollback()
         return fail('duplicate_value', 409,
                     detail='A customer with that username or reference ID '
-                           'already exists.' if 'Duplicate' in str(exc.orig)
-                    else str(exc.orig)[:200])
+                           'already exists.')
     except DataError as exc:
         db.session.rollback()
         return fail('invalid_field_value', 422,
                     detail='One of the values is not allowed for its field. '
                            'Check Title, Customer type, Connection type and '
-                           'Tax type. (' + str(exc.orig)[:160] + ')')
+                           'Tax type.')
     return None
 
 
@@ -371,7 +370,7 @@ def _assign_initial_plan(customer, data):
         db.session.commit()
     except (IntegrityError, DataError) as exc:
         db.session.rollback()
-        return None, f'The plan could not be assigned: {str(exc.orig)[:120]}'
+        return None, 'The plan could not be assigned due to a database error.'
     return customer_plan, None
 
 

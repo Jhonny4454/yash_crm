@@ -46,14 +46,16 @@ def _audit(action, details):
             action=action, details=details,
             ip_address=request.remote_addr))
         db.session.commit()
-    except Exception:
+    except Exception as exc:
+        current_app.logger.warning('Audit log failed (%s): %s', action, exc)
         db.session.rollback()
 
 
 def _setting(key, default):
     try:
         return Setting.get(key, default)
-    except Exception:
+    except Exception as exc:
+        current_app.logger.warning('_setting(%s) failed: %s', key, exc)
         return default
 
 

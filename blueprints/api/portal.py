@@ -853,7 +853,7 @@ def _start_checkout(order, customer, amount, return_url=None):
         order.status = 'failed'
         order.note = str(exc)[:255]
         db.session.commit()
-        return fail('gateway_error', 424, detail=str(exc)[:200])
+        return fail('gateway_error', 424, detail='A payment gateway error occurred. Please try again later.')
 
     order.payment_session_id = payload.get('payment_session_id')
     order.cf_order_id = str(payload.get('cf_order_id') or '')

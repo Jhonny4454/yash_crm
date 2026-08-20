@@ -202,7 +202,7 @@ def restore_templates():
         result = restore_default_templates()
     except Exception as exc:
         db.session.rollback()
-        return fail('restore_failed', 500, detail=str(exc)[:200])
+        return fail('restore_failed', 500, detail='An error occurred while restoring templates.')
 
     changed = len(result['created']) + len(result['reactivated']) + len(result['refilled'])
     result['changed'] = changed
@@ -900,7 +900,7 @@ def import_csv():
         job.status = 'failed'
         job.error_report = str(exc)[:2000]
         db.session.commit()
-        return fail('import_failed', 500, detail=str(exc)[:200])
+        return fail('import_failed', 500, detail='An error occurred during the import.')
 
     job.total_rows = total
     job.ok_rows = ok_rows
@@ -1169,7 +1169,7 @@ def isp_test():
     try:
         result = isp_providers.test_credential(cred)
     except Exception as exc:
-        return fail('test_failed', 424, detail=str(exc)[:200])
+        return fail('test_failed', 424, detail='An error occurred while testing the credential.')
 
     success = bool(getattr(result, 'ok', False))
     message = getattr(result, 'message', '') or 'Connection tested.'

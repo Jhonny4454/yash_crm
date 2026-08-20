@@ -66,7 +66,7 @@ def invoice_pdf(iid):
         detailed = (request.args.get('detail') or '').strip() in ('1', 'true', 'yes')
         pdf = build_invoice_pdf(invoice, logo_path=_logo_path(), detailed=detailed)
     except Exception as exc:
-        return fail('pdf_failed', 500, detail=str(exc)[:200])
+        return fail('pdf_failed', 500, detail='An error occurred while generating the PDF.')
 
     return Response(pdf, mimetype='application/pdf', headers={
         'Content-Disposition':
@@ -104,7 +104,7 @@ def public_invoice_pdf(iid):
     except Exception as exc:
         from flask import current_app
         current_app.logger.exception('Public invoice PDF failed')
-        return fail('pdf_failed', 500, detail=str(exc)[:200])
+        return fail('pdf_failed', 500, detail='An error occurred while generating the PDF.')
 
     return Response(pdf, mimetype='application/pdf', headers={
         'Content-Disposition':
@@ -150,7 +150,7 @@ def invoice_send(iid):
         from app import _bill_context, send_template_message
         result = send_template_message(customer, template_type, **_bill_context(invoice))
     except Exception as exc:
-        return fail('send_failed', 424, detail=str(exc)[:200])
+        return fail('send_failed', 424, detail='An error occurred while sending the message.')
 
     status = getattr(result, 'status', 'unknown')
     detail = getattr(result, 'detail', '') or ''
@@ -190,7 +190,7 @@ def _invoice_send_email(invoice, customer):
                            f'If this mentions reportlab, activate the venv and '
                            f'run "pip install -r requirements.txt".')
     except Exception as exc:
-        return fail('pdf_failed', 500, detail=str(exc)[:200])
+        return fail('pdf_failed', 500, detail='An error occurred while generating the PDF.')
 
     company = ''
     try:
@@ -286,7 +286,7 @@ def customer_send_reminder(cid):
              'invoice_count': len(unpaid)},
             customer_plan=active_plan, invoice=latest)
     except Exception as exc:
-        return fail('send_failed', 424, detail=str(exc)[:200])
+        return fail('send_failed', 424, detail='An error occurred while sending the message.')
 
     status = getattr(result, 'status', 'unknown')
     from services.messaging import DELIVERABLE_STATUSES
