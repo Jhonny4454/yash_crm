@@ -726,6 +726,10 @@ def payment_create():
     if not invoice:
         return fail('invoice_not_found', 404)
 
+    if invoice.status == 'cancelled':
+        return fail('invoice_cancelled', 409,
+                    detail='This invoice has been cancelled. Payment cannot be recorded against a cancelled invoice.')
+
     from models import User as _User
     _current_user = _User.query.get(current_staff_id())
     _is_admin = _current_user.is_admin() if _current_user else False
@@ -761,6 +765,9 @@ def payment_authorize(pid):
     payment = db.session.get(Payment, pid)
     if not payment:
         return fail('not_found', 404)
+    if payment.invoice and payment.invoice.status == 'cancelled':
+        return fail('invoice_cancelled', 409,
+                    detail='This invoice has been cancelled. Cannot authorise payment against a cancelled invoice.')
     payment.status = 'approved'
     payment.authorized_at = datetime.utcnow()
     payment.authorized_by_user_id = current_staff_id()

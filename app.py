@@ -370,30 +370,37 @@ def generate_auto_invoices():
             (CustomerPlan.last_invoice_date == None) | (CustomerPlan.last_invoice_date < today)
         ).all()
         for cp in plans_to_renew:
-            plan = cp.plan
-            customer = cp.customer
-            invoice = Invoice(
-                customer_id=customer.id,
-                invoice_no=generate_invoice_no(),
-                issue_date=today,
-                due_date=today + timedelta(days=15),
-                total_amount=cp.effective_price,
-                tax_amount=0.00,
-                status='sent'
-            )
-            db.session.add(invoice)
-            cp.last_invoice_date = today
-            db.session.commit()
-            log_audit('Auto-Invoice', f"Generated invoice {invoice.invoice_no} for {customer.full_name}")
-            send_email(customer.email, f"New Invoice {invoice.invoice_no}", "Your invoice is attached.")
-            send_sms(customer.mobile, f"Dear {customer.full_name}, invoice {invoice.invoice_no} generated. Due: {invoice.due_date}")
-            send_whatsapp(customer.mobile, f"Your invoice {invoice.invoice_no} is ready.")
+            try:
+                plan = cp.plan
+                customer = cp.customer
+                invoice = Invoice(
+                    customer_id=customer.id,
+                    invoice_no=generate_invoice_no(),
+                    issue_date=today,
+                    due_date=today + timedelta(days=15),
+                    total_amount=cp.effective_price,
+                    tax_amount=0.00,
+                    status='sent'
+                )
+                db.session.add(invoice)
+                cp.last_invoice_date = today
+                db.session.commit()
+                log_audit('Auto-Invoice', f"Generated invoice {invoice.invoice_no} for {customer.full_name}")
+                send_email(customer.email, f"New Invoice {invoice.invoice_no}", "Your invoice is attached.")
+                send_sms(customer.mobile, f"Dear {customer.full_name}, invoice {invoice.invoice_no} generated. Due: {invoice.due_date}")
+                send_whatsapp(customer.mobile, f"Your invoice {invoice.invoice_no} is ready.")
+            except Exception as exc:
+                db.session.rollback()
+                app.logger.warning('Auto-invoice failed for plan %s: %s', cp.id, exc)
         unpaid = Invoice.query.filter(Invoice.status.in_(['sent', 'overdue'])).all()
         for inv in unpaid:
-            if inv.due_date < today:
-                cust = inv.customer
-                send_sms(cust.mobile, f"Reminder: Invoice {inv.invoice_no} is overdue. Please pay.")
-                send_email(cust.email, f"Overdue Invoice {inv.invoice_no}", "Please clear your dues.")
+            try:
+                if inv.due_date < today:
+                    cust = inv.customer
+                    send_sms(cust.mobile, f"Reminder: Invoice {inv.invoice_no} is overdue. Please pay.")
+                    send_email(cust.email, f"Overdue Invoice {inv.invoice_no}", "Please clear your dues.")
+            except Exception as exc:
+                app.logger.warning('Overdue invoice reminder failed for %s: %s', inv.id, exc)
 
 def send_grace_period_reminders():
     with app.app_context():
@@ -403,11 +410,15 @@ def send_grace_period_reminders():
             Invoice.issue_date == today
         ).all()
         for inv in due_today_unpaid:
-            cust = inv.customer
-            send_sms(cust.mobile, f"Reminder: Invoice {inv.invoice_no} is unpaid. "
-                                   f"Service will be suspended after the grace period if unpaid.")
-            send_whatsapp(cust.mobile,
-                          f"Your invoice {inv.invoice_no} is still unpaid. Please pay to avoid suspension.")
+            try:
+                cust = inv.customer
+                send_sms(cust.mobile, f"Reminder: Invoice {inv.invoice_no} is unpaid. "
+                                       f"Service will be suspended after the grace period if unpaid.")
+                send_whatsapp(cust.mobile,
+                              f"Your invoice {inv.invoice_no} is still unpaid. Please pay to avoid suspension.")
+            except Exception as exc:
+                app.logger.warning('Grace period reminder failed for invoice %s: %s',
+                                   inv.id, exc)
 
 def auto_suspend_overdue():
     with app.app_context():
@@ -445,6 +456,7 @@ def send_expiry_reminders():
     with app.app_context():
         today = date.today()
         total_sent = 0
+        failed = 0
 
         # 3 days before expiry
         expiring_3d = CustomerPlan.query.filter(
@@ -452,9 +464,13 @@ def send_expiry_reminders():
             CustomerPlan.end_date == today + timedelta(days=3)
         ).all()
         for cp in expiring_3d:
-            send_template_message(cp.customer, 'expiry_3d', {'days': 3},
-                                  customer_plan=cp)
-            total_sent += 1
+            try:
+                send_template_message(cp.customer, 'expiry_3d', {'days': 3},
+                                      customer_plan=cp)
+                total_sent += 1
+            except Exception as exc:
+                failed += 1
+                app.logger.warning('expiry_3d failed for %s: %s', cp.customer_id, exc)
 
         # 2 days before expiry
         expiring_2d = CustomerPlan.query.filter(
@@ -462,9 +478,13 @@ def send_expiry_reminders():
             CustomerPlan.end_date == today + timedelta(days=2)
         ).all()
         for cp in expiring_2d:
-            send_template_message(cp.customer, 'expiry_2d', {'days': 2},
-                                  customer_plan=cp)
-            total_sent += 1
+            try:
+                send_template_message(cp.customer, 'expiry_2d', {'days': 2},
+                                      customer_plan=cp)
+                total_sent += 1
+            except Exception as exc:
+                failed += 1
+                app.logger.warning('expiry_2d failed for %s: %s', cp.customer_id, exc)
 
         # 1 day before expiry
         expiring_1d = CustomerPlan.query.filter(
@@ -472,9 +492,13 @@ def send_expiry_reminders():
             CustomerPlan.end_date == today + timedelta(days=1)
         ).all()
         for cp in expiring_1d:
-            send_template_message(cp.customer, 'expiry_1d', {'days': 1},
-                                  customer_plan=cp)
-            total_sent += 1
+            try:
+                send_template_message(cp.customer, 'expiry_1d', {'days': 1},
+                                      customer_plan=cp)
+                total_sent += 1
+            except Exception as exc:
+                failed += 1
+                app.logger.warning('expiry_1d failed for %s: %s', cp.customer_id, exc)
 
         # Expired today
         expired_today = CustomerPlan.query.filter(
@@ -482,11 +506,15 @@ def send_expiry_reminders():
             CustomerPlan.end_date == today
         ).all()
         for cp in expired_today:
-            send_template_message(cp.customer, 'expired', customer_plan=cp)
-            total_sent += 1
+            try:
+                send_template_message(cp.customer, 'expired', customer_plan=cp)
+                total_sent += 1
+            except Exception as exc:
+                failed += 1
+                app.logger.warning('expired failed for %s: %s', cp.customer_id, exc)
 
         # Notify admin of expiry summary
-        if total_sent:
+        if total_sent or failed:
             summary = (
                 f"Expiry Reminder Summary - {today.strftime('%d %b %Y')}\n\n"
                 f"Expiring in 3 days: {len(expiring_3d)}\n"
@@ -494,6 +522,7 @@ def send_expiry_reminders():
                 f"Expiring tomorrow: {len(expiring_1d)}\n"
                 f"Expired today: {len(expired_today)}\n"
                 f"Total messages sent: {total_sent}"
+                + (f"\nFailed: {failed}" if failed else "")
             )
 
             def _get(key, default=''):
@@ -535,15 +564,19 @@ def send_overdue_reminders():
         ).all()
         sent = 0
         for inv in overdue:
-            cust = inv.customer
-            if cust and cust.is_active:
-                result = send_template_message(
-                    cust, 'due_reminder',
-                    invoice=inv,
-                )
-                if getattr(result, 'status', '') in ('sent', 'queued'):
-                    sent += 1
-                inv.status = 'overdue'
+            try:
+                cust = inv.customer
+                if cust and cust.is_active:
+                    result = send_template_message(
+                        cust, 'due_reminder',
+                        invoice=inv,
+                    )
+                    if getattr(result, 'status', '') in ('sent', 'queued'):
+                        sent += 1
+                    inv.status = 'overdue'
+            except Exception as exc:
+                app.logger.warning('Overdue reminder failed for invoice %s: %s',
+                                   inv.id, exc)
         try:
             db.session.commit()
         except Exception:
