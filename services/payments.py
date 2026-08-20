@@ -109,6 +109,14 @@ def approve_payment(payment, user=None):
                           if i.balance > 0)
         if outstanding <= 0:
             customer.is_active = True
+            try:
+                from app import enable_connection_on_network
+                enable_connection_on_network(customer)
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).warning(
+                    'ISP reconnect failed after payment for %s: %s',
+                    customer.full_name, exc)
 
     db.session.commit()
 

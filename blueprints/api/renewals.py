@@ -891,8 +891,8 @@ def _mode_detail(data):
 def _reconnect(customer):
     """Put a disconnected line back on the network. Never fatal."""
     try:
-        from app import enable_on_network
-        enable_on_network(customer)
+        from app import enable_connection_on_network
+        enable_connection_on_network(customer)
     except Exception as exc:
         current_app.logger.warning('Network reconnect failed for %s: %s',
                                    customer.full_name, exc)

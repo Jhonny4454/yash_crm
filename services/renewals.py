@@ -244,6 +244,14 @@ def approve(req, user=None, note=None):
 
     # A renewal always brings a suspended customer back online.
     customer.is_active = True
+    try:
+        from app import enable_connection_on_network
+        enable_connection_on_network(customer)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            'ISP reconnect failed after renewal approval for %s: %s',
+            customer.full_name, exc)
 
     req.status = 'approved'
     req.decided_at = datetime.utcnow()

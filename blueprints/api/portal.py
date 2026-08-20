@@ -1089,6 +1089,12 @@ def _apply_successful_payment(order, txn_id=None, method=None):
 
     if not customer.is_active:
         customer.is_active = True
+        try:
+            from app import enable_connection_on_network
+            enable_connection_on_network(customer)
+        except Exception as exc:
+            current_app.logger.warning('ISP reconnect failed after portal payment for %s: %s',
+                                       customer.full_name, exc)
 
     db.session.commit()
 

@@ -375,11 +375,13 @@ def generate_auto_invoices():
                 customer = cp.customer
                 invoice = Invoice(
                     customer_id=customer.id,
+                    customer_plan_id=cp.id,
                     invoice_no=generate_invoice_no(),
                     issue_date=today,
                     due_date=today + timedelta(days=15),
                     total_amount=cp.effective_price,
                     tax_amount=0.00,
+                    caption=f'{plan.name} ({plan.validity_days} days)' if plan else None,
                     status='sent'
                 )
                 db.session.add(invoice)
