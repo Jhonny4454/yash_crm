@@ -174,6 +174,11 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
   const [sending, setSending] = useState(false);
   const [renewing, setRenewing] = useState(false);
   const [renewTo, setRenewTo] = useState(today);
+  const [fromDate, setFromDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().slice(0, 10);
+  });
   const [job, setJob] = useState(null);
   const jobId = useRef(null);
 
@@ -187,6 +192,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
 
     get("/reports/plan-expiry", {
       days, mode, zone: zone || undefined, on: on || undefined, page, per_page: PER_PAGE,
+      ...((view === "expired" || view === "renewed") ? { from_date: fromDate, to_date: today() } : {}),
     })
       .then((payload) => {
         if (cancelled) return;
@@ -198,7 +204,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
       .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
-  }, [days, mode, zone, on, page, reloadKey]);
+  }, [days, mode, zone, on, page, reloadKey, fromDate, view]);
 
   // A change of filter is a change of list, so the selection cannot survive it.
   // Paging deliberately does NOT clear it - ticking rows on page 1, going to
@@ -501,14 +507,24 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
           <div className="bulk-actions">
             <button type="button" className="btn sm" onClick={clearSelection}>Clear</button>
 
+            {(view === "expired" || view === "renewed") && (
+              <div className="quick-renew">
+                <label htmlFor="from-date">From</label>
+                <input id="from-date" type="date" className="input" value={fromDate}
+                       max={today()} onChange={(e) => setFromDate(e.target.value)} />
+                <label htmlFor="to-date">To</label>
+                <input id="to-date" type="date" className="input" value={today()}
+                       readOnly />
+              </div>
+            )}
+
             {/* Hidden, not disabled, for a user whose permissions do not cover
                 them. A greyed-out button that never becomes usable is an
                 invitation to ask why, every day, forever. */}
-            {canRenew && (
+            {canRenew && view !== "expired" && (
               <div className="quick-renew">
                 <label htmlFor="renew-to">Renew to</label>
                 <input id="renew-to" type="date" className="input" value={renewTo}
-                       readOnly={view === "expired"}
                        min={today()} onChange={(e) => setRenewTo(e.target.value)} />
                 <button type="button" className="btn sm primary"
                         disabled={renewing || !renewTo} onClick={quickRenew}>
@@ -517,7 +533,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
               </div>
             )}
 
-            {canMessage && view !== "expired" && (
+            {canMessage && (
               <button type="button" className="btn sm"
                       disabled={sending} onClick={sendExpiryNotice}>
                 {sending ? "Sending…" : "Send reminder on WhatsApp"}
@@ -632,7 +648,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
                       <td className="right num">
                         {row.outstanding > 0
                           ? <strong style={{ color: "#b91c1c" }}>{inr(row.outstanding)}</strong>
-                          : "—"}
+                          : inr(0)}
                       </td>
                       {showSave && (
                         <td className="right">

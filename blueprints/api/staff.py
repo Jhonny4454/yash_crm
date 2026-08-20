@@ -207,7 +207,7 @@ def staff_type_list():
 EXPIRY_PAGE_SIZE = 100
 
 
-def _expiry_query(mode, days, unbounded, zone, today, on=None):
+def _expiry_query(mode, days, unbounded, zone, today, on=None, from_date=None, to_date=None):
     """The CustomerPlan query behind the expiry board, filtered in SQL.
 
     ``on`` pins the window to ONE date - the dashboard's day chips lead here
@@ -234,6 +234,11 @@ def _expiry_query(mode, days, unbounded, zone, today, on=None):
                              CustomerPlan.last_invoice_date <= today)
         if on:
             query = query.filter(CustomerPlan.last_invoice_date == on)
+        elif from_date or to_date:
+            if from_date:
+                query = query.filter(CustomerPlan.last_invoice_date >= from_date)
+            if to_date:
+                query = query.filter(CustomerPlan.last_invoice_date <= to_date)
         elif not unbounded:
             window_start = today - timedelta(days=max(0, days - 1))
             query = query.filter(CustomerPlan.last_invoice_date >= window_start)
@@ -248,6 +253,12 @@ def _expiry_query(mode, days, unbounded, zone, today, on=None):
     elif days >= 0:
         query = query.filter(CustomerPlan.end_date >= today,
                              CustomerPlan.end_date <= today + timedelta(days=days))
+    elif from_date or to_date:
+        query = query.filter(CustomerPlan.end_date < today)
+        if from_date:
+            query = query.filter(CustomerPlan.end_date >= from_date)
+        if to_date:
+            query = query.filter(CustomerPlan.end_date <= to_date)
     else:
         query = query.filter(CustomerPlan.end_date < today)
     # Oldest lapse first on the expired view - the connection that has been
@@ -264,7 +275,7 @@ def _parse_iso_date(value):
 
 
 def _expiry_args():
-    """(mode, days, unbounded, zone, today, on) from the query string."""
+    """(mode, days, unbounded, zone, today, on, from_date, to_date) from the query string."""
     # `days=all` drops the far edge of the window: every plan still to expire,
     # or - in renewed mode - every renewal on record. The dashboard's "View
     # all" buttons use it, because the seven-day chips beside them are a view
@@ -280,7 +291,9 @@ def _expiry_args():
     if mode != 'renewed':
         mode = 'expiry'
     return (mode, days, unbounded, (request.args.get('zone') or '').strip(),
-            today_local(), _parse_iso_date(request.args.get('on')))
+            today_local(), _parse_iso_date(request.args.get('on')),
+            _parse_iso_date(request.args.get('from_date')),
+            _parse_iso_date(request.args.get('to_date')))
 
 
 @bp.get('/reports/plan-expiry')
@@ -300,8 +313,9 @@ def report_plan_expiry():
     """
     from sqlalchemy.orm import selectinload
 
-    mode, days, unbounded, zone, today, on = _expiry_args()
-    query = _expiry_query(mode, days, unbounded, zone, today, on)
+    mode, days, unbounded, zone, today, on, from_date, to_date = _expiry_args()
+    query = _expiry_query(mode, days, unbounded, zone, today, on,
+                          from_date=from_date, to_date=to_date)
 
     # The plan and the customer, and nothing else.
     #
