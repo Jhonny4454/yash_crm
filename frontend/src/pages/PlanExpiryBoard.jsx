@@ -179,6 +179,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
     d.setDate(d.getDate() - 7);
     return d.toISOString().slice(0, 10);
   });
+  const [toDate, setToDate] = useState(today);
   const [job, setJob] = useState(null);
   const jobId = useRef(null);
 
@@ -192,7 +193,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
 
     get("/reports/plan-expiry", {
       days, mode, zone: zone || undefined, on: on || undefined, page, per_page: PER_PAGE,
-      ...((view === "expired" || view === "renewed") ? { from_date: fromDate, to_date: today() } : {}),
+      ...((view === "expired" || view === "renewed") ? { from_date: fromDate, to_date: toDate } : {}),
     })
       .then((payload) => {
         if (cancelled) return;
@@ -204,7 +205,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
       .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
-  }, [days, mode, zone, on, page, reloadKey, fromDate, view]);
+  }, [days, mode, zone, on, page, reloadKey, fromDate, toDate, view]);
 
   // A change of filter is a change of list, so the selection cannot survive it.
   // Paging deliberately does NOT clear it - ticking rows on page 1, going to
@@ -513,8 +514,8 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
                 <input id="from-date" type="date" className="input" value={fromDate}
                        max={today()} onChange={(e) => setFromDate(e.target.value)} />
                 <label htmlFor="to-date">To</label>
-                <input id="to-date" type="date" className="input" value={today()}
-                       readOnly />
+                <input id="to-date" type="date" className="input" value={toDate}
+                       max={today()} onChange={(e) => setToDate(e.target.value)} />
               </div>
             )}
 
@@ -536,7 +537,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
             {canMessage && (
               <button type="button" className="btn sm"
                       disabled={sending} onClick={sendExpiryNotice}>
-                {sending ? "Sending…" : "Send reminder on WhatsApp"}
+                {sending ? "Sending…" : "Send reminder"}
               </button>
             )}
           </div>

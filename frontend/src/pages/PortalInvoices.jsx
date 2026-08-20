@@ -88,6 +88,7 @@ const canPay = (gateway) => (invoice) =>
  * it was taking the most horizontal space.
  */
 function BillRow({ invoice, gateway, onPaid, ask }) {
+  const t = useT();
   const balance = Number(invoice.balance || 0);
   const unpaid = balance > 0;
   // Overdue earns its own colour. "You owe this" and "you owed this three
@@ -107,13 +108,13 @@ function BillRow({ invoice, gateway, onPaid, ask }) {
         <strong className="bill-row-no">{invoice.invoice_no || `Bill #${invoice.id}`}</strong>
         <span className="bill-row-dates">
           {fmtDate(invoice.issue_date)}
-          {invoice.due_date ? ` · due ${fmtDate(invoice.due_date)}` : ""}
+          {invoice.due_date ? ` · ${t("bills.due")} ${fmtDate(invoice.due_date)}` : ""}
         </span>
       </div>
 
       <div className="bill-row-money">
         <strong>{invoice.status === 'cancelled' ? '\u20b90' : inr(unpaid ? balance : invoice.total_amount)}</strong>
-        <span>{invoice.status === 'cancelled' ? 'voided' : !unpaid ? "paid" : overdue ? "overdue" : "to pay"}</span>
+        <span>{invoice.status === 'cancelled' ? t("bills.voided") : !unpaid ? t("bills.paid") : overdue ? t("bills.overdue") : t("bills.to_pay")}</span>
       </div>
 
       {canPay(gateway)(invoice) && (

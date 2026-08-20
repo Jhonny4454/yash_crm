@@ -437,16 +437,17 @@ def report_plan_expiry_renew():
         Generate Invoice for that.
     """
     data = body()
-    mode, days, unbounded, zone, today, on = _expiry_args()
+    mode, days, unbounded, zone, today, on, from_date, to_date = _expiry_args()
 
     end_date = data.get('end_date') or data.get('date')
     try:
         new_end = datetime.strptime(str(end_date)[:10], '%Y-%m-%d').date()
     except (TypeError, ValueError):
         return fail('invalid_end_date', 400,
-                    detail='Pick the date the plans should run to.')
+                     detail='Pick the date the plans should run to.')
 
-    query = _expiry_query(mode, days, unbounded, zone, today, on)
+    query = _expiry_query(mode, days, unbounded, zone, today, on,
+                          from_date=from_date, to_date=to_date)
     query, err = _selected_plans(query, data)
     if err:
         return err
@@ -507,12 +508,13 @@ def report_plan_expiry_notify():
         return fail('messaging_unavailable', 503)
 
     data = body()
-    mode, days, unbounded, zone, today, on = _expiry_args()
+    mode, days, unbounded, zone, today, on, from_date, to_date = _expiry_args()
     if mode == 'renewed':
         return fail('not_for_this_view', 400,
-                    detail='Expiry notices cannot be sent from the renewed list.')
+                     detail='Expiry notices cannot be sent from the renewed list.')
 
-    query = _expiry_query(mode, days, unbounded, zone, today, on)
+    query = _expiry_query(mode, days, unbounded, zone, today, on,
+                          from_date=from_date, to_date=to_date)
     query, err = _selected_plans(query, data)
     if err:
         return err

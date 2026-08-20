@@ -4651,6 +4651,7 @@ def customer_login():
                 flash('Your connection is currently disabled. Please contact support.',
                       'warning')
                 return render_template('customer/login.html', form=form)
+            session.clear()
             session['customer_id'] = customer.id
             session.permanent = True
             log_audit('Customer Login', f"Customer {customer.full_name} logged in")

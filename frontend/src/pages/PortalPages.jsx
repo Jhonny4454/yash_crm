@@ -268,7 +268,7 @@ export function PortalPlans() {
   // they fall into "Other plans" rather than being silently dropped.
   const families = Object.entries(plans.reduce((groups, plan) => {
     const family = (plan.plan_type || "").trim();
-    const label = family ? family.toUpperCase() : "Other plans";
+    const label = family ? family.toUpperCase() : t("plans.other");
     (groups[label] ||= []).push(plan);
     return groups;
   }, {}));
@@ -580,10 +580,10 @@ export function PortalProfile() {
   ].filter(([, value]) => value !== null && value !== undefined && value !== "");
 
   const errors = {};
-  if (!form.old_password) errors.old_password = "Enter your current password.";
-  if (form.new_password.length < 6) errors.new_password = "Use at least 6 characters.";
-  else if (form.new_password === form.old_password) errors.new_password = "Choose a different password.";
-  if (form.confirm_password !== form.new_password) errors.confirm_password = "The two passwords do not match.";
+  if (!form.old_password) errors.old_password = t("profile.validate.old_password");
+  if (form.new_password.length < 6) errors.new_password = t("profile.validate.new_password_short");
+  else if (form.new_password === form.old_password) errors.new_password = t("profile.validate.new_password_same");
+  if (form.confirm_password !== form.new_password) errors.confirm_password = t("profile.validate.confirm_mismatch");
   const isValid = Object.keys(errors).length === 0;
 
   const set = (key) => (event) => {
@@ -609,7 +609,7 @@ export function PortalProfile() {
       setForm({ old_password: "", new_password: "", confirm_password: "" });
       setTouched({});
       await refreshProfile();
-      setMessage("Your password has been updated.");
+      setMessage(t("profile.password_updated"));
     } catch (err) {
       setError(err);
     } finally {
