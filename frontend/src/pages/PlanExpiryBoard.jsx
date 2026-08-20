@@ -193,7 +193,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
 
     get("/reports/plan-expiry", {
       days, mode, zone: zone || undefined, on: on || undefined, page, per_page: PER_PAGE,
-      ...((view === "expired" || view === "renewed" || view === "expiring") ? { from_date: fromDate, to_date: toDate } : {}),
+      ...((view === "expired" || view === "renewed") ? { from_date: fromDate, to_date: toDate } : {}),
     })
       .then((payload) => {
         if (cancelled) return;
@@ -492,7 +492,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
 
       {job && <JobProgress job={job} />}
 
-      {(view === "expired" || view === "renewed" || view === "expiring") && (
+      {(view === "expired" || view === "renewed") && (
         <div className="bulk-bar" style={{ marginBottom: 0 }}>
           <div className="quick-renew">
             <label htmlFor="from-date">From</label>
@@ -524,7 +524,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
             {/* Hidden, not disabled, for a user whose permissions do not cover
                 them. A greyed-out button that never becomes usable is an
                 invitation to ask why, every day, forever. */}
-            {canRenew && view === "renewed" && (
+            {canRenew && view !== "expired" && (
               <div className="quick-renew">
                 <label htmlFor="renew-to">Renew to</label>
                 <input id="renew-to" type="date" className="input" value={renewTo}
