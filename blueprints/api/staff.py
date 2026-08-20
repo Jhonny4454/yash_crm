@@ -62,7 +62,7 @@ def staff_capabilities():
 @bp.get('/staff')
 @staff_required
 def staff_list():
-    query = User.query
+    query = User.query.filter(User.is_active.is_(True))
     q = (request.args.get('q') or '').strip()
     if q:
         from .utils import escape_like
@@ -180,14 +180,14 @@ def staff_delete(uid):
 
     if user.role == 'admin':
         remaining = User.query.filter(User.role == 'admin',
-                                      User.is_active.is_(True),
-                                      User.id != uid).count()
+                                       User.is_active.is_(True),
+                                       User.id != uid).count()
         if remaining == 0:
             return fail('cannot_remove_last_admin', 400)
 
-    user.is_active = False
+    db.session.delete(user)
     db.session.commit()
-    return ok({'status': 'deactivated'})
+    return ok({'status': 'deleted'})
 
 
 @bp.get('/staff-types')

@@ -1420,14 +1420,23 @@ DEFAULT_TEMPLATES = [
         template_type='renewal',
         description='Sent when a plan is renewed and the invoice is raised.',
         body=(
-            "Dear {{customer_name}}\n\n"
+            "Plan Renewed\n"
+            "\n"
+            "Dear {{first_name}},\n"
+            "\n"
             "Your broadband connection has been renewed and the invoice has "
-            "been generated.\n\n"
-            "Amount Due: Rs. {{due_amount}}\n\n"
-            "Please make the payment to avoid service interruption.\n\n"
-            "\u260e\ufe0f {{company_phone}}\n"
+            "been generated.\n"
+            "\n"
+            "Amount Due: Rs. {{due_amount}}\n"
+            "\n"
+            "Please make the payment to avoid service interruption.\n"
+            "\n"
+            "Support No: {{company_phone}}\n"
             "{{company_name}}\n"
-            "Thank You"
+            "Thank You\n"
+            "\n"
+            "Visit Account\n"
+            "{{app_link}}"
         ),
     ),
     dict(
@@ -1435,12 +1444,20 @@ DEFAULT_TEMPLATES = [
         template_type='expiry_3d',
         description='Three days before the plan ends.',
         body=(
-            "Dear {{customer_name}},\n\n"
-            "Your Internet Plan will expire {{expiry_date}}.\n\n"
-            "Please renew your plan to avoid any interruption\n\n"
+            "Internet Plan Expiring\n"
+            "\n"
+            "Dear {{first_name}},\n"
+            "\n"
+            "Your Internet Plan will expire {{expiry_date}}.\n"
+            "\n"
+            "Please renew your plan to avoid any interruption.\n"
+            "\n"
             "Support No: {{company_phone}}\n"
             "{{company_name}}\n"
-            "Thank You"
+            "Thank You\n"
+            "\n"
+            "Visit Account\n"
+            "{{app_link}}"
         ),
     ),
     dict(
@@ -1448,12 +1465,20 @@ DEFAULT_TEMPLATES = [
         template_type='expiry_2d',
         description='Two days before the plan ends.',
         body=(
-            "Dear {{customer_name}},\n\n"
-            "Your Internet Plan will expire {{expiry_date}}.\n\n"
-            "Please renew your plan to avoid any interruption\n\n"
+            "Internet Plan Expiring\n"
+            "\n"
+            "Dear {{first_name}},\n"
+            "\n"
+            "Your Internet Plan will expire {{expiry_date}}.\n"
+            "\n"
+            "Please renew your plan to avoid any interruption.\n"
+            "\n"
             "Support No: {{company_phone}}\n"
             "{{company_name}}\n"
-            "Thank You"
+            "Thank You\n"
+            "\n"
+            "Visit Account\n"
+            "{{app_link}}"
         ),
     ),
     dict(
@@ -1461,12 +1486,20 @@ DEFAULT_TEMPLATES = [
         template_type='expiry_1d',
         description='One day before the plan ends.',
         body=(
-            "Dear {{customer_name}},\n\n"
-            "Your Internet Plan will expire TOMORROW ({{expiry_date}}).\n\n"
-            "Please renew your plan immediately to avoid any interruption.\n\n"
+            "Internet Plan Expiring\n"
+            "\n"
+            "Dear {{first_name}},\n"
+            "\n"
+            "Your Internet Plan will expire TOMORROW ({{expiry_date}}).\n"
+            "\n"
+            "Please renew your plan to avoid any interruption.\n"
+            "\n"
             "Support No: {{company_phone}}\n"
             "{{company_name}}\n"
-            "Thank You"
+            "Thank You\n"
+            "\n"
+            "Visit Account\n"
+            "{{app_link}}"
         ),
     ),
     dict(
@@ -1476,13 +1509,13 @@ DEFAULT_TEMPLATES = [
         body=(
             "Plan Expired\n"
             "\n"
-            "Dear {{customer_name}}\n"
+            "Dear {{first_name}},\n"
             "\n"
-            "Your Internet Connection Has Been Expired.\n"
-            "Kindly renew it now from Our Customer App.\n"
+            "Your Internet Plan has expired.\n"
+            "Please renew it now from our Customer App.\n"
             "\n"
             "{{company_name}}\n"
-            "Thank you for choosing us\n"
+            "Thank You\n"
             "\n"
             "Visit Account\n"
             "{{app_link}}"
@@ -1493,10 +1526,14 @@ DEFAULT_TEMPLATES = [
         template_type='payment_received',
         description='Confirmation the money arrived.',
         body=(
-            "Dear {{customer_name}},\n\n"
+            "Payment Received\n"
+            "\n"
+            "Dear {{first_name}},\n"
+            "\n"
             "Your payment of Rs.{{paid_amount}} has been received.\n"
-            "Your outstanding balance is Rs.{{balance}}\n\n"
-            "Support {{company_phone}}\n"
+            "Your outstanding balance is Rs.{{balance}}\n"
+            "\n"
+            "Support No: {{company_phone}}\n"
             "{{company_name}}\n"
             "Thank You"
         ),
@@ -1506,11 +1543,15 @@ DEFAULT_TEMPLATES = [
         template_type='due_reminder',
         description='Chases what the account owes.',
         body=(
-            "Dear {{customer_name}},\n\n"
+            "Payment Due Reminder\n"
+            "\n"
+            "Dear {{first_name}},\n"
+            "\n"
             "Your payment of \u20b9{{due_amount}} is due.\n"
-            "Please make the payment immediately to avoid disconnection of "
-            "your internet services.\n\n"
-            "\u260e\ufe0f {{company_phone}}\n"
+            "Please make the payment to avoid disconnection of "
+            "your internet services.\n"
+            "\n"
+            "Support No: {{company_phone}}\n"
             "{{company_name}}\n"
             "Thank You"
         ),
@@ -1562,7 +1603,7 @@ DEFAULT_TEMPLATES = [
         body=(
             "Welcome\n"
             "\n"
-            "Dear {{customer_name}},\n"
+            "Dear {{first_name}},\n"
             "\n"
             "Your username: {{username}}\n"
             "Amount payable: Rs.{{amount}}\n"
@@ -1570,7 +1611,7 @@ DEFAULT_TEMPLATES = [
             "For support: \u260e\ufe0f {{company_phone}}\n"
             "\n"
             "{{company_name}}\n"
-            "Thank You For choosing us\n"
+            "Thank You\n"
             "\n"
             "Visit Account\n"
             "{{app_link}}"
@@ -1609,13 +1650,15 @@ DEFAULT_TEMPLATES = [
         template_type='internet_down',
         description='Area outage notification to customer.',
         body=(
-            "Dear Customer\n"
+            "Internet Service Down\n"
+            "\n"
+            "Dear {{first_name}},\n"
             "\n"
             "Our internet service is currently down in your area due to a "
             "technical issue. The service is expected to be restored within "
             "{{hours}} hours.\n"
             "\n"
-            "Support No : {{company_phone}}\n"
+            "Support No: {{company_phone}}\n"
             "\n"
             "{{company_name}}\n"
             "Thank you for your patience and cooperation."
@@ -1626,11 +1669,13 @@ DEFAULT_TEMPLATES = [
         template_type='internet_restored',
         description='Area restored notification to customer.',
         body=(
-            "Dear Customer\n"
+            "Internet Service Restored\n"
+            "\n"
+            "Dear {{first_name}},\n"
             "\n"
             "The internet service in your area has now been restored.\n"
             "\n"
-            "Support No :{{company_phone}}\n"
+            "Support No: {{company_phone}}\n"
             "\n"
             "{{company_name}}\n"
             "Thank you for your patience and continued support."
@@ -1641,16 +1686,17 @@ DEFAULT_TEMPLATES = [
         template_type='complaint_registered',
         description='Customer complaint confirmation.',
         body=(
-            "Hello {{customer_name}},\n"
+            "Complaint Registered\n"
+            "\n"
+            "Dear {{first_name}},\n"
             "\n"
             "Your complaint has been registered.\n"
             "\n"
             "Ticket No: {{ticket_no}}\n"
-            "We appreciate your patience.\n"
             "\n"
-            "\ud83c\udd94 User id: {{username}}\n"
+            "User id: {{username}}\n"
             "\n"
-            "\u260e\ufe0f {{company_phone}}\n"
+            "Support No: {{company_phone}}\n"
             "{{company_name}}\n"
             "Thank you"
         ),
@@ -1660,14 +1706,16 @@ DEFAULT_TEMPLATES = [
         template_type='issue_resolved',
         description='Complaint resolved notification to customer.',
         body=(
-            "Hello {{customer_name}},\n"
+            "Issue Resolved\n"
+            "\n"
+            "Dear {{first_name}},\n"
             "\n"
             "Your complaint has been successfully resolved.\n"
             "\n"
             "Ticket no: {{ticket_no}}\n"
-            "\ud83c\udd94 User id: {{username}}\n"
+            "User id: {{username}}\n"
             "\n"
-            "\u260e\ufe0f {{company_phone}}\n"
+            "Support No: {{company_phone}}\n"
             "{{company_name}}\n"
             "Thank you"
         ),
@@ -1677,6 +1725,8 @@ DEFAULT_TEMPLATES = [
         template_type='new_complaint',
         description='Admin notification of new complaint.',
         body=(
+            "New Complaint Registered\n"
+            "\n"
             "A new complaint has been registered with the following details:\n"
             "\n"
             "Complaint: {{complaint_type}}\n"
@@ -1685,8 +1735,7 @@ DEFAULT_TEMPLATES = [
             "Ticket No: {{ticket_no}}\n"
             "Address: {{address}}\n"
             "\n"
-            "{{company_name}}\n"
-            "Thank you"
+            "{{company_name}}"
         ),
     ),
 
@@ -1705,9 +1754,13 @@ DEFAULT_TEMPLATES = [
         template_type='payment_submitted',
         description='The customer submitted a payment from the portal.',
         body=(
-            "Dear {{customer_name}},\n\n"
+            "Payment Submitted\n"
+            "\n"
+            "Dear {{first_name}},\n"
+            "\n"
             "We have received your payment request of Rs.{{paid_amount}}.\n"
-            "It will be confirmed once verified.\n\n"
+            "It will be confirmed once verified.\n"
+            "\n"
             "{{company_name}}"
         ),
     ),
@@ -1716,9 +1769,13 @@ DEFAULT_TEMPLATES = [
         template_type='payment_rejected',
         description='A submitted payment could not be verified.',
         body=(
-            "Dear {{customer_name}},\n\n"
+            "Payment Rejected\n"
+            "\n"
+            "Dear {{first_name}},\n"
+            "\n"
             "We could not verify your payment of Rs.{{paid_amount}}.\n"
-            "Please contact us on {{company_phone}}.\n\n"
+            "Please contact us on {{company_phone}}.\n"
+            "\n"
             "{{company_name}}"
         ),
     ),
@@ -1727,9 +1784,13 @@ DEFAULT_TEMPLATES = [
         template_type='renewal_approved',
         description='A portal renewal request was approved.',
         body=(
-            "Dear {{customer_name}},\n\n"
+            "Renewal Approved\n"
+            "\n"
+            "Dear {{first_name}},\n"
+            "\n"
             "Your renewal has been approved. Your plan now runs to "
-            "{{expiry_date}}.\n\n"
+            "{{expiry_date}}.\n"
+            "\n"
             "{{company_name}}"
         ),
     ),

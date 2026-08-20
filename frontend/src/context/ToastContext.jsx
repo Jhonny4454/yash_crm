@@ -170,7 +170,7 @@ function ConfirmDialog({ title, message, confirmLabel, cancelLabel, tone, onReso
   }, [onResolve]);
 
   return (
-    <div className="confirm-scrim" onClick={() => onResolve(false)}>
+    <div className="confirm-scrim">
       <div
         className="confirm-card"
         role="alertdialog"

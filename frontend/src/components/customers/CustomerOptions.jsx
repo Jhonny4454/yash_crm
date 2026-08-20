@@ -195,7 +195,7 @@ export function Modal({ title, onClose, children, width }) {
   }, [onClose]);
 
   return (
-    <div className="modal-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-scrim">
       <div className="modal-card" ref={card} role="dialog" aria-modal="true"
            aria-label={title} style={width ? { maxWidth: width } : undefined}>
         <header className="modal-head">

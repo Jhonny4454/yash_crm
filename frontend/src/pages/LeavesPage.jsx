@@ -253,9 +253,9 @@ function LeaveDialog({ value, onClose, onSaved }) {
   }
 
   return (
-    <div className="modal-scrim" onClick={onClose}>
+    <div className="modal-scrim">
       <form className="card modal-card" style={{ maxWidth: 520 }}
-            onClick={(e) => e.stopPropagation()} onSubmit={save} noValidate>
+            onSubmit={save} noValidate>
         <div className="card-head">
           <h2>{isNew ? "Request leave" : "Edit leave request"}</h2>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">✕</button>

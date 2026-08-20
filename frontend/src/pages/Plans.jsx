@@ -227,9 +227,9 @@ function PlanDialog({ value, knownTypes = [], onClose, onSaved }) {
   }
 
   return (
-    <div className="modal-scrim" onClick={onClose}>
+    <div className="modal-scrim">
       <form className="card modal-card" style={{ width: "100%", maxWidth: 540, borderRadius: 16 }}
-            onClick={(e) => e.stopPropagation()} onSubmit={save}>
+            onSubmit={save}>
         <div className="card-head" style={{ padding: "16px 24px", borderBottom: "1px solid #f1f5f9" }}>
           <h2 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700 }}>{isNew ? "Add plan" : `Edit ${form.name}`}</h2>
           <button type="button" className="icon-btn" onClick={onClose}

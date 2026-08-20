@@ -5071,6 +5071,21 @@ def init_database(flask_app=None):
             db.session.commit()
             flask_app.logger.info("Admin account re-enabled.")
 
+        # One-time: remove all staff except the four authorised accounts.
+        try:
+            KEEP_STAFF = {'admin', 'dinesh', 'nitesh', 'ram'}
+            all_active = User.query.filter(User.is_active.is_(True)).all()
+            to_remove = [u for u in all_active if u.username.lower() not in KEEP_STAFF]
+            if to_remove:
+                for u in to_remove:
+                    db.session.delete(u)
+                db.session.commit()
+                flask_app.logger.info(
+                    "Removed %d non-authorised staff accounts.", len(to_remove))
+        except Exception as exc:                            # noqa: BLE001
+            db.session.rollback()
+            flask_app.logger.warning('Could not clean staff: %s', exc)
+
 
 # --------------------------------------------------------------------------- #
 #  Schema check on import

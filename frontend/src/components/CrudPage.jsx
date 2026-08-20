@@ -462,11 +462,10 @@ function CrudDialog({ endpoint, singular, columns, value, onClose, onSaved }) {
   const wide = columns.length > 5;
 
   return (
-    <div className="modal-scrim" onClick={onClose}>
+    <div className="modal-scrim">
       <form
         className="card modal-card"
         style={{ maxWidth: wide ? 660 : 480, borderRadius: 16 }}
-        onClick={(e) => e.stopPropagation()}
         onSubmit={save}
         noValidate
       >

@@ -723,8 +723,8 @@ function EditInvoiceDialog({ invoice, onClose, onDone }) {
   }
 
   return (
-    <div className="modal-scrim" onClick={onClose}>
-      <div className="modal-card edit-invoice" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-scrim">
+      <div className="modal-card edit-invoice">
         <div className="panel-head">Edit {invoice.invoice_no}</div>
         <form onSubmit={submit}>
           {error && <p className="renew-warn">{error}</p>}
