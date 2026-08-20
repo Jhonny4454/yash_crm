@@ -500,7 +500,10 @@ def render_template_type(template_type: str, context: dict) -> str | None:
     tpl = active_template(template_type)
     if not tpl:
         return None
-    return render(tpl.body, context)
+    result = render(tpl.body, context)
+    if result:
+        result = result.encode('utf-8', 'surrogateescape').decode('utf-8', 'ignore')
+    return result
 
 
 # --------------------------------------------------------------------------- #
@@ -1627,24 +1630,24 @@ DEFAULT_TEMPLATES = [
         template_type='daily_report',
         description='Daily summary sent to admin.',
         body=(
-            "\ud83d\udd30 Daily Report - {{today}}\n"
+            "Daily Report - {{today}}\n"
             "\n"
-            "\ud83d\udcdd Complaint Report\n"
-            "\ud83d\udcdd New Complaint: {{new_complaints}}\n"
-            "\u26a0\ufe0f Open Complaint: {{open_complaints}}\n"
-            "\ud83e\udeab Old Complaint: {{old_complaints}}\n"
-            "\u2705 Closed Complaint: {{closed_complaints}}\n"
+            "Complaint Report\n"
+            "New Complaint: {{new_complaints}}\n"
+            "Open Complaint: {{open_complaints}}\n"
+            "Old Complaint: {{old_complaints}}\n"
+            "Closed Complaint: {{closed_complaints}}\n"
             "\n"
-            "\ud83d\udca5 Collection Report\n"
-            "\u2728 New Leads: {{new_leads}}\n"
-            "\ud83c\udfaf New Connection: {{new_connections}}\n"
-            "\u2b07\ufe0f Plan Expiring: {{expiring_count}}\n"
-            "\u274c Plan Expired: {{expired_count}}\n"
-            "\u2705 Plan Renewed: {{renewed_count}}\n"
-            "\u26a0\ufe0f Today's Outstanding: \u20b9{{today_outstanding}}\n"
-            "\ud83d\udcc9 Total Outstanding: \u20b9{{total_outstanding}}\n"
+            "Collection Report\n"
+            "New Leads: {{new_leads}}\n"
+            "New Connection: {{new_connections}}\n"
+            "Plan Expiring: {{expiring_count}}\n"
+            "Plan Expired: {{expired_count}}\n"
+            "Plan Renewed: {{renewed_count}}\n"
+            "Today's Outstanding: \u20b9{{today_outstanding}}\n"
+            "Total Outstanding: \u20b9{{total_outstanding}}\n"
             "\n"
-            "\ud83d\udcb5 Collection Details\n"
+            "Collection Details\n"
             "{{collection_details}}\n"
             "Total Collected Amount: \u20b9{{total_collected}}\n"
             "Thank You"
