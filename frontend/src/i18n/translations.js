@@ -174,6 +174,7 @@
     "plans.move_different": "\u0926\u0947\u0928\u0947\u0935\u0947\u0928 \u0928\u0940\u091f\u0935\u0930\u0940 \u091c\u093e",
     "plans.select_plan": "\u0907\u0902\u091f\u0930\u0928\u0947\u091f \u0928\u0940\u091f \u0928\u0935\u093e",
     "plans.choose_plan_label": "\u0928\u0940\u091f \u0928\u0935\u093e\u2026",
+    "plans.other": "\u0907\u0924\u0930 \u0928\u0940\u091f",
     "plans.plan": "\u0928\u0940\u091f",
     "plans.speed": "\u0935\u0947\u0917",
     "plans.validity": "\u092e\u094d\u092f\u093e\u0926 \u0915\u093e\u0932\u093e",
