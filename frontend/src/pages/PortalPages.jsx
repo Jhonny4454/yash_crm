@@ -86,16 +86,15 @@ function PortalList({ endpoint, title, columns, t }) {
     <div className="page-heading">
       <div>
         <h1>{title}</h1>
-        <p>Your account history is always available here. Tap a row to print
-           or save its receipt.</p>
+        <p>{t?.("payments.subtitle") || "Your account history is always available here. Tap a row to print or save its receipt."}</p>
       </div>
     </div>
 
     <ErrorNote error={error} onRetry={refetch} />
 
     <section className="panel table-wrap">
-      {loading ? <Loading label={`Loading ${title.toLowerCase()}`} />
-        : !data?.length ? <Empty title={`No ${title.toLowerCase()} yet`} />
+      {loading ? <Loading label={t?.("common.loading") || "Loading\u2026"} />
+        : !data?.length ? <Empty title={t?.("common.nothing_to_show") || "Nothing to show"} />
           : (
             // cards-sm: one labelled card per row below 720px.
             <table className="data cards-sm">
@@ -307,7 +306,7 @@ export function PortalPlans() {
 
         <PlanCountdown plan={current} t={t} />
 
-        {!renewalOff && <PriceLines quote={quote} fallback={current.price} />}
+        {!renewalOff && <PriceLines quote={quote} fallback={current.price} t={t} />}
 
         {renewalOff && (
           <p className="renew-card-off" role="status">{renewalOff}</p>
@@ -369,9 +368,9 @@ export function PortalPlans() {
                       {items.map((plan) => (
                         <option key={plan.id} value={plan.id}>
                           {plan.name} — {inr(plan.total ?? plan.price_monthly)}
-                          {" / "}{plan.validity_days} days
+                          {" / "}{plan.validity_days} {t("common.days")}
                           {plan.speed_mbps ? ` · ${plan.speed_mbps} Mbps` : ""}
-                          {current && plan.id === current.plan_id ? "  (your current plan)" : ""}
+                          {current && plan.id === current.plan_id ? `  ${t("common.current_plan")}` : ""}
                         </option>
                       ))}
                     </optgroup>
@@ -384,13 +383,13 @@ export function PortalPlans() {
                   <dl>
                     <div><dt>{t("plans.plan")}</dt><dd>{selected.name}</dd></div>
                     <div><dt>{t("plans.speed")}</dt><dd>{selected.speed_mbps ? `${selected.speed_mbps} Mbps` : "\u2014"}</dd></div>
-                    <div><dt>{t("plans.validity")}</dt><dd>{selected.validity_days} days</dd></div>
+                    <div><dt>{t("plans.validity")}</dt><dd>{selected.validity_days} {t("common.days")}</dd></div>
                     <div><dt>{t("plans.plan_price")}</dt><dd>{inr(selected.price ?? selected.price_monthly)}</dd></div>
                     {Number(selected.tax_amount) > 0 && (
                       <div>
-                        <dt>GST {selected.tax_percent}%</dt>
+                        <dt>{t("common.gst")} {selected.tax_percent}%</dt>
                         <dd>{selected.tax_mode === "include"
-                          ? `${inr(selected.tax_amount)} (included)`
+                          ? `${inr(selected.tax_amount)} ${t("common.included")}`
                           : `+ ${inr(selected.tax_amount)}`}</dd>
                       </div>
                     )}
@@ -524,21 +523,21 @@ export function PlanCountdown({ plan, t: _t }) {
 }
 
 /** Plan price, GST and total — or just the price when no tax applies. */
-function PriceLines({ quote, fallback }) {
+function PriceLines({ quote, fallback, t }) {
   const total = quote?.total ?? fallback;
   const tax = Number(quote?.tax_amount || 0);
   const included = quote?.tax_mode === "include";
 
   return (
     <dl className="renew-price">
-      <div><dt>Plan price</dt><dd>{inr(quote?.price ?? fallback)}</dd></div>
+      <div><dt>{t?.("common.plan_price") || "Plan price"}</dt><dd>{inr(quote?.price ?? fallback)}</dd></div>
       {tax > 0 && (
         <div>
-          <dt>GST {quote.tax_percent}%</dt>
-          <dd>{included ? `${inr(tax)} (included)` : `+ ${inr(tax)}`}</dd>
+          <dt>{t?.("common.gst") || "GST"} {quote.tax_percent}%</dt>
+          <dd>{included ? `${inr(tax)} ${t?.("common.included") || "(included)"}` : `+ ${inr(tax)}`}</dd>
         </div>
       )}
-      <div className="is-total"><dt>You pay</dt><dd>{inr(total)}</dd></div>
+      <div className="is-total"><dt>{t?.("common.you_pay") || "You pay"}</dt><dd>{inr(total)}</dd></div>
     </dl>
   );
 }
@@ -699,7 +698,7 @@ function Rows({ title, rows, empty, limit, hint, t: _t }) {
         <h2>{title}</h2>
         {hint && <span className="rows-hint">{hint}</span>}
       </div>
-      {!shown?.length ? <Empty title="Nothing to show" hint={empty} /> : (
+      {!shown?.length ? <Empty title={tFn("common.nothing_to_show")} hint={empty} /> : (
         <div className="list-cards">
           {shown.map((row) => {
             const isBill = !row.payment_date;
@@ -711,7 +710,7 @@ function Rows({ title, rows, empty, limit, hint, t: _t }) {
                   <strong>
                     {isBill
                       ? row.invoice_no
-                      : row.receipt_no || row.payment_mode || "Payment"}
+                      : row.receipt_no || row.payment_mode || tFn("common.payment")}
                   </strong>
                   <p>{fmtDate(row.issue_date || row.payment_date)}</p>
                 </div>

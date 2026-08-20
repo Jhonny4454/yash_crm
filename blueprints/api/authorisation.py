@@ -221,9 +221,9 @@ def authorize_bulk():
 
     if len(ids) > 500:
         return fail('too_many', 400,
-                    detail='Authorise at most 500 payments at a time.')
+                     detail='Authorise at most 500 payments at a time.')
 
-    found = {p.id: p for p in Payment.query.filter(Payment.id.in_(ids)).all()}
+    found = {p.id: p for p in Payment.query.filter(Payment.id.in_(ids)).with_for_update().all()}
 
     authorised, skipped = [], []
     now = datetime.utcnow()
@@ -291,7 +291,7 @@ def reject_bulk():
     except (TypeError, ValueError):
         return fail('invalid_ids', 400)
 
-    found = {p.id: p for p in Payment.query.filter(Payment.id.in_(ids)).all()}
+    found = {p.id: p for p in Payment.query.filter(Payment.id.in_(ids)).with_for_update().all()}
     rejected, skipped = [], []
     now = datetime.utcnow()
     staff_id = current_staff_id()

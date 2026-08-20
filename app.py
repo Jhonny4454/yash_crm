@@ -297,11 +297,36 @@ def send_template_message(customer, template_type, context=None, *,
         )
         body = messaging.render_template_type(template_type, ctx) or ''
         if body.strip():
-            subject = template_type.replace('_', ' ').replace(
-                'expiry', 'Plan Expiry Reminder'
-            ).replace('expired', 'Plan Expired'
-            ).replace('due_reminder', 'Payment Reminder'
-            ).replace('daily_report', 'Daily Report').title()
+            _EMAIL_SUBJECTS = {
+                'expiry_3d': 'Plan Expiry Reminder - 3 Days',
+                'expiry_2d': 'Plan Expiry Reminder - 2 Days',
+                'expiry_1d': 'Plan Expiry Reminder - 1 Day',
+                'expired': 'Plan Expired',
+                'renewal': 'Plan Renewed',
+                'payment_received': 'Payment Received',
+                'due_reminder': 'Payment Due Reminder',
+                'daily_report': 'Daily Report',
+                'welcome': 'Welcome to {{company_name}}',
+                'bill': 'Invoice',
+                'summary_bill': 'Invoice',
+                'detailed_bill': 'Invoice',
+                'payment_approved': 'Payment Receipt',
+                'internet_down': 'Internet Service Down',
+                'internet_restored': 'Internet Service Restored',
+                'complaint_registered': 'Complaint Registered',
+                'issue_resolved': 'Issue Resolved',
+                'new_complaint': 'New Complaint',
+                'payment_submitted': 'Payment Submitted',
+                'payment_rejected': 'Payment Rejected',
+                'renewal_approved': 'Renewal Approved',
+            }
+            subject = _EMAIL_SUBJECTS.get(
+                template_type,
+                template_type.replace('_', ' ').title()
+            )
+            if '{{company_name}}' in subject:
+                subject = subject.replace('{{company_name}}',
+                                          ctx.get('company_name', 'YASH Internet Services'))
             mailer.send_email(email, subject, body.strip())
 
     return result
@@ -401,12 +426,19 @@ def auto_suspend_overdue():
                 cp.suspension_review_status = 'pending_review'
                 cp.suspended_at = datetime.utcnow()
                 db.session.commit()
-                disable_connection_on_network(customer)
+                try:
+                    disable_connection_on_network(customer)
+                except Exception as exc:
+                    app.logger.warning('ISP disable failed for %s: %s',
+                                       customer.id, exc)
                 log_audit('Auto-Suspend', f"Suspended customer {customer.full_name} due to unpaid invoices. "
                                            f"Moved to Pending Review.")
-                send_sms(customer.mobile, "Your service has been suspended due to non-payment. Please contact support.")
-                send_email(customer.email, "Service Suspended",
-                           "Your service has been suspended due to non-payment. Please contact support.")
+                try:
+                    send_sms(customer.mobile, "Your service has been suspended due to non-payment. Please contact support.")
+                    send_email(customer.email, "Service Suspended",
+                               "Your service has been suspended due to non-payment. Please contact support.")
+                except Exception:
+                    pass
 
 def send_expiry_reminders():
     """Send templates for plans expiring in 3 days, 2 days, 1 day, and expired today."""

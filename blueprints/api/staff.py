@@ -546,6 +546,8 @@ def report_plan_expiry_notify():
 
     def send_one(cp):
         from app import send_template_message
+        if not cp.customer:
+            return False
         template_type = _expiry_template(cp)
         result = send_template_message(cp.customer, template_type, customer_plan=cp)
         return getattr(result, 'ok', False)

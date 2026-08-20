@@ -88,13 +88,18 @@ def _apply_tax(amount, mode):
 
 
 def _next_invoice_no():
+    from sqlalchemy.exc import IntegrityError
     today = date.today().strftime('%Y%m%d')
-    last = db.session.execute(
-        db.select(Invoice.id).order_by(Invoice.id.desc()).limit(1)).scalar() or 0
     for attempt in range(20):
+        last = db.session.execute(
+            db.select(Invoice.id).order_by(Invoice.id.desc()).limit(1)).scalar() or 0
         candidate = f"INV-{today}-{last + 1 + attempt:04d}"
-        if not Invoice.query.filter_by(invoice_no=candidate).first():
-            return candidate
+        try:
+            if not Invoice.query.filter_by(invoice_no=candidate).first():
+                return candidate
+        except IntegrityError:
+            db.session.rollback()
+            continue
     return f"INV-{today}-{secrets.token_hex(4).upper()}"
 
 

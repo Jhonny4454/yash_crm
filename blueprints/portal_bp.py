@@ -77,14 +77,19 @@ def _outstanding(customer_id):
 
 
 def _next_invoice_no():
+    from sqlalchemy.exc import IntegrityError
     from models import Invoice as _I
     today = date.today().strftime('%Y%m%d')
-    last = db.session.execute(
-        db.select(_I.id).order_by(_I.id.desc()).limit(1)).scalar() or 0
     for attempt in range(20):
+        last = db.session.execute(
+            db.select(_I.id).order_by(_I.id.desc()).limit(1)).scalar() or 0
         candidate = f"INV-{today}-{last + 1 + attempt:04d}"
-        if not _I.query.filter_by(invoice_no=candidate).first():
-            return candidate
+        try:
+            if not _I.query.filter_by(invoice_no=candidate).first():
+                return candidate
+        except IntegrityError:
+            db.session.rollback()
+            continue
     return f"INV-{today}-{secrets.token_hex(4).upper()}"
 
 

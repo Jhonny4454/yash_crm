@@ -319,8 +319,10 @@ def customer_create():
         send_template_message(customer, 'welcome',
                               plan=assigned.plan if assigned else None,
                               customer_plan=assigned)
-    except Exception:
-        pass
+    except Exception as exc:
+        from flask import current_app
+        current_app.logger.warning('Welcome message failed for customer %s: %s',
+                                   customer.id, exc)
 
     payload = customer_dict(customer, detail=True)
     payload['assigned_plan'] = customer_plan_dict(assigned) if assigned else None
