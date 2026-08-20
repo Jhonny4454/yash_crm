@@ -531,6 +531,19 @@ if _should_start_scheduler and not scheduler.running:
     scheduler.add_job(send_grace_period_reminders, CronTrigger(hour=10, minute=0), **job_opts)
     scheduler.add_job(send_expiry_reminders, CronTrigger(hour=9, minute=0), **job_opts)
     scheduler.add_job(nightly_backup, CronTrigger(minute=20), **job_opts)
+
+    # Reconcile WhatsApp delivery status. WabAssist has no webhook to
+    # subscribe to - its status lives behind GET /api/v1/messages/status and
+    # only moves because something asks. Without this job a row that lands on
+    # 'queued' stays there forever, even though the customer has the message.
+    from services.wa_reconcile import run as wa_reconcile_run
+    scheduler.add_job(wa_reconcile_run, CronTrigger(minute='*/3'), **job_opts)
+
+    # The admin daily summary. 21:00, after collections close. Check the
+    # arithmetic first with services.daily_report.preview().
+    from services.daily_report import run as daily_report_run
+    scheduler.add_job(daily_report_run, CronTrigger(hour=21, minute=0), **job_opts)
+
     scheduler.start()
 
 # ---------- Error handlers ----------

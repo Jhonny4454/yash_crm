@@ -184,3 +184,66 @@ Worth doing, in order: rotate that password, move the credentials to `.env`
 from history, either purge it with `git filter-repo` or treat the old password
 as permanently compromised. `migrate_csv_import.py`, `migrate_building_locality.py`
 and the other `migrate_*.py` scripts are worth checking for the same pattern.
+
+---
+
+# Part 4 — wiring it into the scheduler
+
+Your app already runs APScheduler inside the Flask process (`app.py:493`), with
+`RUN_SCHEDULER` and a single gunicorn worker keeping it to one instance. Add two
+jobs to the block at `app.py:525`:
+
+```python
+    # Reconcile WhatsApp delivery status. WabAssist has no webhook -- 'queued'
+    # only ever advances because something asks. Every 3 minutes is well inside
+    # the rate limit and keeps the log honest while an operator is watching it.
+    from services.wa_reconcile import run as wa_reconcile_run
+    scheduler.add_job(wa_reconcile_run, CronTrigger(minute='*/3'), **job_opts)
+
+    # The admin daily summary. 21:00 IST, after collections close.
+    from services.daily_report import run as daily_report_run
+    scheduler.add_job(daily_report_run, CronTrigger(hour=21, minute=0), **job_opts)
+```
+
+Both are wrapped in `app.app_context()` internally, so they are safe as
+scheduler jobs.
+
+## Before enabling the daily report
+
+Check the arithmetic first. A nightly summary that is quietly wrong is worse
+than none, because nobody re-checks a number that arrives every day:
+
+```
+python -c "from services.daily_report import preview; preview()"
+```
+
+That prints every figure, the rule used to derive it, and the rendered message —
+and sends nothing. Two things it will show you:
+
+**`new_leads` is always `?`.** There is no lead model in this schema. Nothing
+tracks leads, so the figure cannot be produced. Either add lead capture, or drop
+that line from the `daily_report` template body in `services/messaging.py`.
+
+**Recipients need setting.** It reads `daily_report_recipients` from Settings
+(comma-separated), falling back to `company_phone`. With neither set, it logs a
+warning and sends nothing rather than guessing.
+
+Figures marked `?` mean that one aggregation raised — the rule is in the log.
+Every figure is computed independently, so one wrong column name costs that
+line and not the report.
+
+---
+
+# Part 5 — do not delete `internet_down` / `internet_restored`
+
+Both are seeded `DEFAULT_TEMPLATES` in `services/messaging.py` (~line 1661), and
+`seed_default_templates()` / `restore_default_templates()` recreate them on
+demand. Your CRM expects them to exist.
+
+Deleting them from Meta would break outage notifications, and every attempt
+would fail with `132001` — the code your own `WHATSAPP_ERROR_HINTS` already
+explains. Worse, `restore_default_templates()` would keep putting the CRM-side
+rows back, so the feature would look present and silently fail.
+
+They were the only two templates missing from the screenshots, which is most
+likely why they ended up on the delete list. Recommend keeping both.

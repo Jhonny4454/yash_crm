@@ -338,10 +338,10 @@ class Payment(db.Model):
     #: payment_dict had nothing to read a name from.
     customer = db.relationship('Customer', foreign_keys=[customer_id])
 
-    received_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    received_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'))
     received_by_user = db.relationship('User', foreign_keys=[received_by_user_id])
     authorized_at = db.Column(db.DateTime)
-    authorized_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    authorized_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'))
     authorized_by_user = db.relationship('User', foreign_keys=[authorized_by_user_id])
     discount_amount = db.Column(db.Numeric(10, 2), default=0.00)
 
@@ -355,7 +355,7 @@ class Payment(db.Model):
     #: Why an admin rejected the entry, shown back to the customer.
     rejection_reason = db.Column(db.String(255))
     rejected_at = db.Column(db.DateTime)
-    rejected_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    rejected_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'))
     rejected_by_user = db.relationship('User', foreign_keys=[rejected_by_user_id])
 
     #: Same snapshot-not-FK reasoning as Invoice.discount_reason.
@@ -441,7 +441,7 @@ class Payment(db.Model):
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'))
     action = db.Column(db.String(100))
     details = db.Column(db.Text)
     ip_address = db.Column(db.String(45))
@@ -613,8 +613,8 @@ class Expense(db.Model):
     amount = db.Column(db.Numeric(10, 2))
     expense_date = db.Column(db.Date)
     description = db.Column(db.Text)
-    prepared_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    passed_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    prepared_by_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'))
+    passed_by_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'))
     status = db.Column(db.Enum('draft', 'pending', 'approved', 'rejected'), default='pending')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -629,7 +629,7 @@ class Expense(db.Model):
 class Attendance(db.Model):
     __tablename__ = 'attendance'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'))
     date = db.Column(db.Date)
     # 'leave' and 'holiday' are days the office marks but nobody worked, and
     # the attendance screen has always offered them in its dropdown. The column
@@ -645,7 +645,7 @@ class Attendance(db.Model):
 class Leave(db.Model):
     __tablename__ = 'leaves'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'))
     start_date = db.Column(db.Date)
     end_date = db.Column(db.Date)
     reason = db.Column(db.Text)
@@ -655,7 +655,7 @@ class Leave(db.Model):
 class Payroll(db.Model):
     __tablename__ = 'payroll'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'))
     month_year = db.Column(db.Date)
     salary = db.Column(db.Numeric(10, 2))
     paid = db.Column(db.Boolean, default=False)
@@ -808,7 +808,7 @@ class WalletEntry(db.Model):
     reason = db.Column(db.String(200))
     invoice_id = db.Column(db.Integer, db.ForeignKey('invoices.id'))
     payment_id = db.Column(db.Integer, db.ForeignKey('payments.id'))
-    created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
     customer = db.relationship('Customer', backref=db.backref(
@@ -909,10 +909,23 @@ class MessageLog(db.Model):
     channel = db.Column(db.String(20), default='whatsapp')   # whatsapp | sms
     template_type = db.Column(db.String(50))
     body = db.Column(db.Text)
-    #: sent | failed | skipped | dry-run
+    #: sent | queued | delivered | read | failed | skipped | dry-run
     status = db.Column(db.String(20), default='sent', index=True)
     error = db.Column(db.String(500))
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    #: WabAssist hands these back on a successful send and they are the ONLY
+    #: keys GET /api/v1/messages/status accepts. Without them a row that lands
+    #: on 'queued' can never be looked up again, which is how 'queued' became
+    #: permanent -- see services/wa_reconcile.py.
+    queue_id = db.Column(db.String(64), index=True)
+    request_id = db.Column(db.String(64))
+    meta_message_id = db.Column(db.String(128))
+    delivered_at = db.Column(db.DateTime)
+    read_at = db.Column(db.DateTime)
+    #: How many times reconciliation has asked about this row. Caps the polling
+    #: of a message that is never going to settle.
+    status_checks = db.Column(db.Integer, default=0)
 
     customer = db.relationship('Customer', backref=db.backref('message_logs', lazy='dynamic'))
 

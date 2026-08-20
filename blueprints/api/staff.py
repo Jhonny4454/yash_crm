@@ -185,6 +185,23 @@ def staff_delete(uid):
         if remaining == 0:
             return fail('cannot_remove_last_admin', 400)
 
+    from models import Payment, Expense, AuditLog, Attendance, LeaveRequest, SalaryRecord, CustomerWalletEntry
+    for model, col_name in [
+        (Payment, 'received_by_user_id'),
+        (Payment, 'authorized_by_user_id'),
+        (Payment, 'rejected_by_user_id'),
+        (Expense, 'prepared_by_id'),
+        (Expense, 'passed_by_id'),
+        (AuditLog, 'user_id'),
+        (Attendance, 'user_id'),
+        (LeaveRequest, 'user_id'),
+        (SalaryRecord, 'user_id'),
+        (CustomerWalletEntry, 'created_by_user_id'),
+    ]:
+        col = getattr(model, col_name, None)
+        if col is not None:
+            model.query.filter(col == uid).update({col_name: None}, synchronize_session=False)
+
     db.session.delete(user)
     db.session.commit()
     return ok({'status': 'deleted'})

@@ -510,14 +510,19 @@ def render_template_type(template_type: str, context: dict) -> str | None:
 #  Transport
 # --------------------------------------------------------------------------- #
 class SendResult:
-    __slots__ = ('ok', 'status', 'detail', 'phone', 'body')
+    __slots__ = ('ok', 'status', 'detail', 'phone', 'body',
+                 'queue_id', 'request_id')
 
-    def __init__(self, ok, status, detail='', phone='', body=''):
+    def __init__(self, ok, status, detail='', phone='', body='',
+                 queue_id=None, request_id=None):
         self.ok = ok
-        self.status = status          # sent | failed | skipped | dry-run
+        self.status = status          # sent | queued | failed | skipped | dry-run
         self.detail = (detail or '')[:500]
         self.phone = phone
         self.body = body
+        #: Set only on a real send. The keys reconciliation looks a row up by.
+        self.queue_id = queue_id
+        self.request_id = request_id
 
     def __bool__(self):
         return bool(self.ok)
@@ -548,6 +553,10 @@ def _log(customer_id, phone, body, channel, result, template_type=None):
             body=body or '',
             status=result.status,
             error=('' if result.ok else result.detail)[:500],
+            # getattr, not attribute access: _log promises never to raise, and
+            # a SendResult built elsewhere may predate these slots.
+            queue_id=getattr(result, 'queue_id', None),
+            request_id=getattr(result, 'request_id', None),
         ))
         db.session.commit()
     except Exception:
@@ -599,6 +608,7 @@ def send_whatsapp(phone, message, customer_id=None, template_type=None,
                                                         meta_template)
         resp = requests.request(method, url, timeout=SEND_TIMEOUT, **kwargs)
         ok, status, detail = interpret_response(resp.status_code, resp.text)
+        queue_id, request_id = extract_gateway_ids(resp.text)
 
         # The caller asked for an approved template and this gateway sent
         # plain text instead. The gateway will still answer 200/QUEUED, so
@@ -608,7 +618,8 @@ def send_whatsapp(phone, message, customer_id=None, template_type=None,
         if meta_template and not provider_sends_templates():
             detail = f'{detail}\n\n{NO_TEMPLATE_SUPPORT}'
 
-        res = SendResult(ok, status, detail, msisdn, message)
+        res = SendResult(ok, status, detail, msisdn, message,
+                         queue_id=queue_id, request_id=request_id)
     except Exception as exc:
         res = SendResult(False, 'failed', f"{type(exc).__name__}: {exc}", msisdn, message)
 
@@ -747,6 +758,37 @@ def interpret_response(status_code, text):
             f'message but has not confirmed that WhatsApp delivered it.')
 
     return True, 'sent', f'HTTP {status_code}: {body[:200]}'
+
+
+def extract_gateway_ids(text):
+    """The ids WabAssist returns alongside QUEUED.
+
+    Deliberately separate from ``interpret_response``: that function returns a
+    three-tuple which two call sites unpack, and widening it would break them.
+
+    These ids are the only keys ``GET /api/v1/messages/status`` accepts. The
+    response used to be read for its status word and thrown away, so a row that
+    landed on 'queued' had nothing to look itself up by and stayed there
+    forever - even though the customer had the message. See
+    ``services/wa_reconcile.py``.
+    """
+    body = (text or '')[:2000]
+    if not body.strip().startswith('{'):
+        return None, None
+    try:
+        payload = json.loads(body) or {}
+    except Exception:
+        return None, None
+    inner = payload.get('data') if isinstance(payload.get('data'), dict) else {}
+
+    def pick(*keys):
+        for key in keys:
+            for source in (payload, inner):
+                if isinstance(source, dict) and source.get(key):
+                    return str(source[key])[:64]
+        return None
+
+    return pick('queueId', 'queue_id'), pick('requestId', 'request_id')
 
 
 def _redact(value):
@@ -1582,10 +1624,20 @@ DEFAULT_TEMPLATES = [
     dict(
         name='Summary Bill',
         template_type='summary_bill',
-        description='Same approved template as the bill.',
+        description='Bill notification with summary details.',
         body=(
+            "Dear {{first_name}},\n"
+            "\n"
+            "Your invoice is ready.\n"
+            "\n"
             "Invoice No: {{invoice_no}}\n"
-            "Amount: {{amount}}\n"
+            "Plan: {{plan_name}}\n"
+            "Amount: ₹{{amount}}\n"
+            "Due Date: {{due_date}}\n"
+            "\n"
+            "Please make the payment to avoid service interruption.\n"
+            "\n"
+            "Support: {{company_phone}}\n"
             "{{company_name}}"
         ),
     ),
@@ -1656,42 +1708,6 @@ DEFAULT_TEMPLATES = [
             "{{collection_details}}\n"
             "Total Collected Amount: \u20b9{{total_collected}}\n"
             "Thank You"
-        ),
-    ),
-    dict(
-        name='Internet Down',
-        template_type='internet_down',
-        description='Area outage notification to customer.',
-        body=(
-            "Internet Service Down\n"
-            "\n"
-            "Dear {{first_name}},\n"
-            "\n"
-            "Our internet service is currently down in your area due to a "
-            "technical issue. The service is expected to be restored within "
-            "{{hours}} hours.\n"
-            "\n"
-            "Support No: {{company_phone}}\n"
-            "\n"
-            "{{company_name}}\n"
-            "Thank you for your patience and cooperation."
-        ),
-    ),
-    dict(
-        name='Internet Restored',
-        template_type='internet_restored',
-        description='Area restored notification to customer.',
-        body=(
-            "Internet Service Restored\n"
-            "\n"
-            "Dear {{first_name}},\n"
-            "\n"
-            "The internet service in your area has now been restored.\n"
-            "\n"
-            "Support No: {{company_phone}}\n"
-            "\n"
-            "{{company_name}}\n"
-            "Thank you for your patience and continued support."
         ),
     ),
     dict(
@@ -1814,11 +1830,13 @@ def seed_default_templates():
     """Insert the standard message templates once, on first boot.
 
     Also re-activates templates that were deactivated.
+    Deactivates templates that are no longer in the default list.
     Does NOT overwrite existing template bodies — use restore_default_templates()
     to reset to defaults.
     """
     from models import db, MessageTemplate
-    created, reactivated = 0, 0
+    created, reactivated, deactivated = 0, 0, 0
+    active_types = {spec['template_type'] for spec in DEFAULT_TEMPLATES}
     for spec in DEFAULT_TEMPLATES:
         exists = MessageTemplate.query.filter_by(
             template_type=spec['template_type']).first()
@@ -1829,7 +1847,13 @@ def seed_default_templates():
         if not exists.is_active:
             exists.is_active = True
             reactivated += 1
-    if created or reactivated:
+    # Deactivate templates whose type is no longer in the default list.
+    for row in MessageTemplate.query.filter(
+            MessageTemplate.is_active == True).all():
+        if row.template_type not in active_types:
+            row.is_active = False
+            deactivated += 1
+    if created or reactivated or deactivated:
         db.session.commit()
     return created
 
