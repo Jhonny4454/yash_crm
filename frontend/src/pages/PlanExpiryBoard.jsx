@@ -193,7 +193,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
 
     get("/reports/plan-expiry", {
       days, mode, zone: zone || undefined, on: on || undefined, page, per_page: PER_PAGE,
-      ...((view === "expired" || view === "renewed") ? { from_date: fromDate, to_date: toDate } : {}),
+      ...((view === "expired" || view === "renewed" || view === "expiring") ? { from_date: fromDate, to_date: toDate } : {}),
     })
       .then((payload) => {
         if (cancelled) return;
@@ -492,6 +492,19 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
 
       {job && <JobProgress job={job} />}
 
+      {(view === "expired" || view === "renewed" || view === "expiring") && (
+        <div className="bulk-bar" style={{ marginBottom: 0 }}>
+          <div className="quick-renew">
+            <label htmlFor="from-date">From</label>
+            <input id="from-date" type="date" className="input" value={fromDate}
+                   max={today()} onChange={(e) => setFromDate(e.target.value)} />
+            <label htmlFor="to-date">To</label>
+            <input id="to-date" type="date" className="input" value={toDate}
+                   max={today()} onChange={(e) => setToDate(e.target.value)} />
+          </div>
+        </div>
+      )}
+
       {canSelect && selectedCount > 0 && (
         <div className="bulk-bar" role="status">
           <span>
@@ -507,17 +520,6 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
           </span>
           <div className="bulk-actions">
             <button type="button" className="btn sm" onClick={clearSelection}>Clear</button>
-
-            {(view === "expired" || view === "renewed") && (
-              <div className="quick-renew">
-                <label htmlFor="from-date">From</label>
-                <input id="from-date" type="date" className="input" value={fromDate}
-                       max={today()} onChange={(e) => setFromDate(e.target.value)} />
-                <label htmlFor="to-date">To</label>
-                <input id="to-date" type="date" className="input" value={toDate}
-                       max={today()} onChange={(e) => setToDate(e.target.value)} />
-              </div>
-            )}
 
             {/* Hidden, not disabled, for a user whose permissions do not cover
                 them. A greyed-out button that never becomes usable is an

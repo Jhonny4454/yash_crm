@@ -248,17 +248,16 @@ def _expiry_query(mode, days, unbounded, zone, today, on=None, from_date=None, t
     query = query.filter(CustomerPlan.status == 'active')
     if on:
         query = query.filter(CustomerPlan.end_date == on)
+    elif from_date or to_date:
+        if from_date:
+            query = query.filter(CustomerPlan.end_date >= from_date)
+        if to_date:
+            query = query.filter(CustomerPlan.end_date <= to_date)
     elif unbounded:
         query = query.filter(CustomerPlan.end_date >= today)
     elif days >= 0:
         query = query.filter(CustomerPlan.end_date >= today,
                              CustomerPlan.end_date <= today + timedelta(days=days))
-    elif from_date or to_date:
-        query = query.filter(CustomerPlan.end_date < today)
-        if from_date:
-            query = query.filter(CustomerPlan.end_date >= from_date)
-        if to_date:
-            query = query.filter(CustomerPlan.end_date <= to_date)
     else:
         query = query.filter(CustomerPlan.end_date < today)
     # Oldest lapse first on the expired view - the connection that has been
