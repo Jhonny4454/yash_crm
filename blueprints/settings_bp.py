@@ -248,17 +248,25 @@ def _save_banner(fs):
     if size > 2 * 1024 * 1024:
         return False, "Banner image must be under 2 MB."
 
-    from services.cloudinary import is_enabled, upload
-    if is_enabled():
-        url = upload(fs, public_id='portal-banner')
-        if url:
-            return True, url
-        return False, 'Cloudinary upload failed. Check Settings > Cloudinary.'
+    # This imported `services.cloudinary`, a module that is not in this
+    # project - so uploading a banner raised ModuleNotFoundError and the page
+    # returned a 500 rather than an error anybody could act on. The import is
+    # inside the function, so nothing failed until somebody actually chose a
+    # file, which is why it survived.
+    #
+    # services/cloud_storage.py does the same job (any S3-compatible bucket)
+    # and is configured from Settings > File storage & backups.
+    from services import cloud_storage
 
-    name = f"banner_{datetime.utcnow():%Y%m%d%H%M%S}{ext}"
-    folder = os.path.join(current_app.root_path, 'static', 'uploads')
-    os.makedirs(folder, exist_ok=True)
-    fs.save(os.path.join(folder, secure_filename(name)))
+    name = secure_filename(f"banner_{datetime.utcnow():%Y%m%d%H%M%S}{ext}")
+    where, error = cloud_storage.save_upload('banners', name, fs.stream,
+                                             getattr(fs, 'mimetype', None))
+    if error:
+        return False, f'The banner could not be saved: {error}'
+
+    # The bare filename is stored either way, exactly as before, so whatever
+    # reads this setting does not have to know where the file ended up.
+    current_app.logger.info('Portal banner saved to %s storage', where)
     return True, name
 
 

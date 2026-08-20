@@ -365,14 +365,36 @@ def _encrypt_plaintext_secrets(app):
     with app.app_context():
         from models_ext import ENCRYPTED_SETTINGS, FERNET_PREFIX, encrypt_setting_value
         from models_ext import Setting
+        from models import db
+
         updated = []
-        for key in ENCRYPTED_SETTINGS:
-            row = Setting.query.filter_by(key=key).first()
-            if row and row.value and not row.value.startswith(FERNET_PREFIX):
-                row.value = encrypt_setting_value(row.value)
-                updated.append(key)
+        try:
+            for key in ENCRYPTED_SETTINGS:
+                row = Setting.query.filter_by(key=key).first()
+                if row and row.value and not row.value.startswith(FERNET_PREFIX):
+                    encrypted = encrypt_setting_value(row.value)
+                    # Unchanged means there is no CREDENTIAL_KEY to encrypt
+                    # with. Counting it as "updated" would commit nothing and
+                    # log an encryption that did not happen, on every boot.
+                    if encrypted != row.value:
+                        row.value = encrypted
+                        updated.append(key)
+        except Exception as exc:                            # noqa: BLE001
+            # On a brand new deployment this runs before init_database() has
+            # created the tables, so the query fails with "no such table:
+            # settings". That is the normal first boot, not a fault - but it
+            # was propagating out of harden() and printing "Security hardening
+            # could not be applied", which reads as though cookies, CORS,
+            # headers and rate limiting had all been skipped. They had not:
+            # they are installed above this. Only the migration is deferred,
+            # and it runs on the next boot once the table exists.
+            db.session.rollback()
+            app.logger.info(
+                'Deferring secret encryption to the next boot (%s)',
+                str(exc).splitlines()[0][:120])
+            return
+
         if updated:
-            from models import db
             db.session.commit()
             app.logger.info('Encrypted %d settings that were still plaintext: %s',
                             len(updated), ', '.join(updated))

@@ -38,6 +38,82 @@ def _fernet():
     return Fernet(key.encode() if isinstance(key, str) else key)
 
 
+#: What a Fernet token starts with. Used to tell an already-encrypted value
+#: from one still stored as plaintext, so the boot-time migration is a no-op
+#: on the second run.
+FERNET_PREFIX = 'gAAAAA'
+
+
+def encrypt_setting_value(plaintext):
+    """Encrypt one settings-table value. Returns it unchanged if it cannot.
+
+    Deliberately does NOT raise when CREDENTIAL_KEY is unset, unlike
+    ``EncryptedSecretMixin.set_secret``. The difference is what the caller can
+    do about it: an ISP credential is being saved by a person who can be shown
+    an error, while this runs during boot over rows that already exist. Raising
+    here would mean an application that refuses to start because of a key it
+    never had - so it degrades to the behaviour of every previous version
+    (plaintext) and says so in the log, once.
+    """
+    if plaintext is None or plaintext == '':
+        return plaintext
+    text = str(plaintext)
+    if text.startswith(FERNET_PREFIX):
+        return text                                  # already encrypted
+    f = _fernet()
+    if f is None:
+        _warn_no_credential_key()
+        return text
+    return f.encrypt(text.encode()).decode()
+
+
+def decrypt_setting_value(value):
+    """Decrypt a settings-table value; pass anything unencrypted straight through.
+
+    A value that is not a Fernet token is returned as-is rather than treated
+    as an error, because both states are legitimate: rows written before this
+    existed, and rows on a deployment with no CREDENTIAL_KEY, are plaintext.
+    """
+    if value is None or value == '':
+        return value
+    text = str(value)
+    if not text.startswith(FERNET_PREFIX):
+        return text
+    f = _fernet()
+    if f is None:
+        _warn_no_credential_key()
+        return text
+    try:
+        return f.decrypt(text.encode()).decode()
+    except InvalidToken:
+        # Encrypted under a different CREDENTIAL_KEY. Returning the ciphertext
+        # would send it to a payment gateway as if it were a key; returning
+        # empty makes the integration report "not configured", which is the
+        # true situation and the one an operator can act on.
+        return ''
+
+
+_warned_no_key = False
+
+
+def _warn_no_credential_key():
+    """Say it once. This is called per setting, per request."""
+    global _warned_no_key
+    if _warned_no_key:
+        return
+    _warned_no_key = True
+    try:
+        from flask import current_app
+        current_app.logger.warning(
+            'CREDENTIAL_KEY is not set, so stored secrets (WhatsApp token, '
+            'payment keys, SMTP and storage passwords) are held in the '
+            'database as plaintext. Generate one with: python -c '
+            '"from cryptography.fernet import Fernet; '
+            'print(Fernet.generate_key().decode())"')
+    except Exception:                                       # noqa: BLE001
+        pass
+
+
 class EncryptedSecretMixin:
     """Adds transparent encrypt/decrypt on a `_secret` column."""
 
@@ -194,6 +270,26 @@ SETTING_DEFAULTS = [
     ('backup_hour',             '3',      'int'),
     ('backup_retention_days',   '30',     'int'),
 ]
+
+
+#: Setting keys whose value is encrypted at rest.
+#:
+#: security.py encrypts these on boot and services/messaging, services/cashfree
+#: and services/mailer decrypt them on read - all four of those modules already
+#: imported this name, and it did not exist, so the import raised and the whole
+#: feature silently did nothing: `harden()` logged "Security hardening could
+#: not be applied" and every consumer fell back to reading the raw column.
+#:
+#: Keep in step with `is_secret()` in blueprints/api/settings_schema.py, which
+#: decides which of these the Settings screen masks. A key that is masked on
+#: screen but missing here is one that looks protected and is not.
+ENCRYPTED_SETTINGS = frozenset({
+    'wa_api_token',
+    'cashfree_secret_key',
+    'razorpay_key_secret',
+    'mail_password',
+    's3_secret_access_key',
+})
 
 
 # --------------------------------------------------------------------------- #

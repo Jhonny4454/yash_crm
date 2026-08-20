@@ -409,7 +409,10 @@ def generate_auto_invoices():
                         inv.status = 'overdue'
             except Exception as exc:
                 app.logger.warning('Overdue notification failed for invoice %s: %s', inv.id, exc)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
 def send_grace_period_reminders():
     with app.app_context():
@@ -458,9 +461,14 @@ def send_expiry_reminders():
     """Send templates for plans expiring in 3 days, 2 days, and expired today."""
     with app.app_context():
         today = date.today()
+        # Skip auto-suspended customers — they already got a suspension notice.
+        _active_plan = (
+            CustomerPlan.query
+            .join(Customer, CustomerPlan.customer_id == Customer.id)
+            .filter(CustomerPlan.status == 'active', Customer.is_active == True)
+        )
         # 3 days before expiry
-        expiring_3d = CustomerPlan.query.filter(
-            CustomerPlan.status == 'active',
+        expiring_3d = _active_plan.filter(
             CustomerPlan.end_date == today + timedelta(days=3)
         ).all()
         for cp in expiring_3d:
@@ -468,8 +476,7 @@ def send_expiry_reminders():
                                   customer_plan=cp)
 
         # 2 days before expiry
-        expiring_2d = CustomerPlan.query.filter(
-            CustomerPlan.status == 'active',
+        expiring_2d = _active_plan.filter(
             CustomerPlan.end_date == today + timedelta(days=2)
         ).all()
         for cp in expiring_2d:
@@ -477,8 +484,7 @@ def send_expiry_reminders():
                                   customer_plan=cp)
 
         # Expired today
-        expired_today = CustomerPlan.query.filter(
-            CustomerPlan.status == 'active',
+        expired_today = _active_plan.filter(
             CustomerPlan.end_date == today
         ).all()
         for cp in expired_today:
