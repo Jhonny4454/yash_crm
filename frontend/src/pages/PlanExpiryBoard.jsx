@@ -524,7 +524,7 @@ export default function PlanExpiryBoard({ view = "expiring" }) {
             {/* Hidden, not disabled, for a user whose permissions do not cover
                 them. A greyed-out button that never becomes usable is an
                 invitation to ask why, every day, forever. */}
-            {canRenew && view !== "expired" && (
+            {canRenew && view === "renewed" && (
               <div className="quick-renew">
                 <label htmlFor="renew-to">Renew to</label>
                 <input id="renew-to" type="date" className="input" value={renewTo}
