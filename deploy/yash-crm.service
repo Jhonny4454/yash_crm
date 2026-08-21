@@ -1,0 +1,53 @@
+# /etc/systemd/system/yash-crm.service
+#
+# ONE worker, always. APScheduler runs inside the Flask process, so a second
+# worker is a second scheduler: two auto-invoices per customer, two "your plan
+# expires" WhatsApp messages, two suspension sweeps, two daily reports.
+#
+# This has bitten this app before. On Render a `--workers 2` on the command
+# line silently overrode gunicorn.conf.py, because command-line flags win over
+# the config file. That is why no --workers flag appears below and why
+# WEB_CONCURRENCY is pinned in the environment instead.
+#
+[Unit]
+Description=Yash Internet Services CRM
+After=network-online.target mysql.service
+Wants=network-online.target
+Requires=mysql.service
+
+[Service]
+Type=notify
+User=yashcrm
+Group=yashcrm
+WorkingDirectory=/opt/yash-crm
+EnvironmentFile=/opt/yash-crm/.env
+
+# --bind is safe to pass here: it is not one of the settings the config file
+# guards. Loopback only -- nginx is the only thing that should reach gunicorn.
+ExecStart=/opt/yash-crm/.venv/bin/gunicorn \
+    --config /opt/yash-crm/gunicorn.conf.py \
+    --bind 127.0.0.1:8000 \
+    wsgi:application
+
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=35
+
+# Hardening. The app writes to instance/, backups/ and the log dir; nothing else.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+ReadWritePaths=/opt/yash-crm/instance /opt/yash-crm/backups /var/log/yash-crm
+
+StandardOutput=append:/var/log/yash-crm/app.log
+StandardError=append:/var/log/yash-crm/error.log
+
+[Install]
+WantedBy=multi-user.target

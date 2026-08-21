@@ -1,0 +1,24 @@
+# /etc/cloudflared/config.yml
+#
+# The tunnel dials OUT to Cloudflare, so the server needs no inbound ports,
+# no port forwarding and no public IP exposure. Nothing to scan.
+#
+tunnel: REPLACE_WITH_TUNNEL_ID
+credentials-file: /etc/cloudflared/REPLACE_WITH_TUNNEL_ID.json
+
+# Keep the connection healthy through NAT and idle periods.
+protocol: quic
+no-autoupdate: false
+
+ingress:
+  # Your CRM. Replace with the hostname you route in the Cloudflare dashboard.
+  - hostname: crm.yashinternetservices.com
+    service: http://127.0.0.1:80
+    originRequest:
+      connectTimeout: 10s
+      # Matches gunicorn's 120s timeout so a slow report does not 502.
+      noTLSVerify: false
+      httpHostHeader: crm.yashinternetservices.com
+
+  # Everything else gets refused rather than silently routed somewhere.
+  - service: http_status:404
