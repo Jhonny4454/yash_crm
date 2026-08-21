@@ -3,6 +3,17 @@
 Moves the app off Render and the database off Railway, onto one server in
 Mumbai, reached through a Cloudflare Tunnel.
 
+**No nginx.** `blueprints/spa_bp.py` already serves the Vite SPA at `/app` with
+its own gzip cache and immutable asset headers, Flask serves `/static`, and
+Cloudflare does TLS, compression and edge caching. A reverse proxy in between
+would have nothing to do except maintain a second routing table that can
+disagree with Flask's — which is exactly the bug an earlier draft of this had:
+it listed Flask's prefixes explicitly and missed 14 of the 21 in `app.py`, so
+`/masters`, `/inventory`, `/hr`, `/dashboard` and `/login` would have returned
+a blank SPA page instead of the real screen. cloudflared points straight at
+gunicorn. `deploy/nginx-yash-crm.conf` is kept, corrected, for the case where
+you want nginx for some other reason.
+
 **One correction to something I said earlier.** I estimated ₹500–900/month for
 the VPS. That was low. Realistic pricing for a box that comfortably runs Flask
 *and* MySQL together:
@@ -101,8 +112,8 @@ sudo bash deploy/deploy.sh
 ```
 
 Installs dependencies, builds the Vite frontend, runs `upgrade_schema.py` and
-`migrate_message_status.py`, installs the systemd unit and nginx site, starts
-everything, and health-checks `/api/v1/health`.
+`migrate_message_status.py`, installs the systemd unit, starts the service and
+health-checks `/api/v1/health`.
 
 ## 7. Cloudflare Tunnel
 
@@ -139,6 +150,8 @@ Then check, in order:
 
 1. **Log in.** Admin account, then a staff account.
 2. **One customer page** loads with correct plan and balance.
+2b. **The SPA at `/app`** loads — that path is served by Flask, not a web
+   server, so it is worth checking separately from the Jinja screens.
 3. **Send a WhatsApp test** from Settings to your own phone.
 4. **Watch the message log.** Within ~3 minutes the row should leave `queued` —
    that is the new reconcile job proving itself.

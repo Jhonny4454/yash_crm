@@ -6,7 +6,7 @@
 #   sudo bash setup.sh
 #
 # Installs system packages, MySQL, an unprivileged service account, the Python
-# virtualenv, nginx and cloudflared. It does NOT start the app -- run deploy.sh
+# virtualenv and cloudflared. It does NOT start the app -- run deploy.sh
 # for that, once .env is filled in.
 #
 set -euo pipefail
@@ -26,7 +26,6 @@ apt-get update -qq
 apt-get install -y -qq \
     python3.12 python3.12-venv python3-pip \
     mysql-server \
-    nginx \
     git curl ca-certificates \
     build-essential pkg-config default-libmysqlclient-dev \
     ufw fail2ban

@@ -43,15 +43,14 @@ done
 
 log "Services"
 install -m 644 "$APP_DIR/deploy/yash-crm.service" /etc/systemd/system/yash-crm.service
-install -m 644 "$APP_DIR/deploy/nginx-yash-crm.conf" /etc/nginx/sites-available/yash-crm
-ln -sf /etc/nginx/sites-available/yash-crm /etc/nginx/sites-enabled/yash-crm
-rm -f /etc/nginx/sites-enabled/default
 
-nginx -t
 systemctl daemon-reload
 systemctl enable --now yash-crm
 systemctl restart yash-crm
-systemctl reload nginx
+
+# No nginx: cloudflared points straight at gunicorn, and Flask serves its own
+# static files and SPA. Reload it too if it is running.
+systemctl is-active --quiet cloudflared && systemctl restart cloudflared || true
 
 log "Health check"
 sleep 4

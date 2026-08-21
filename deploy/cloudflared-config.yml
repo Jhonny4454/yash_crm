@@ -1,24 +1,30 @@
 # /etc/cloudflared/config.yml
 #
-# The tunnel dials OUT to Cloudflare, so the server needs no inbound ports,
-# no port forwarding and no public IP exposure. Nothing to scan.
+# The tunnel dials OUT to Cloudflare, so the server needs no inbound ports, no
+# port forwarding and no public IP exposure. Nothing to scan.
+#
+# It points straight at gunicorn. There is no nginx in this stack, and that is
+# deliberate: Flask already serves its own static files and the Vite SPA (see
+# blueprints/spa_bp.py, which gzips and sets immutable cache headers itself),
+# while Cloudflare handles TLS, compression and edge caching. A reverse proxy
+# in between would add a second, redundant routing table whose only real job
+# would be to occasionally disagree with Flask's.
 #
 tunnel: REPLACE_WITH_TUNNEL_ID
 credentials-file: /etc/cloudflared/REPLACE_WITH_TUNNEL_ID.json
 
-# Keep the connection healthy through NAT and idle periods.
 protocol: quic
 no-autoupdate: false
 
 ingress:
-  # Your CRM. Replace with the hostname you route in the Cloudflare dashboard.
   - hostname: crm.yashinternetservices.com
-    service: http://127.0.0.1:80
+    service: http://127.0.0.1:8000
     originRequest:
       connectTimeout: 10s
-      # Matches gunicorn's 120s timeout so a slow report does not 502.
-      noTLSVerify: false
+      # Matches gunicorn's timeout=120 so a slow report does not 502.
       httpHostHeader: crm.yashinternetservices.com
+      # Meta fetches invoice and receipt PDFs from a public URL at send time.
+      disableChunkedEncoding: false
 
-  # Everything else gets refused rather than silently routed somewhere.
+  # Anything else is refused rather than silently routed somewhere.
   - service: http_status:404
